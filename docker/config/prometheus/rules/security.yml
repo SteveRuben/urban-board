@@ -1,0 +1,20 @@
+groups:
+- name: security_alerts
+  rules:
+  - alert: HighErrorRate
+    expr: sum(rate(nginx_http_requests_total{status=~"4.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High HTTP error rate detected"
+      description: "More than 5% of requests are returning 4xx errors"
+
+  - alert: PossibleBruteForceAttack
+    expr: sum(rate(nginx_http_requests_total{status="401"}[5m])) > 10
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Possible brute force attack detected"
+      description: "High rate of 401 errors detected in the last 5 minutes"

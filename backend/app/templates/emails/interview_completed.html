@@ -1,0 +1,134 @@
+<!-- backend/app/templates/emails/interview_completed.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .header img {
+            max-width: 150px;
+            height: auto;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        h1 {
+            color: #0284c7;
+            font-size: 24px;
+            margin-top: 0;
+        }
+        .score-container {
+            background-color: #f0f9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #0284c7;
+        }
+        .details {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8fafc;
+            border-radius: 8px;
+        }
+        .details p {
+            margin: 5px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #0284c7;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .cta-button:hover {
+            background-color: #0369a1;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eeeeee;
+            color: #666666;
+            font-size: 14px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #555555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RecruteIA</h1>
+        </div>
+        
+        <div class="content">
+            <h1>{{ title }}</h1>
+            
+            <p>Bonjour,</p>
+            
+            <p>L'entretien avec <strong>{{ candidate_name }}</strong> pour le poste de <strong>{{ job_role }}</strong> est maintenant terminé.</p>
+            
+            <div class="score-container">
+                <p>Score global du candidat</p>
+                <div class="score">{{ score }}/10</div>
+            </div>
+            
+            <div class="details">
+                <p><span class="info-label">Candidat:</span> {{ candidate_name }}</p>
+                <p><span class="info-label">Poste:</span> {{ job_role }}</p>
+                <p><span class="info-label">Date de l'entretien:</span> 
+                    {% if interview_date %}
+                        {{ interview_date }}
+                    {% else %}
+                        Aujourd'hui
+                    {% endif %}
+                </p>
+            </div>
+            
+            <p>Pour consulter les détails complets de l'entretien, y compris les réponses aux questions et les évaluations détaillées, cliquez sur le bouton ci-dessous:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ cta_link }}" class="cta-button">Voir les résultats détaillés</a>
+            </div>
+            
+            <p>Vous recevez cet email car vous êtes le recruteur assigné à cet entretien. Si vous n'êtes pas à l'origine de cette action, veuillez contacter l'administrateur.</p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ current_year }} RecruteIA. Tous droits réservés.</p>
+            <p>Cet email a été généré automatiquement, merci de ne pas y répondre.</p>
+        </div>
+    </div>
+</body>
+</html>

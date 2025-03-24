@@ -1,0 +1,16 @@
+**/Lib/**
+**/logs/**
+**/node_modules/**
+**/venv/**
+**/migrations/**
+**/instance/**
+**/**/node_modules/**
+**/**/.next/**
+**/.env.local
+**/.env.development.local
+**/.env.production.local
+**/.env.test.local
+**/.env
+**/.env.development
+**/.env.production
+**/.env.test

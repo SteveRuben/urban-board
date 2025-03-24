@@ -1,0 +1,133 @@
+// frontend/pages/_app.js
+import React, { useEffect } from 'react';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
+import PublicLayout from '../components/layout/PublicLayout';
+import DashboardLayout from '../components/layout/DashboardLayout';
+import AuthLayout from '../components/layout/AuthLayout';
+import ToastContainer from '../components/notifications/ToastContainer';
+import LoadingScreen from '../components/ui/LoadingScreen';
+import '../styles/globals.css';
+
+// Configuration des routes par type de layout
+const layoutConfig = {
+  // Routes toujours avec layout public, même pour les utilisateurs connectés
+  alwaysPublic: ['/', '/about', '/pricing', '/contact', '/legal', '/terms', '/privacy'],
+  
+  // Routes d'authentification avec layout minimal
+  auth: ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'],
+  
+  // Routes nécessitant une authentification (redirection vers login si non connecté)
+  protected: [
+    '/dashboard',
+    '/interviews',
+    '/resumes',
+    '/settings',
+    '/notifications',
+    '/profile'
+  ]
+};
+
+// Fonction pour déterminer le type de layout à utiliser
+const getLayoutType = (pathname, isAuthenticated) => {
+  // Gestion des cas spéciaux avec layout personnalisé (page.getLayout)
+  if (pathname === '/custom-layout') {
+    return 'custom';
+  }
+  
+  // Routes d'authentification
+  if (layoutConfig.auth.some(route => pathname.startsWith(route))) {
+    return 'auth';
+  }
+  
+  // Routes publiques toujours avec layout public
+  if (layoutConfig.alwaysPublic.some(route => pathname === route)) {
+    return 'public';
+  }
+  
+  // Routes protégées ou toute autre route quand l'utilisateur est connecté
+  if (isAuthenticated) {
+    return 'dashboard';
+  }
+  
+  // Par défaut, layout public pour les visiteurs
+  return 'public';
+};
+
+// Wrapper pour gérer les layouts et la redirection
+function AppWithLayout({ Component, pageProps }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  
+  // Gérer la redirection pour les routes protégées
+  useEffect(() => {
+    if (!loading && !user) {
+      const isProtectedRoute = layoutConfig.protected.some(route => 
+        router.pathname === route || router.pathname.startsWith(`${route}/`)
+      );
+      
+      if (isProtectedRoute) {
+        router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath)}`);
+      }
+    }
+  }, [user, loading, router.pathname]);
+  
+  // Afficher un écran de chargement pendant la vérification de l'authentification
+  if (loading) {
+    return <LoadingScreen />;
+  }
+  
+  // Cas spécial: la page fournit son propre layout
+  if (Component.getLayout) {
+    return Component.getLayout(<Component {...pageProps} />);
+  }
+  
+  // Déterminer le layout à utiliser
+  const layoutType = getLayoutType(router.pathname, !!user);
+  
+  // Appliquer le layout approprié
+  switch (layoutType) {
+    case 'auth':
+      return (
+        <AuthLayout>
+          <Component {...pageProps} />
+        </AuthLayout>
+      );
+    case 'dashboard':
+      return (
+        <DashboardLayout>
+          <Component {...pageProps} />
+        </DashboardLayout>
+      );
+    case 'public':
+    default:
+      return (
+        <PublicLayout>
+          <Component {...pageProps} />
+        </PublicLayout>
+      );
+  }
+}
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+        <title>RecruteIA - Entretiens d'embauche propulsés par l'IA</title>
+      </Head>
+      
+      <AuthProvider>
+        <NotificationProvider>
+          <AppWithLayout Component={Component} pageProps={pageProps} />
+          <ToastContainer />
+        </NotificationProvider>
+      </AuthProvider>
+    </>
+  );
+}
+
+export default MyApp;

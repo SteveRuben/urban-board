@@ -1,0 +1,87 @@
+// frontend/tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
+        },
+        secondary: {
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          300: '#c4b5fd',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+  safelist: [
+    // Classes pour les couleurs de scores
+    'bg-green-500',
+    'bg-blue-500',
+    'bg-yellow-500',
+    'bg-red-500',
+    'text-green-600',
+    'text-blue-600',
+    'text-yellow-600',
+    'text-red-600',
+    'bg-green-100',
+    'bg-blue-100',
+    'bg-yellow-100',
+    'bg-red-100',
+    'text-green-800',
+    'text-blue-800',
+    'text-yellow-800',
+    'text-red-800',
+    
+    // Classes pour les compétences
+    'bg-blue-100',
+    'bg-indigo-100',
+    'bg-purple-100',
+    'bg-green-100',
+    'bg-teal-100',
+    'bg-cyan-100',
+    'bg-orange-100',
+    'bg-amber-100',
+    'bg-yellow-100',
+    'bg-lime-100',
+    'bg-emerald-100',
+    'bg-pink-100',
+    'text-blue-800',
+    'text-indigo-800',
+    'text-purple-800',
+    'text-green-800',
+    'text-teal-800',
+    'text-cyan-800',
+    'text-orange-800',
+    'text-amber-800',
+    'text-yellow-800',
+    'text-lime-800',
+    'text-emerald-800',
+    'text-pink-800',
+  ]
+};

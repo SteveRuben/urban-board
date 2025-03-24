@@ -1,0 +1,36 @@
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copie des fichiers de dépendances
+COPY package.json package-lock.json ./
+
+# Installation des dépendances
+RUN npm ci
+
+# Copie des fichiers de l'application
+COPY . .
+
+# Construction de l'application
+RUN npm run build
+
+# Étape de production
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+# Définition des variables d'environnement
+ENV NODE_ENV=production
+
+# Copie des fichiers nécessaires depuis l'étape de build
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.js ./next.config.js
+
+# Exposition du port
+EXPOSE 3000
+
+# Commande de démarrage
+CMD ["npm", "start"]
