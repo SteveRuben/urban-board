@@ -1,400 +1,369 @@
 // frontend/components/interview/RequestAIAnalysis.jsx
 import React, { useState, useEffect } from 'react';
+import { Brain, AlertCircle, RefreshCw, Search, Filter, ChevronDown } from 'lucide-react';
 import AIAssistantService from '../../services/aiAssistantService';
-import { Brain, Zap, AlertCircle, Check, X } from 'lucide-react';
 
-const RequestAIAnalysis = ({ interviewId, teamId }) => {
-  const [teamAssistants, setTeamAssistants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+/**
+ * Composant permettant de demander une analyse IA spécifique
+ */
+const RequestAIAnalysis = ({ interviewId, teamId, onRequestAnalysis }) => {
+  const [assistants, setAssistants] = useState([]);
   const [selectedAssistant, setSelectedAssistant] = useState(null);
-  const [selectedAnalysisType, setSelectedAnalysisType] = useState(null);
-  const [availableAnalysisTypes, setAvailableAnalysisTypes] = useState([]);
+  const [analysisType, setAnalysisType] = useState('');
   const [parameters, setParameters] = useState({});
-  const [showModal, setShowModal] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState(null);
-
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [loadingAssistants, setLoadingAssistants] = useState(true);
+  const [showAssistantDropdown, setShowAssistantDropdown] = useState(false);
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  
+  // Charger les assistants IA disponibles
   useEffect(() => {
-    const fetchTeamAssistants = async () => {
+    const fetchAssistants = async () => {
       try {
-        setLoading(true);
-        const assistants = await AIAssistantService.getTeamAssistants(teamId);
-        // Filtrer les assistants qui peuvent faire des analyses
-        const analysisAssistants = assistants.filter(assistant => 
-          assistant.capabilities && 
-          assistant.capabilities.analysis_types && 
-          assistant.capabilities.analysis_types.length > 0
-        );
-        setTeamAssistants(analysisAssistants);
-      } catch (err) {
-        setError('Impossible de charger les assistants IA');
-        console.error(err);
-      } finally {
-        setLoading(false);
+        setLoadingAssistants(true);
+        
+        // En environnement de développement, utiliser des données fictives
+        if (process.env.NODE_ENV === 'development') {
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const mockAssistants = [
+            {
+              id: 'ai-001',
+              name: 'TechEvaluator',
+              assistant_type: 'evaluator',
+              model_version: 'claude-3.7-sonnet',
+              capabilities: {
+                analysis_types: ['technical', 'general', 'bias']
+              }
+            },
+            {
+              id: 'ai-002',
+              name: 'HR Assistant',
+              assistant_type: 'recruiter',
+              model_version: 'gpt-4o',
+              capabilities: {
+                analysis_types: ['behavioral', 'cultural-fit']
+              }
+            },
+            {
+              id: 'ai-003',
+              name: 'Language Analyst',
+              assistant_type: 'analyzer',
+              model_version: 'claude-3-opus',
+              capabilities: {
+                analysis_types: ['language', 'communication']
+              }
+            }
+          ];
+          setAssistants(mockAssistants);
+        } else {
+          const userAssistants = await AIAssistantService.getUserAssistants();
+          setAssistants(userAssistants);
+        }
+        
+        setLoadingAssistants(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des assistants:', error);
+        setError('Impossible de charger les assistants IA. Veuillez réessayer.');
+        setLoadingAssistants(false);
       }
     };
-
-    fetchTeamAssistants();
-  }, [teamId]);
-
+    
+    fetchAssistants();
+  }, [interviewId]);
+  
+  // Mettre à jour les options d'analyse lors du changement d'assistant
   useEffect(() => {
     if (selectedAssistant) {
-      const assistant = teamAssistants.find(a => a.id === selectedAssistant);
-      if (assistant && assistant.capabilities && assistant.capabilities.analysis_types) {
-        setAvailableAnalysisTypes(assistant.capabilities.analysis_types);
-        setSelectedAnalysisType(assistant.capabilities.analysis_types[0] || null);
-      } else {
-        setAvailableAnalysisTypes([]);
-        setSelectedAnalysisType(null);
-      }
+      // Réinitialiser le type d'analyse
+      setAnalysisType('');
+      setParameters({});
     }
-  }, [selectedAssistant, teamAssistants]);
-
-  const handleRequestAnalysis = async () => {
-    if (!selectedAssistant || !selectedAnalysisType) return;
+  }, [selectedAssistant]);
+  
+  // Gérer le changement de paramètre
+  const handleParameterChange = (key, value) => {
+    setParameters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  
+  // Gérer la soumission de la demande d'analyse
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedAssistant || !analysisType) {
+      setError('Veuillez sélectionner un assistant et un type d\'analyse.');
+      return;
+    }
     
     try {
-      setProcessing(true);
-      const response = await AIAssistantService.requestAnalysis(
-        teamId,
-        interviewId,
-        selectedAssistant,
-        selectedAnalysisType,
-        parameters
-      );
+      setIsLoading(true);
+      setError(null);
       
-      setResult({
-        success: true,
-        data: response
-      });
+      // Appeler la fonction de demande d'analyse
+      await onRequestAnalysis(selectedAssistant.id, analysisType, parameters);
+      
+      // Réinitialiser après succès
+      setIsLoading(false);
+      setParameters({});
+      
     } catch (err) {
-      setResult({
-        success: false,
-        error: err.response?.data?.message || 'Erreur lors de la demande d\'analyse'
-      });
-    } finally {
-      setProcessing(false);
+      console.error('Erreur lors de la demande d\'analyse:', err);
+      setError('La demande d\'analyse a échoué. Veuillez réessayer.');
+      setIsLoading(false);
     }
   };
-
-  const resetForm = () => {
-    setSelectedAssistant(null);
-    setSelectedAnalysisType(null);
-    setParameters({});
-    setResult(null);
+  
+  // Obtenir les types d'analyse disponibles pour l'assistant sélectionné
+  const getAvailableAnalysisTypes = () => {
+    if (!selectedAssistant || !selectedAssistant.capabilities || !selectedAssistant.capabilities.analysis_types) {
+      return [];
+    }
+    
+    return selectedAssistant.capabilities.analysis_types;
   };
-
+  
+  // Obtenir le libellé d'un type d'analyse
   const getAnalysisTypeLabel = (type) => {
     switch (type) {
-      case 'general': return 'Analyse générale';
-      case 'technical': return 'Évaluation technique';
-      case 'behavioral': return 'Analyse comportementale';
-      case 'bias': return 'Détection de biais';
-      case 'language': return 'Analyse linguistique';
-      default: return type;
-    }
-  };
-
-  const getAnalysisTypeDescription = (type) => {
-    switch (type) {
-      case 'general':
-        return 'Une analyse générale de l\'entretien couvrant les points clés et impressions globales.';
       case 'technical':
-        return 'Évaluation des compétences techniques du candidat, de sa maîtrise des technologies et de sa résolution de problèmes.';
+        return 'Technique';
       case 'behavioral':
-        return 'Analyse du comportement, des soft skills et de la compatibilité culturelle du candidat.';
+        return 'Comportemental';
+      case 'general':
+        return 'Général';
       case 'bias':
-        return 'Détection des biais potentiels dans l\'entretien pour assurer un processus équitable.';
+        return 'Biais';
+      case 'cultural-fit':
+        return 'Compatibilité culturelle';
       case 'language':
-        return 'Analyse de la communication, du vocabulaire et des compétences linguistiques.';
+        return 'Langage';
+      case 'communication':
+        return 'Communication';
       default:
-        return 'Analyse spécialisée pour ce type d\'entretien.';
+        return type;
     }
   };
-
-  if (loading) {
-    return (
-      <div className="animate-pulse bg-white rounded-lg shadow p-6">
-        <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-        <div className="h-4 bg-gray-200 rounded w-2/3 mb-6"></div>
-        <div className="h-10 bg-gray-200 rounded mb-4"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-red-500 mb-4">{error}</div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Réessayer
-        </button>
-      </div>
-    );
-  }
-
-  if (teamAssistants.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-center">
-          <Brain className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun assistant IA capable d'analyse</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Cette équipe n'a pas d'assistants IA pouvant réaliser des analyses.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-6">
-          <div className="flex items-center mb-2">
-            <Zap className="h-6 w-6 text-indigo-500 mr-2" />
-            <h3 className="text-lg font-bold text-gray-800">
-              Demander une analyse IA
-            </h3>
+  
+  // Obtenir les paramètres pour un type d'analyse
+  const getParametersForAnalysisType = () => {
+    switch (analysisType) {
+      case 'technical':
+        return (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Domaine technique
+            </label>
+            <select
+              value={parameters.domain || ''}
+              onChange={(e) => handleParameterChange('domain', e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            >
+              <option value="">Sélectionner un domaine</option>
+              <option value="frontend">Frontend</option>
+              <option value="backend">Backend</option>
+              <option value="database">Base de données</option>
+              <option value="devops">DevOps</option>
+              <option value="mobile">Mobile</option>
+              <option value="ai">Intelligence artificielle</option>
+            </select>
           </div>
-          <p className="text-gray-600 mb-6">
-            Utilisez l'intelligence artificielle pour analyser cet entretien et obtenir des insights détaillés.
-          </p>
-          
-          <button 
-            onClick={() => setShowModal(true)}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg flex items-center justify-center"
-          >
-            <Brain className="mr-2 h-5 w-5" />
-            Lancer une analyse IA
-          </button>
-        </div>
+        );
+        
+      case 'behavioral':
+        return (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Aspect comportemental
+            </label>
+            <select
+              value={parameters.aspect || ''}
+              onChange={(e) => handleParameterChange('aspect', e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            >
+              <option value="">Sélectionner un aspect</option>
+              <option value="teamwork">Travail d'équipe</option>
+              <option value="leadership">Leadership</option>
+              <option value="communication">Communication</option>
+              <option value="problem_solving">Résolution de problèmes</option>
+              <option value="stress_management">Gestion du stress</option>
+            </select>
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+  
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-lg font-medium text-gray-900">Demander une analyse IA</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Utilisez les assistants IA pour analyser l'entretien
+        </p>
       </div>
-
-      {/* Modal de demande d'analyse */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center">
-                  <Zap className="mr-2 h-5 w-5 text-indigo-500" />
-                  Demander une analyse IA
-                </h3>
-                <button
-                  className="text-gray-500 hover:text-gray-700"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-            
-            {result ? (
-              <div className="p-6">
-                {result.success ? (
-                  <div className="text-center">
-                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                      <Check className="h-6 w-6 text-green-600" />
+      
+      {loadingAssistants ? (
+        <div className="p-6 flex justify-center items-center">
+          <RefreshCw className="h-6 w-6 text-primary-600 animate-spin" />
+          <span className="ml-3 text-gray-600">Chargement des assistants...</span>
+        </div>
+      ) : assistants.length === 0 ? (
+        <div className="p-6 text-center">
+          <Brain className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 mb-3">Aucun assistant IA disponible.</p>
+          <p className="text-sm text-gray-500">
+            Vous devez configurer des assistants IA pour utiliser cette fonctionnalité.
+          </p>
+          <a
+            href="/ai-assistants/create"
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            Créer un assistant IA
+          </a>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="p-4 space-y-5">
+          {/* Sélection de l'assistant */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Assistant IA
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                className="w-full p-2 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                onClick={() => setShowAssistantDropdown(!showAssistantDropdown)}
+              >
+                {selectedAssistant ? (
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-indigo-600 flex items-center justify-center mr-2">
+                      <Brain className="h-4 w-4 text-white" />
                     </div>
-                    <h3 className="mt-2 text-lg font-medium text-gray-900">Analyse demandée avec succès</h3>
-                    <p className="mt-2 text-sm text-gray-500">
-                      L'analyse a été lancée et sera disponible dans quelques instants.
-                    </p>
-                    
-                    <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="text-sm font-medium text-gray-700 mb-1">Type d'analyse :</div>
-                      <div className="text-sm text-gray-900 mb-3">{getAnalysisTypeLabel(result.data.analysis_type)}</div>
-                      
-                      <div className="text-sm font-medium text-gray-700 mb-1">Statut :</div>
-                      <div className="text-sm">
-                        <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                          {result.data.status === 'completed' ? 'Terminée' : 'En cours'}
-                        </span>
-                      </div>
+                    <div>
+                      <span className="block text-sm font-medium">{selectedAssistant.name}</span>
+                      <span className="block text-xs text-gray-500">{selectedAssistant.model_version}</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                      <AlertCircle className="h-6 w-6 text-red-600" />
-                    </div>
-                    <h3 className="mt-2 text-lg font-medium text-gray-900">Erreur</h3>
-                    <p className="mt-2 text-sm text-red-500">
-                      {result.error}
-                    </p>
-                  </div>
+                  <span className="text-gray-500">Sélectionner un assistant</span>
                 )}
-                
-                <div className="mt-6 flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      resetForm();
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Fermer
-                  </button>
-                  {result.success && (
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+              </button>
+              
+              {showAssistantDropdown && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 border border-gray-200 max-h-72 overflow-y-auto">
+                  {assistants.map((assistant) => (
                     <button
+                      key={assistant.id}
                       type="button"
-                      onClick={() => setResult(null)}
-                      className="px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700"
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center"
+                      onClick={() => {
+                        setSelectedAssistant(assistant);
+                        setShowAssistantDropdown(false);
+                      }}
                     >
-                      Nouvelle analyse
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-6">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    1. Choisir un assistant IA
-                  </label>
-                  <div className="space-y-3 max-h-32 overflow-y-auto mb-1">
-                    {teamAssistants.map((assistant) => (
-                      <div 
-                        key={assistant.id} 
-                        className={`border rounded-lg p-3 cursor-pointer ${
-                          selectedAssistant === assistant.id 
-                            ? 'border-indigo-500 bg-indigo-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setSelectedAssistant(assistant.id)}
-                      >
-                        <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white">
-                            <Brain size={14} />
-                          </div>
-                          <div className="ml-3">
-                            <div className="font-medium">{assistant.name}</div>
-                            <div className="text-xs text-gray-500 flex items-center">
-                              {assistant.team_role && (
-                                <span className="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded mr-2">
-                                  {assistant.team_role}
-                                </span>
-                              )}
-                              <span>{assistant.model_version}</span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-indigo-600 flex items-center justify-center mr-2">
+                        <Brain className="h-4 w-4 text-white" />
                       </div>
+                      <div>
+                        <span className="block text-sm font-medium">{assistant.name}</span>
+                        <span className="block text-xs text-gray-500">{assistant.model_version}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Type d'analyse (si un assistant est sélectionné) */}
+          {selectedAssistant && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Type d'analyse
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                  disabled={getAvailableAnalysisTypes().length === 0}
+                >
+                  {analysisType ? (
+                    <span>{getAnalysisTypeLabel(analysisType)}</span>
+                  ) : (
+                    <span className="text-gray-500">Sélectionner un type d'analyse</span>
+                  )}
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                </button>
+                
+                {showTypeDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 border border-gray-200">
+                    {getAvailableAnalysisTypes().map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100"
+                        onClick={() => {
+                          setAnalysisType(type);
+                          setShowTypeDropdown(false);
+                        }}
+                      >
+                        {getAnalysisTypeLabel(type)}
+                      </button>
                     ))}
                   </div>
-                </div>
-                
-                {selectedAssistant && (
-                  <>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        2. Type d'analyse
-                      </label>
-                      {availableAnalysisTypes.length > 0 ? (
-                        <div className="space-y-2">
-                          {availableAnalysisTypes.map((type) => (
-                            <div 
-                              key={type}
-                              className={`border rounded-lg p-3 cursor-pointer ${
-                                selectedAnalysisType === type
-                                  ? 'border-indigo-500 bg-indigo-50'
-                                  : 'border-gray-200 hover:border-gray-300'
-                              }`}
-                              onClick={() => setSelectedAnalysisType(type)}
-                            >
-                              <div className="font-medium text-gray-900">
-                                {getAnalysisTypeLabel(type)}
-                              </div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                {getAnalysisTypeDescription(type)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">
-                          Cet assistant ne peut pas effectuer d'analyses. Veuillez en choisir un autre.
-                        </div>
-                      )}
-                    </div>
-                    
-                    {selectedAnalysisType && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          3. Paramètres optionnels
-                        </label>
-                        <div className="border border-gray-200 rounded-lg p-3">
-                          <div className="mb-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Focus particulier
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="ex: compétences techniques, soft skills..."
-                              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                              value={parameters.focus || ''}
-                              onChange={(e) => setParameters({...parameters, focus: e.target.value})}
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Niveau de détail
-                            </label>
-                            <select
-                              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                              value={parameters.detail_level || 'standard'}
-                              onChange={(e) => setParameters({...parameters, detail_level: e.target.value})}
-                            >
-                              <option value="brief">Bref</option>
-                              <option value="standard">Standard</option>
-                              <option value="detailed">Détaillé</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
                 )}
               </div>
-            )}
-            
-            {!result && (
-              <div className="bg-gray-50 p-4 flex justify-end space-x-3 rounded-b-lg">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRequestAnalysis}
-                  disabled={!selectedAssistant || !selectedAnalysisType || processing}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    !selectedAssistant || !selectedAnalysisType || processing
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  }`}
-                >
-                  {processing ? 'Traitement en cours...' : 'Lancer l\'analyse'}
-                </button>
+            </div>
+          )}
+          
+          {/* Paramètres spécifiques au type d'analyse */}
+          {selectedAssistant && analysisType && getParametersForAnalysisType()}
+          
+          {/* Message d'erreur */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+              <div className="flex">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                <span>{error}</span>
               </div>
-            )}
+            </div>
+          )}
+          
+          {/* Bouton de soumission */}
+          <div>
+            <button
+              type="submit"
+              disabled={!selectedAssistant || !analysisType || isLoading}
+              className={`w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+                !selectedAssistant || !analysisType || isLoading
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
+              }`}
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                  Analyse en cours...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Demander l'analyse
+                </>
+              )}
+            </button>
           </div>
-        </div>
+        </form>
       )}
-    </>
+    </div>
   );
 };
 

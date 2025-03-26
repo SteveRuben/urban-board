@@ -44,22 +44,47 @@ const BiometricDashboard = ({ biometricData, recordingHistory = [] }) => {
   // Préparer les scores d'engagement pour le graphique à barres
   useEffect(() => {
     if (biometricData?.engagement) {
-      const engagementMap = {
-        "Faible": 1,
-        "Moyen": 2,
-        "Bon": 3,
-        "Excellent": 4
-      };
-      
-      const data = Object.entries(biometricData.engagement).map(([key, value]) => ({
-        name: key === 'eyeContact' ? 'Contact visuel' : 
-              key === 'posture' ? 'Posture' :
-              key === 'gestures' ? 'Gestuelle' : 'Attention',
-        score: engagementMap[value] || 0,
-        rawValue: value
-      }));
-      
-      setEngagementScores(data);
+      // Si engagement est un nombre simple (0-1)
+      if (typeof biometricData.engagement === 'number') {
+        const engagementLevel = biometricData.engagement >= 0.8 ? 'Excellent' :
+                               biometricData.engagement >= 0.6 ? 'Bon' :
+                               biometricData.engagement >= 0.4 ? 'Moyen' : 'Faible';
+                               
+        setEngagementScores([
+          {
+            name: 'Engagement général',
+            score: biometricData.engagement * 4, // convertir en échelle 0-4
+            rawValue: engagementLevel
+          },
+          {
+            name: 'Attention',
+            score: biometricData.confidence ? biometricData.confidence * 4 : 2,
+            rawValue: biometricData.confidence ? 
+                      (biometricData.confidence >= 0.75 ? 'Excellent' : 
+                       biometricData.confidence >= 0.5 ? 'Bon' : 
+                       biometricData.confidence >= 0.25 ? 'Moyen' : 'Faible') : 'Moyen'
+          }
+        ]);
+      } 
+      // Si engagement est un objet avec différentes métriques
+      else if (typeof biometricData.engagement === 'object') {
+        const engagementMap = {
+          "Faible": 1,
+          "Moyen": 2,
+          "Bon": 3,
+          "Excellent": 4
+        };
+        
+        const data = Object.entries(biometricData.engagement).map(([key, value]) => ({
+          name: key === 'eyeContact' ? 'Contact visuel' : 
+               key === 'posture' ? 'Posture' :
+               key === 'gestures' ? 'Gestuelle' : 'Attention',
+          score: engagementMap[value] || 0,
+          rawValue: value
+        }));
+        
+        setEngagementScores(data);
+      }
     }
   }, [biometricData]);
   
@@ -96,6 +121,17 @@ const BiometricDashboard = ({ biometricData, recordingHistory = [] }) => {
       </div>
     );
   }
+
+  // Trouver l'émotion dominante (s'il y en a)
+  const dominantEmotion = emotionData.length > 0 ? emotionData[0] : null;
+  
+  // Trouver le point fort d'engagement (s'il y en a)
+  const strongestEngagement = engagementScores.length > 0 ? 
+    [...engagementScores].sort((a, b) => b.score - a.score)[0] : null;
+  
+  // Trouver le point faible d'engagement (s'il y en a)
+  const weakestEngagement = engagementScores.length > 0 ? 
+    [...engagementScores].sort((a, b) => a.score - b.score)[0] : null;
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
@@ -180,18 +216,21 @@ const BiometricDashboard = ({ biometricData, recordingHistory = [] }) => {
         
         <ul className="space-y-2 text-sm">
           {/* Émotion dominante */}
-          {emotionData.length > 0 && (
+          {dominantEmotion && (
             <li className="flex items-start">
-              <div className={`h-4 w-4 mt-0.5 rounded-full bg-${EMOTION_COLORS[emotionData[0].name.toLowerCase()] || 'gray-400'} mr-2`}></div>
+              <div 
+                className="h-4 w-4 mt-0.5 rounded-full mr-2" 
+                style={{backgroundColor: EMOTION_COLORS[dominantEmotion.name.toLowerCase()] || '#9ca3af'}}
+              ></div>
               <span>
-                <strong>Émotion dominante:</strong> {emotionData[0].name} ({emotionData[0].value}%) - 
-                {emotionData[0].name.toLowerCase() === 'neutral' 
+                <strong>Émotion dominante:</strong> {dominantEmotion.name} ({dominantEmotion.value}%) - 
+                {dominantEmotion.name.toLowerCase() === 'neutral' 
                   ? " Le candidat maintient une expression neutre." 
-                  : emotionData[0].name.toLowerCase() === 'happy'
+                  : dominantEmotion.name.toLowerCase() === 'happy'
                     ? " Le candidat montre de l'enthousiasme et de la confiance."
-                    : emotionData[0].name.toLowerCase() === 'surprised'
+                    : dominantEmotion.name.toLowerCase() === 'surprised'
                     ? " Le candidat semble surpris par certaines questions."
-                    : emotionData[0].name.toLowerCase() === 'sad'
+                    : dominantEmotion.name.toLowerCase() === 'sad'
                     ? " Le candidat peut sembler hésitant ou préoccupé."
                     : " Émotion notable à observer."}
               </span>
@@ -199,48 +238,42 @@ const BiometricDashboard = ({ biometricData, recordingHistory = [] }) => {
           )}
           
           {/* Force d'engagement */}
-          {engagementScores.length > 0 && (
+          {strongestEngagement && (
             <li className="flex items-start">
               <div className="h-4 w-4 mt-0.5 rounded-full bg-blue-400 mr-2"></div>
               <span>
-                <strong>Point fort d'engagement:</strong> {
-                  engagementScores.sort((a, b) => b.score - a.score)[0].name
-                } - {
-                  engagementScores.sort((a, b) => b.score - a.score)[0].rawValue
-                }
+                <strong>Point fort d'engagement:</strong> {strongestEngagement.name} - {strongestEngagement.rawValue}
               </span>
             </li>
           )}
           
           {/* Point faible d'engagement */}
-          {engagementScores.length > 0 && (
+          {weakestEngagement && (
             <li className="flex items-start">
               <div className="h-4 w-4 mt-0.5 rounded-full bg-yellow-400 mr-2"></div>
               <span>
-                <strong>Point à améliorer:</strong> {
-                  engagementScores.sort((a, b) => a.score - b.score)[0].name
-                } - {
-                  engagementScores.sort((a, b) => a.score - b.score)[0].rawValue
-                }
+                <strong>Point à améliorer:</strong> {weakestEngagement.name} - {weakestEngagement.rawValue}
               </span>
             </li>
           )}
           
           {/* Conseils */}
-          <li className="flex items-start mt-4">
-            <div className="h-4 w-4 mt-0.5 rounded-full bg-green-400 mr-2"></div>
-            <span>
-              <strong>Conseil:</strong> {
-                engagementScores.sort((a, b) => a.score - b.score)[0].name === 'Contact visuel'
-                  ? "Encouragez le candidat à maintenir davantage de contact visuel."
-                  : engagementScores.sort((a, b) => a.score - b.score)[0].name === 'Posture'
-                  ? "Suggérez au candidat d'adopter une posture plus ouverte et engagée."
-                  : engagementScores.sort((a, b) => a.score - b.score)[0].name === 'Gestuelle'
-                  ? "Invitez le candidat à utiliser plus de gestes pour illustrer ses propos."
-                  : "Posez des questions qui suscitent davantage l'intérêt du candidat."
-              }
-            </span>
-          </li>
+          {weakestEngagement && (
+            <li className="flex items-start mt-4">
+              <div className="h-4 w-4 mt-0.5 rounded-full bg-green-400 mr-2"></div>
+              <span>
+                <strong>Conseil:</strong> {
+                  weakestEngagement.name === 'Contact visuel'
+                    ? "Encouragez le candidat à maintenir davantage de contact visuel."
+                    : weakestEngagement.name === 'Posture'
+                    ? "Suggérez au candidat d'adopter une posture plus ouverte et engagée."
+                    : weakestEngagement.name === 'Gestuelle'
+                    ? "Invitez le candidat à utiliser plus de gestes pour illustrer ses propos."
+                    : "Posez des questions qui suscitent davantage l'intérêt du candidat."
+                }
+              </span>
+            </li>
+          )}
         </ul>
       </div>
     </div>

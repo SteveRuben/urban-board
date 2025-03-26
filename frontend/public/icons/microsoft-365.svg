@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 100">
+  <!-- Fond transparent -->
+  <rect width="240" height="100" fill="none"/>
+  
+  <!-- Logo Microsoft -->
+  <g>
+    <!-- Carré rouge -->
+    <rect x="40" y="30" width="20" height="20" fill="#f25022"/>
+    <!-- Carré vert -->
+    <rect x="62" y="30" width="20" height="20" fill="#7fba00"/>
+    <!-- Carré bleu -->
+    <rect x="40" y="52" width="20" height="20" fill="#00a4ef"/>
+    <!-- Carré jaune -->
+    <rect x="62" y="52" width="20" height="20" fill="#ffb900"/>
+    
+    <!-- Texte "Microsoft 365" -->
+    <g fill="#737373">
+      <!-- Microsoft -->
+      <path d="M90 40h3.5v12h2v-12h3.5v-2h-9z"/>
+      <path d="M100 38h2v6h5v-6h2v14h-2v-6h-5v6h-2z"/>
+      <path d="M111 38h2v12h5v2h-7z"/>
+      <path d="M119 38h2v14h-2z"/>
+      <path d="M122 38h2.5l3.5 9.5 3.5-9.5h2.5v14h-2v-10l-3.5 10h-1l-3.5-10v10h-2z"/>
+      <path d="M135 38h7v2h-5v4h4v2h-4v4h5v2h-7z"/>
+      <path d="M148 42c-0.5-1.5-1.5-2-3-2-1 0-2 0.5-2 1.5 0 2.5 8 1 8 6.5 0 3-2.5 4-5 4s-4-1-4.5-3.5l2-0.5c0.5 1.5 1.5 2 3 2s2-0.5 2-1.5c0-2.5-8-1-8-6.5 0-3 2.5-4 4.5-4 2 0 4 1 4.5 3.5z"/>
+      <path d="M155 40h-3.5v-2h9v2h-3.5v12h-2z"/>
+      
+      <!-- 365 -->
+      <path d="M167 38h7v2h-5v4h4v2h-4v6h-2z"/>
+      <path d="M177 45l-4-7h2.5l2.5 5 2.5-5h2.5l-4 7v7h-2z"/>
+      <path d="M188 42c-0.5-1.5-1.5-2-3-2-1 0-2 0.5-2 1.5 0 2.5 8 1 8 6.5 0 3-2.5 4-5 4s-4-1-4.5-3.5l2-0.5c0.5 1.5 1.5 2 3 2s2-0.5 2-1.5c0-2.5-8-1-8-6.5 0-3 2.5-4 4.5-4 2 0 4 1 4.5 3.5z"/>
+    </g>
+  </g>
+</svg>

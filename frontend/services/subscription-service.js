@@ -1,5 +1,5 @@
 // frontend/services/subscription-service.js
-import axios from 'axios';
+/* import axios from 'axios'; */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -7,7 +7,8 @@ export const SubscriptionService = {
   // Récupérer les plans disponibles
   getPlans: async () => {
     try {
-      const response = await axios.get(`${API_URL}/subscriptions/plans`);
+      const response = await fetch('/api/subscriptions/plans');
+      if (!response.ok) throw new Error('Erreur lors du chargement des plans');
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des plans:', error);
@@ -18,7 +19,7 @@ export const SubscriptionService = {
   // Récupérer l'abonnement actuel de l'utilisateur
   getCurrentSubscription: async () => {
     try {
-      const response = await axios.get(`${API_URL}/subscriptions/current`, {
+      const response = await fetch('/api/subscriptions/current', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -63,7 +64,7 @@ export const SubscriptionService = {
   // Récupérer l'historique de facturation
   getBillingHistory: async () => {
     try {
-      const response = await axios.get(`${API_URL}/subscriptions/payments`, {
+      const response = await fetch('api/subscriptions/payments', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -86,13 +87,13 @@ export const SubscriptionService = {
   // Changer de plan
   changePlan: async (planId, billingCycle) => {
     try {
-      const response = await axios.post(`${API_URL}/subscriptions/change-plan`, 
-        { plan_id: planId, billing_cycle: billingCycle },
-        {
+      const response = await fetch('api/subscriptions/change-plan', {
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
-          }
+          },
+          body: { plan_id: planId, billing_cycle: billingCycle }
         }
       );
       
@@ -106,13 +107,12 @@ export const SubscriptionService = {
   // Annuler l'abonnement
   cancelSubscription: async (subscriptionId, reason) => {
     try {
-      const response = await axios.post(`${API_URL}/subscriptions/${subscriptionId}/cancel`, 
-        { reason },
-        {
+      const response = await fetch(`api/subscriptions/${subscriptionId}/cancel`,{
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
-          }
+          },
+          body: { reason }
         }
       );
       
@@ -126,13 +126,12 @@ export const SubscriptionService = {
   // Obtenir un checkout URL pour paiement
   getCheckoutSession: async (planId, billingCycle) => {
     try {
-      const response = await axios.post(`${API_URL}/subscriptions`, 
-        { plan_id: planId, billing_cycle: billingCycle },
-        {
+      const response = await axios.post(`${API_URL}/subscriptions`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
-          }
+          },
+          body: { plan_id: planId, billing_cycle: billingCycle }
         }
       );
       

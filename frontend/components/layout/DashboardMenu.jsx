@@ -82,7 +82,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
       name: 'Analyse de CV',
       href: '/resumes',
       icon: DocumentTextIcon,
-      access: hasAccess('full_candidate_analysis')
+      access: hasAccess('full_candidate_analysis') || true // Temporairement accessible à tous pour le développement
     },
     {
       name: 'Assistants IA',

@@ -1,4 +1,4 @@
-// frontend/pages/interviews/[id].jsx (mise à jour)
+// frontend/pages/interviews/[id].jsx (mise à jour avec modes d'entretien IA)
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -22,14 +22,17 @@ import ResponseInput from '../../components/interview/ResponseInput';
 import EvaluationCard from '../../components/interview/EvaluationCard';
 import AIContentsPanel from '../../components/interview/AIContentsPanel';
 import RequestAIAnalysis from '../../components/interview/RequestAIAnalysis';
+import AIAssistantChat from '../../components/interview/AIAssistantChat';
+import SuggestedQuestions from '../../components/interview/SuggestedQuestions';
 
 // Layout
 import DashboardLayout from '../../components/layout/DashboardLayout';
 
 // Hooks et utilitaires
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/dateUtils';
 import AIAssistantService from '../../services/aiAssistantService';
+import { BotIcon, UserPlus, MessageCircle, AlertCircle, Brain } from 'lucide-react';
 
 /**
  * Page principale d'entretien qui intègre tous les composants nécessaires
@@ -45,6 +48,8 @@ const InterviewPage = () => {
   const [teamId, setTeamId] = useState(null);
   const [aiContents, setAiContents] = useState([]);
   const [loadingAiContents, setLoadingAiContents] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   
   const videoRef = useRef(null);
   
@@ -61,6 +66,16 @@ const InterviewPage = () => {
         // Si l'entretien appartient à une équipe, récupérer l'ID de l'équipe
         if (response.data.team_id) {
           setTeamId(response.data.team_id);
+        }
+        
+        // En mode développement, simuler des questions suggérées
+        if (process.env.NODE_ENV === 'development' && response.data.interview_mode === 'collaborative') {
+          const mockSuggestions = [
+            { id: 'sugg1', question: "Pouvez-vous me parler d'une situation où vous avez dû résoudre un conflit dans votre équipe ?", type: "behavioral" },
+            { id: 'sugg2', question: "Quelle est votre expérience avec les frameworks frontend modernes comme React et Vue ?", type: "technical" },
+            { id: 'sugg3', question: "Comment abordez-vous l'optimisation des performances dans vos applications ?", type: "technical" }
+          ];
+          setSuggestedQuestions(mockSuggestions);
         }
         
         setLoading(false);
@@ -202,6 +217,36 @@ const InterviewPage = () => {
     }
   };
   
+  // Utiliser une question suggérée
+  const handleUseSuggestedQuestion = (question) => {
+    // Implémenter la logique pour utiliser la question suggérée
+    console.log('Question utilisée:', question);
+    
+    // Retirer la question de la liste des suggestions
+    setSuggestedQuestions(prev => prev.filter(q => q.id !== question.id));
+    
+    // Ajouter une nouvelle suggestion après un délai (simuler l'IA)
+    setTimeout(() => {
+      const newSuggestion = {
+        id: `sugg-${Date.now()}`,
+        question: "Comment gérez-vous les délais serrés et la pression dans vos projets ?",
+        type: "behavioral"
+      };
+      setSuggestedQuestions(prev => [...prev, newSuggestion]);
+    }, 5000);
+  };
+  
+  // Gérer la demande d'une nouvelle suggestion de question
+  const handleRequestNewSuggestion = () => {
+    // Simuler une charge
+    const mockNewSuggestion = {
+      id: `sugg-${Date.now()}`,
+      question: "Pouvez-vous décrire votre approche pour tester vos applications ?",
+      type: "technical"
+    };
+    setSuggestedQuestions(prev => [...prev, mockNewSuggestion]);
+  };
+  
   if (loading) {
     return (
       <DashboardLayout>
@@ -214,8 +259,9 @@ const InterviewPage = () => {
   }
   
   // Déterminer les props de l'entretien
-  const jobRole = interview?.jobTitle || interview?.position || 'Non spécifié';
-  const experienceLevel = interview?.experienceLevel || 'Intermédiaire';
+  const jobRole = interview?.jobTitle || interview?.position || interview?.job_role || 'Non spécifié';
+  const experienceLevel = interview?.experienceLevel || interview?.experience_level || 'Intermédiaire';
+  const interviewMode = interview?.interview_mode || 'autonomous';
   
   return (
     <DashboardLayout>
@@ -239,10 +285,28 @@ const InterviewPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">
             Entretien pour {jobRole}
           </h1>
-          <p className="text-gray-600 mt-1">
-            Niveau: {experienceLevel} | 
-            {interview?.scheduledFor ? ` Prévu: ${formatDate(interview.scheduledFor)}` : ' Non programmé'}
-          </p>
+          <div className="text-gray-600 mt-1 flex items-center flex-wrap">
+            <span>Niveau: {experienceLevel}</span>
+            <span className="mx-2">|</span>
+            {interview?.scheduledFor ? (
+              <span>Prévu: {formatDate(interview.scheduledFor)}</span>
+            ) : (
+              <span>Non programmé</span>
+            )}
+            <span className="mx-2">|</span>
+            {/* Badge du mode d'entretien */}
+            {interviewMode === 'autonomous' ? (
+              <Badge color="blue" className="ml-1 flex items-center">
+                <BotIcon size={14} className="mr-1" />
+                IA autonome
+              </Badge>
+            ) : (
+              <Badge color="green" className="ml-1 flex items-center">
+                <UserPlus size={14} className="mr-1" />
+                IA collaborative
+              </Badge>
+            )}
+          </div>
         </div>
         
         {/* Onglets */}
@@ -294,17 +358,60 @@ const InterviewPage = () => {
           interviewId={interviewId}
           jobRole={jobRole}
           experienceLevel={experienceLevel}
+          interviewMode={interviewMode}
           onInterviewComplete={handleInterviewComplete}
           onError={handleError}
         >
           {activeTab === 'interview' ? (
             /* Interface d'entretien */
-            <InterviewInterface videoRef={videoRef} />
+            <InterviewInterface 
+              videoRef={videoRef} 
+              interviewMode={interviewMode}
+              suggestedQuestions={suggestedQuestions}
+              onUseSuggestedQuestion={handleUseSuggestedQuestion}
+              onRequestNewSuggestion={handleRequestNewSuggestion}
+              isAIChatOpen={isAIChatOpen}
+              setIsAIChatOpen={setIsAIChatOpen}
+            />
           ) : (
             /* Tableau de bord d'analyse */
             <AnalyticsDashboard videoRef={videoRef} />
           )}
         </InterviewController>
+      )}
+      
+      {/* Chat IA flottant pour le mode collaboratif */}
+      {interviewMode === 'collaborative' && activeTab === 'interview' && isAIChatOpen && (
+        <div className="fixed bottom-6 right-6 w-96 h-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 flex flex-col">
+          <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+            <div className="flex items-center">
+              <Brain className="h-5 w-5 text-primary-600 mr-2" />
+              <h3 className="font-medium">Assistant IA</h3>
+            </div>
+            <button 
+              onClick={() => setIsAIChatOpen(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 p-4 overflow-y-auto">
+            <AIAssistantChat interviewId={interviewId} />
+          </div>
+        </div>
+      )}
+      
+      {/* Bouton pour ouvrir le chat en mode collaboratif */}
+      {interviewMode === 'collaborative' && activeTab === 'interview' && !isAIChatOpen && (
+        <button
+          onClick={() => setIsAIChatOpen(true)}
+          className="fixed bottom-6 right-6 bg-primary-600 text-white rounded-full p-3 shadow-lg hover:bg-primary-700 flex items-center"
+        >
+          <MessageCircle className="h-6 w-6" />
+          <span className="ml-2 mr-1">Assistant IA</span>
+        </button>
       )}
     </DashboardLayout>
   );
@@ -331,11 +438,18 @@ const InterviewInterface = ({
   handleRecordingStateChange,
   handleTranscriptionComplete,
   handleResponseSubmit,
-  handleNextQuestion
+  handleNextQuestion,
+  // Props ajoutées pour la gestion des modes d'entretien
+  interviewMode,
+  suggestedQuestions,
+  onUseSuggestedQuestion,
+  onRequestNewSuggestion,
+  isAIChatOpen,
+  setIsAIChatOpen
 }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Colonne gauche - Vidéo et analyse biométrique */}
+      {/* Colonne gauche - Vidéo, analyse biométrique et questions suggérées */}
       <div className="lg:col-span-1">
         <Card className="mb-6">
           <Card.Header>
@@ -346,7 +460,7 @@ const InterviewInterface = ({
           </Card.Body>
         </Card>
         
-        <Card>
+        <Card className="mb-6">
           <Card.Header className="flex justify-between items-center">
             <Card.Title>Analyse biométrique</Card.Title>
             <Badge color="indigo">IA</Badge>
@@ -357,6 +471,23 @@ const InterviewInterface = ({
             />
           </Card.Body>
         </Card>
+        
+        {/* Questions suggérées - uniquement en mode collaboratif */}
+        {interviewMode === 'collaborative' && (
+          <Card>
+            <Card.Header className="flex justify-between items-center">
+              <Card.Title>Questions suggérées</Card.Title>
+              <Badge color="green">IA</Badge>
+            </Card.Header>
+            <Card.Body className="p-4">
+              <SuggestedQuestions
+                questions={suggestedQuestions}
+                onUseQuestion={onUseSuggestedQuestion}
+                onRequestNewSuggestion={onRequestNewSuggestion}
+              />
+            </Card.Body>
+          </Card>
+        )}
       </div>
       
       {/* Colonne centrale et droite - Questions et réponses */}
@@ -365,9 +496,17 @@ const InterviewInterface = ({
         <Card className="mb-6">
           <Card.Header className="flex justify-between items-center">
             <Card.Title>Question {currentQuestionIndex + 1}/{questions.length}</Card.Title>
-            {questions[currentQuestionIndex]?.category && (
-              <Badge color="blue">{questions[currentQuestionIndex].category}</Badge>
-            )}
+            <div className="flex items-center">
+              {questions[currentQuestionIndex]?.category && (
+                <Badge color="blue" className="mr-2">{questions[currentQuestionIndex].category}</Badge>
+              )}
+              {interviewMode === 'autonomous' && (
+                <Badge color="indigo" className="flex items-center">
+                  <BotIcon size={14} className="mr-1" />
+                  IA
+                </Badge>
+              )}
+            </div>
           </Card.Header>
           <Card.Body className="p-6">
             {loading ? (
@@ -478,7 +617,8 @@ const AnalyticsDashboard = ({
   responses,
   biometricHistory,
   jobRole,
-  experienceLevel
+  experienceLevel,
+  interviewMode
 }) => {
   return (
     <div className="space-y-6">

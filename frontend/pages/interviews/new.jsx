@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import Layout from '../../components/layout/Layout';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import ResumeUpload from '../../components/resume/ResumeUpload';
 import AIAssistantService from '../../services/aiAssistantService';
@@ -241,7 +240,7 @@ const NewInterviewPage = () => {
   };
 
   return (
-    <Layout>
+    <>
       <Head>
         <title>Nouvel entretien - RecruteIA</title>
         <meta name="description" content="Créer un nouvel entretien assisté par IA" />
@@ -781,7 +780,7 @@ const NewInterviewPage = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }
 

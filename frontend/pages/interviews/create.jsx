@@ -77,7 +77,7 @@ const CreateInterviewPage = () => {
   };
   
   return (
-    <DashboardLayout>
+    <>
       <Head>
         <title>Créer un entretien | RecruteIA</title>
       </Head>
@@ -126,7 +126,7 @@ const CreateInterviewPage = () => {
           onInterviewComplete={handleInterviewComplete}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 };
 

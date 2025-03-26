@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import Layout from '../../components/layout/Layout';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import axios from 'axios';
 
@@ -147,7 +146,7 @@ const InterviewsIndexPage =() => {
   };
 
   return (
-    <Layout>
+    <>
       <Head>
         <title>Entretiens - RecruteIA</title>
         <meta name="description" content="Gérez vos entretiens assistés par IA" />
@@ -360,7 +359,7 @@ const InterviewsIndexPage =() => {
           )}
         </div>
       </div>
-    </Layout>
+    </>
   );
 }
 

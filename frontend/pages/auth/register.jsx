@@ -11,11 +11,13 @@ const RegisterPage = () => {
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    jobTitle: '',
-    department: ''
+    confirmPassword: ''
   });
-  
+
+ /*  ,
+    jobTitle: '',
+    department: '' */
+
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -116,9 +118,9 @@ const RegisterPage = () => {
         email: formData.email,
         password: formData.password,
         first_name: formData.firstName,
-        last_name: formData.lastName,
-        job_title: formData.jobTitle,
-        department: formData.department
+        last_name: formData.lastName
+        /* job_title: formData.jobTitle,
+        department: formData.department */
       };
       
       const result = await register(userData);
@@ -382,7 +384,7 @@ const RegisterPage = () => {
               )}
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label
                   htmlFor="jobTitle"
@@ -418,7 +420,7 @@ const RegisterPage = () => {
                   placeholder="Ressources Humaines"
                 />
               </div>
-            </div>
+            </div> */}
             
             <div className="flex items-center">
               <input

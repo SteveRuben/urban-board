@@ -1,72 +1,146 @@
-// frontend/components/dashboard/DashboardOverviewCard.jsx
+// components/dashboard/DashboardOverviewCard.jsx
 import React from 'react';
+import PropTypes from 'prop-types';
+import { Users, CheckCircle, Clock, BarChart } from 'lucide-react';
 
-const DashboardOverviewCard = ({ title, value, icon, color }) => {
-  const getIconComponent = () => {
+/**
+ * Carte d'aperçu pour le tableau de bord, style Notion
+ */
+const DashboardOverviewCard = ({ 
+  title, 
+  value, 
+  icon, 
+  color = 'blue',
+  previousValue,
+  increaseIsGood = true,
+  showChange = false
+}) => {
+  // Calculer le pourcentage de changement
+  const calculateChange = () => {
+    if (!previousValue || previousValue === 0) return null;
+    
+    const change = ((value - previousValue) / previousValue) * 100;
+    return {
+      value: change.toFixed(1),
+      isPositive: change >= 0
+    };
+  };
+
+  const change = showChange ? calculateChange() : null;
+  
+  // Déterminer la couleur des changements
+  const getChangeColor = (change) => {
+    if (!change) return '';
+    
+    const isPositive = change.isPositive;
+    const isGood = (isPositive && increaseIsGood) || (!isPositive && !increaseIsGood);
+    
+    return isGood ? 'text-green-600' : 'text-red-600';
+  };
+
+  // Configurer l'icône
+  const getIcon = () => {
+    const size = 16;
+    
     switch (icon) {
       case 'total':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        );
+        return <Users size={size} />;
       case 'completed':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
+        return <CheckCircle size={size} />;
       case 'scheduled':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        );
+        return <Clock size={size} />;
       case 'score':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-        );
+        return <BarChart size={size} />;
       default:
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-        );
+        return null;
     }
   };
 
-  const getColorClass = () => {
-    switch (color) {
-      case 'blue':
-        return 'text-blue-500 bg-blue-100';
-      case 'green':
-        return 'text-green-500 bg-green-100';
-      case 'yellow':
-        return 'text-yellow-500 bg-yellow-100';
-      case 'purple':
-        return 'text-purple-500 bg-purple-100';
-      case 'red':
-        return 'text-red-500 bg-red-100';
-      default:
-        return 'text-primary-500 bg-primary-100';
+  // Couleurs pour différents thèmes de carte
+  const colorStyles = {
+    blue: {
+      bgGradient: 'from-blue-50 to-white',
+      iconBg: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      border: 'border-blue-100',
+    },
+    green: {
+      bgGradient: 'from-green-50 to-white',
+      iconBg: 'bg-green-100',
+      iconColor: 'text-green-600',
+      border: 'border-green-100',
+    },
+    purple: {
+      bgGradient: 'from-purple-50 to-white',
+      iconBg: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      border: 'border-purple-100',
+    },
+    yellow: {
+      bgGradient: 'from-amber-50 to-white',
+      iconBg: 'bg-amber-100',
+      iconColor: 'text-amber-600',
+      border: 'border-amber-100',
+    },
+    red: {
+      bgGradient: 'from-red-50 to-white',
+      iconBg: 'bg-red-100',
+      iconColor: 'text-red-600',
+      border: 'border-red-100',
+    },
+    gray: {
+      bgGradient: 'from-gray-50 to-white',
+      iconBg: 'bg-gray-100',
+      iconColor: 'text-gray-600',
+      border: 'border-gray-100',
     }
   };
+
+  const { bgGradient, iconBg, iconColor, border } = colorStyles[color] || colorStyles.blue;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center">
-        <div className={`p-3 rounded-full ${getColorClass()} mr-4`}>
-          {getIconComponent()}
+    <div className={`bg-gradient-to-br ${bgGradient} p-6 rounded-lg border ${border} shadow-sm hover:shadow transition-shadow duration-200`}>
+      <div className="flex items-center mb-3">
+        <div className={`flex items-center justify-center h-7 w-7 rounded-md ${iconBg} ${iconColor}`}>
+          {getIcon()}
         </div>
+        <h3 className="ml-2 text-sm font-medium text-gray-700">{title}</h3>
+      </div>
+      
+      <div className="flex items-end justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-700">{title}</h3>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <div className="text-2xl font-semibold text-gray-900">
+            {value}
+          </div>
+          
+          {change && (
+            <div className={`text-xs font-medium mt-1 flex items-center ${getChangeColor(change)}`}>
+              {change.isPositive ? (
+                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+              ) : (
+                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              )}
+              {Math.abs(change.value)}%
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+DashboardOverviewCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  icon: PropTypes.oneOf(['total', 'completed', 'scheduled', 'score']),
+  color: PropTypes.oneOf(['blue', 'green', 'purple', 'yellow', 'red', 'gray']),
+  previousValue: PropTypes.number,
+  increaseIsGood: PropTypes.bool,
+  showChange: PropTypes.bool
 };
 
 export default DashboardOverviewCard;

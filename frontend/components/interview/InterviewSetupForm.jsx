@@ -1,12 +1,26 @@
 // frontend/components/interview/InterviewSetupForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CVUpload from './CVUpload';
 import aiInterviewService from '../../services/ai-interview-service';
+import AIAssistantService from '../../services/aiAssistantService';
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Trash2, 
+  Plus, 
+  Bot, 
+  UserPlus, 
+  Brain, 
+  Loader, 
+  RefreshCw 
+} from 'lucide-react';
 
 const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCancel }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingAssistants, setLoadingAssistants] = useState(false);
+  const [assistants, setAssistants] = useState([]);
   
   // Données du formulaire
   const [jobTitle, setJobTitle] = useState('');
@@ -16,9 +30,65 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
   const [cvFile, setCVFile] = useState(null);
   const [candidateName, setCandidateName] = useState('');
   const [interviewMode, setInterviewMode] = useState('autonomous');
+  const [selectedAssistants, setSelectedAssistants] = useState([]);
   
   // Questions générées
   const [generatedQuestions, setGeneratedQuestions] = useState([]);
+  
+  // Charger les assistants IA disponibles à l'étape 2
+  useEffect(() => {
+    if (step !== 2) return;
+    
+    const fetchAssistants = async () => {
+      try {
+        setLoadingAssistants(true);
+        
+        // Utiliser des données mockées en développement
+        if (process.env.NODE_ENV === 'development') {
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const mockAssistants = [
+            {
+              id: 'ai-001',
+              name: 'TechEvaluator',
+              assistant_type: 'evaluator',
+              model_version: 'claude-3.7-sonnet',
+              capabilities: {
+                analysis_types: ['technical', 'general', 'bias']
+              }
+            },
+            {
+              id: 'ai-002',
+              name: 'HR Assistant',
+              assistant_type: 'recruiter',
+              model_version: 'gpt-4o',
+              capabilities: {
+                analysis_types: ['behavioral', 'cultural-fit']
+              }
+            },
+            {
+              id: 'ai-003',
+              name: 'Language Analyst',
+              assistant_type: 'analyzer',
+              model_version: 'claude-3-opus',
+              capabilities: {
+                analysis_types: ['language', 'communication']
+              }
+            }
+          ];
+          setAssistants(mockAssistants);
+        } else {
+          const userAssistants = await AIAssistantService.getUserAssistants();
+          setAssistants(userAssistants);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des assistants:', error);
+      } finally {
+        setLoadingAssistants(false);
+      }
+    };
+    
+    fetchAssistants();
+  }, [step]);
   
   // Gérer le téléchargement du CV
   const handleCVUploaded = (file) => {
@@ -61,6 +131,27 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
     setError(null);
     setStep(step - 1);
   };
+
+  // Gérer la sélection/désélection des assistants IA
+  const toggleAIAssistant = (assistantId) => {
+    setSelectedAssistants(prev => {
+      if (prev.includes(assistantId)) {
+        return prev.filter(id => id !== assistantId);
+      } else {
+        return [...prev, assistantId];
+      }
+    });
+  };
+  
+  // Obtenir un label pour le type d'assistant
+  const getAssistantTypeLabel = (type) => {
+    switch (type) {
+      case 'recruiter': return 'Recruteur';
+      case 'evaluator': return 'Évaluateur';
+      case 'analyzer': return 'Analyseur';
+      default: return 'Assistant général';
+    }
+  };
   
   // Générer des questions basées sur le CV et la description du poste
   const generateQuestions = async () => {
@@ -73,7 +164,9 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
         jobDescription,
         {
           numberOfQuestions,
-          experienceLevel
+          experienceLevel,
+          selectedAssistants,
+          interviewMode
         }
       );
       
@@ -102,7 +195,8 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
       experienceLevel,
       questions: generatedQuestions,
       interviewMode,
-      cvFile
+      cvFile,
+      aiAssistants: selectedAssistants
     };
     
     // Notifier le composant parent
@@ -253,7 +347,7 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
             </p>
           </div>
           
-          <div className="mb-4">
+          <div className="mb-6">
             <label htmlFor="numberOfQuestions" className="block text-sm font-medium text-gray-700 mb-1">
               Nombre de questions
             </label>
@@ -270,40 +364,147 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
             </select>
           </div>
           
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Mode d'entretien
             </label>
-            <div className="flex space-x-4">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="modeAutonomous"
-                  name="interviewMode"
-                  value="autonomous"
-                  checked={interviewMode === 'autonomous'}
-                  onChange={() => setInterviewMode('autonomous')}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500"
-                />
-                <label htmlFor="modeAutonomous" className="ml-2 text-sm text-gray-700">
-                  Autonome (IA seule)
-                </label>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  interviewMode === 'autonomous' 
+                    ? 'border-primary-600 bg-primary-50' 
+                    : 'border-gray-300 hover:border-primary-300'
+                }`}
+                onClick={() => setInterviewMode('autonomous')}
+              >
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="modeAutonomous"
+                    name="interviewMode"
+                    value="autonomous"
+                    checked={interviewMode === 'autonomous'}
+                    onChange={() => setInterviewMode('autonomous')}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <label htmlFor="modeAutonomous" className="ml-3 font-medium text-gray-800 flex items-center">
+                    <Bot className="h-4 w-4 mr-2 text-primary-600" />
+                    Mode autonome
+                  </label>
+                </div>
+                <p className="mt-2 text-sm text-gray-600 ml-7">
+                  L'IA mène l'entretien de manière autonome, pose des questions et évalue les réponses
+                </p>
               </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="modeCollaborative"
-                  name="interviewMode"
-                  value="collaborative"
-                  checked={interviewMode === 'collaborative'}
-                  onChange={() => setInterviewMode('collaborative')}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500"
-                />
-                <label htmlFor="modeCollaborative" className="ml-2 text-sm text-gray-700">
-                  Collaboratif (avec recruteur)
-                </label>
+              
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  interviewMode === 'collaborative' 
+                    ? 'border-primary-600 bg-primary-50' 
+                    : 'border-gray-300 hover:border-primary-300'
+                }`}
+                onClick={() => setInterviewMode('collaborative')}
+              >
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="modeCollaborative"
+                    name="interviewMode"
+                    value="collaborative"
+                    checked={interviewMode === 'collaborative'}
+                    onChange={() => setInterviewMode('collaborative')}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <label htmlFor="modeCollaborative" className="ml-3 font-medium text-gray-800 flex items-center">
+                    <UserPlus className="h-4 w-4 mr-2 text-green-600" />
+                    Mode collaboratif
+                  </label>
+                </div>
+                <p className="mt-2 text-sm text-gray-600 ml-7">
+                  Vous menez l'entretien avec l'assistance de l'IA qui suggère des questions et analyse les réponses
+                </p>
               </div>
             </div>
+          </div>
+          
+          {/* Section d'assistants IA */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Assistants IA
+              </label>
+              <a 
+                href="/ai-assistants/create"
+                target="_blank"
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+              >
+                + Créer un assistant
+              </a>
+            </div>
+            
+            {loadingAssistants ? (
+              <div className="flex justify-center items-center p-8 border border-dashed border-gray-300 rounded-md">
+                <RefreshCw className="h-6 w-6 animate-spin text-primary-600 mr-2" />
+                <span className="text-gray-500">Chargement des assistants IA...</span>
+              </div>
+            ) : assistants.length === 0 ? (
+              <div className="text-center p-6 border border-dashed border-gray-300 rounded-md">
+                <Brain className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                <p className="text-gray-600 mb-3">Vous n'avez pas encore d'assistants IA.</p>
+                <a 
+                  href="/ai-assistants/create"
+                  target="_blank"
+                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                >
+                  Créer un assistant IA
+                </a>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto p-3 border border-gray-200 rounded-md">
+                {assistants.map((assistant) => (
+                  <div 
+                    key={assistant.id}
+                    className={`flex items-center rounded-lg p-3 cursor-pointer transition-colors ${
+                      selectedAssistants.includes(assistant.id) 
+                        ? 'bg-primary-50 border border-primary-300' 
+                        : 'bg-gray-50 border border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => toggleAIAssistant(assistant.id)}
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <Brain className="h-5 w-5 text-white" />
+                      </div>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <div className="font-medium text-gray-900">{assistant.name}</div>
+                      <div className="text-sm text-gray-500 flex items-center">
+                        <span className="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded">
+                          {getAssistantTypeLabel(assistant.assistant_type)}
+                        </span>
+                        <span className="mx-1">•</span>
+                        <span>{assistant.model_version}</span>
+                      </div>
+                    </div>
+                    <div className="ml-2">
+                      {selectedAssistants.includes(assistant.id) ? (
+                        <div className="h-5 w-5 rounded-full bg-primary-600 flex items-center justify-center">
+                          <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="h-5 w-5 rounded-full border-2 border-gray-300"></div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-xs text-gray-500">
+              Les assistants IA sélectionnés participeront à l'entretien en analysant les réponses en temps réel
+            </p>
           </div>
         </div>
       )}
@@ -348,9 +549,7 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
                         className="text-gray-400 hover:text-red-500"
                         title="Supprimer la question"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <Trash2 className="h-5 w-5" />
                       </button>
                     </div>
                     
@@ -377,11 +576,33 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
                 onClick={addCustomQuestion}
                 className="flex items-center text-primary-600 hover:text-primary-700 mb-6"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+                <Plus className="h-5 w-5 mr-1" />
                 Ajouter une question personnalisée
               </button>
+              
+              {/* Informations sur le mode d'entretien */}
+              <div className={`p-4 rounded-lg mb-6 ${
+                interviewMode === 'autonomous' ? 'bg-blue-50 border-blue-200 border' : 'bg-green-50 border-green-200 border'
+              }`}>
+                <div className="flex items-start">
+                  {interviewMode === 'autonomous' ? (
+                    <Bot className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
+                  ) : (
+                    <UserPlus className="h-5 w-5 text-green-600 mt-0.5 mr-3" />
+                  )}
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {interviewMode === 'autonomous' ? 'Mode d\'entretien autonome' : 'Mode d\'entretien collaboratif'}
+                    </h3>
+                    <p className="text-sm mt-1 text-gray-600">
+                      {interviewMode === 'autonomous' 
+                        ? "L'IA mènera cet entretien de manière autonome avec le candidat en utilisant les questions ci-dessus. Vous pourrez consulter les résultats une fois l'entretien terminé."
+                        : "Vous mènerez l'entretien avec l'assistance de l'IA, qui vous suggérera des questions et analysera les réponses en temps réel."
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -402,9 +623,7 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
             className="px-4 py-2 text-gray-600 hover:text-gray-800 flex items-center"
             disabled={loading}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ArrowLeft className="h-5 w-5 mr-1" />
             Précédent
           </button>
         )}
@@ -416,17 +635,25 @@ const InterviewSetupForm = ({ onSetupComplete, initialJobDescription = '', onCan
             disabled={loading}
           >
             Suivant
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <ArrowRight className="h-5 w-5 ml-1" />
           </button>
         ) : (
           <button
             onClick={finalizeSetup}
-            className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center"
             disabled={loading}
           >
-            Démarrer l'entretien
+            {loading ? (
+              <>
+                <Loader className="h-5 w-5 mr-2 animate-spin" />
+                Chargement...
+              </>
+            ) : (
+              <>
+                Démarrer l'entretien
+                <ArrowRight className="h-5 w-5 ml-1" />
+              </>
+            )}
           </button>
         )}
       </div>
