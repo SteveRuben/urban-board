@@ -5,7 +5,13 @@ const nextConfig = {
     reactStrictMode: true,
     swcMinify: true,
     images: {
-      domains: ['localhost'],
+      remotePatterns: [
+        {
+          protocol: "http",
+          hostname: "localhost",
+          pathname: "/**",
+        },
+      ],
     },
     // Configuration du proxy API pour le développement
     async rewrites() {

@@ -2,6 +2,8 @@
 /**
  * Service pour gérer les assistants IA et leur intégration dans les entretiens
  */
+const API_URL = '/api/ai-assistants';
+
 class AIAssistantService {
 
   /**
@@ -10,7 +12,7 @@ class AIAssistantService {
    */
   async getAllAssistants() {
     try {
-      const response = await axios.get(API_URL);
+      const response = await fetch(API_URL);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -25,7 +27,7 @@ class AIAssistantService {
    */
   async getAssistantById(id) {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
+      const response = await fetch(`${API_URL}/${id}`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -40,7 +42,10 @@ class AIAssistantService {
    */
   async createAssistant(assistantData) {
     try {
-      const response = await axios.post(API_URL, assistantData);
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        data: assistantData,
+      });
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -56,7 +61,10 @@ class AIAssistantService {
    */
   async updateAssistant(id, assistantData) {
     try {
-      const response = await axios.put(`${API_URL}/${id}`, assistantData);
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        data: assistantData,
+      });
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -71,7 +79,9 @@ class AIAssistantService {
    */
   async deleteAssistant(id) {
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+      });
     } catch (error) {
       this.handleError(error);
       throw error;
@@ -84,7 +94,7 @@ class AIAssistantService {
    */
   async getAssistantTemplates() {
     try {
-      const response = await axios.get(`${API_URL}/templates`);
+      const response = await fetch(`${API_URL}/templates`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -100,7 +110,10 @@ class AIAssistantService {
    */
   async cloneAssistant(id, options = {}) {
     try {
-      const response = await axios.post(`${API_URL}/${id}/clone`, options);
+      const response = await fetch(`${API_URL}/${id}/clone`, {
+        method: 'POST',
+        data: options,
+      });
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -145,7 +158,7 @@ class AIAssistantService {
    */
   async getAssistantDocuments(assistantId) {
     try {
-      const response = await axios.get(`${API_URL}/${assistantId}/documents`);
+      const response = await fetch(`${API_URL}/${assistantId}/documents`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -161,7 +174,9 @@ class AIAssistantService {
    */
   async deleteDocument(assistantId, documentId) {
     try {
-      await axios.delete(`${API_URL}/${assistantId}/documents/${documentId}`);
+      await fetch(`${API_URL}/${assistantId}/documents/${documentId}`, {
+        method: 'DELETE',
+      });
     } catch (error) {
       this.handleError(error);
       throw error;
@@ -176,7 +191,10 @@ class AIAssistantService {
    */
   async testAssistant(assistantId, params) {
     try {
-      const response = await axios.post(`${API_URL}/${assistantId}/test`, params);
+      const response = await fetch(`${API_URL}/${assistantId}/test`, {
+        method: 'POST',
+        data: params,
+      });
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -192,7 +210,7 @@ class AIAssistantService {
    */
   async getAssistantHistory(assistantId, filters = {}) {
     try {
-      const response = await axios.get(`${API_URL}/${assistantId}/history`, { params: filters });
+      const response = await fetch(`${API_URL}/${assistantId}/history`, { params: filters });
       return response.data;
     } catch (error) {
       this.handleError(error);

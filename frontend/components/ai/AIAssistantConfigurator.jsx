@@ -11,7 +11,8 @@ import {
   ClipboardDocumentCheckIcon,
   CpuChipIcon,
   UserCircleIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  FaceSmileIcon
 } from '@heroicons/react/24/outline';
 import { Switch } from '@headlessui/react';
 import aiAssistantService from '../../services/aiAssistantService';
@@ -20,9 +21,15 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-const AIAssistantConfigurator = ({ assistantId = null }) => {
+const AIAssistantConfigurator = ({ 
+  assistantId = null,
+  initialData = null,
+  isEditMode = false,
+  onSuccess = null,
+  onError = null
+}) => {
   const router = useRouter();
-  const isEditMode = !!assistantId;
+  const editMode = isEditMode || !!assistantId;
   
   const [assistant, setAssistant] = useState({
     name: '',
@@ -64,20 +71,62 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
   const [testResponse, setTestResponse] = useState('');
   
   useEffect(() => {
-    // Si nous sommes en mode édition, charger les données de l'assistant
-    if (isEditMode) {
+    // Si nous avons des données initiales, les utiliser
+    if (initialData) {
+      setAssistant(prevState => ({
+        ...prevState,
+        ...initialData,
+        // S'assurer que les objets complexes sont correctement initialisés
+        personality: {
+          ...prevState.personality,
+          ...(initialData.personality || {})
+        },
+        baseKnowledge: {
+          ...prevState.baseKnowledge,
+          ...(initialData.baseKnowledge || {})
+        },
+        capabilities: {
+          ...prevState.capabilities,
+          ...(initialData.capabilities || {})
+        },
+        questionBank: initialData.questionBank || []
+      }));
+      return;
+    }
+    
+    // Si nous sommes en mode édition mais sans données initiales, charger l'assistant
+    if (editMode && assistantId) {
       const fetchAssistant = async () => {
         try {
           const data = await aiAssistantService.getAssistantById(assistantId);
-          setAssistant(data);
+          setAssistant(prevState => ({
+            ...prevState,
+            ...data,
+            // S'assurer que les objets complexes sont correctement initialisés
+            personality: {
+              ...prevState.personality,
+              ...(data.personality || {})
+            },
+            baseKnowledge: {
+              ...prevState.baseKnowledge,
+              ...(data.baseKnowledge || {})
+            },
+            capabilities: {
+              ...prevState.capabilities,
+              ...(data.capabilities || {})
+            },
+            questionBank: data.questionBank || []
+          }));
         } catch (err) {
-          setError('Erreur lors du chargement de l\'assistant: ' + err.message);
+          const errorMessage = 'Erreur lors du chargement de l\'assistant: ' + err.message;
+          setError(errorMessage);
+          if (onError) onError(errorMessage);
         }
       };
       
       fetchAssistant();
     }
-  }, [assistantId, isEditMode]);
+  }, [assistantId, editMode, initialData, onError]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -160,18 +209,25 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
     setError(null);
     
     try {
-      if (isEditMode) {
+      if (editMode) {
         await aiAssistantService.updateAssistant(assistantId, assistant);
+        if (onSuccess) {
+          onSuccess(assistantId);
+        } else {
+          router.push(`/ai-assistants/${assistantId}`);
+        }
       } else {
         const newAssistant = await aiAssistantService.createAssistant(assistant);
-        router.push(`/ai-assistants/${newAssistant.id}`);
-      }
-      // Rediriger vers la liste des assistants après sauvegarde réussie
-      if (isEditMode) {
-        router.push('/ai-assistants');
+        if (onSuccess) {
+          onSuccess(newAssistant.id);
+        } else {
+          router.push(`/ai-assistants/${newAssistant.id}`);
+        }
       }
     } catch (err) {
-      setError('Erreur lors de l\'enregistrement: ' + err.message);
+      const errorMessage = 'Erreur lors de l\'enregistrement: ' + err.message;
+      setError(errorMessage);
+      if (onError) onError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -189,11 +245,11 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
       setTestResponse('Erreur lors du test: ' + err.message);
     }
   };
-  
+
   return (
     <div className="bg-white shadow-sm rounded-lg p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        {isEditMode ? 'Modifier l\'assistant IA' : 'Créer un nouvel assistant IA'}
+        {editMode ? 'Modifier l\'assistant IA' : 'Créer un nouvel assistant IA'}
       </h1>
       
       {error && (
@@ -296,7 +352,7 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Nom de l'assistant
+                  Nom de l'assistant <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -766,7 +822,13 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
       <div className="mt-8 flex justify-end space-x-3 border-t pt-6">
         <button
           type="button"
-          onClick={() => router.push('/ai-assistants')}
+          onClick={() => {
+            if (editMode) {
+              router.push(`/ai-assistants/${assistantId}`);
+            } else {
+              router.push('/ai-assistants');
+            }
+          }}
           className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           Annuler
@@ -777,7 +839,7 @@ const AIAssistantConfigurator = ({ assistantId = null }) => {
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           disabled={saving}
         >
-          {saving ? 'Enregistrement...' : isEditMode ? 'Mettre à jour' : 'Créer l\'assistant'}
+          {saving ? 'Enregistrement...' : editMode ? 'Mettre à jour' : 'Créer l\'assistant'}
         </button>
       </div>
     </div>

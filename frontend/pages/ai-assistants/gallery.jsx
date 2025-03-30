@@ -190,7 +190,7 @@ const AIAssistantGallery = () => {
   });
   
   return (
-    <DashboardLayout title="Galerie de modèles d'assistants IA">
+    <div title="Galerie de modèles d'assistants IA">
       <div className="pb-5 border-b border-gray-200 sm:flex sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:leading-9">
           Galerie de modèles d'assistants IA
@@ -343,7 +343,7 @@ const AIAssistantGallery = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </div>
   );
 };
 
