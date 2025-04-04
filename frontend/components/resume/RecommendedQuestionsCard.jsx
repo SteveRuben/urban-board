@@ -135,7 +135,7 @@ const RecommendedQuestionsCard = ({ questions = [] }) => {
                 {/* Bouton pour utiliser cette question dans un entretien */}
                 <div className="mt-4 text-right">
                   <button
-                    className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded"
+                    className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-black text-sm rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       // Ici, vous pourriez implémenter la fonctionnalité pour ajouter

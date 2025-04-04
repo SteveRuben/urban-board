@@ -494,7 +494,7 @@ const BillingPage = () => {
                       <button 
                         onClick={handleChangePlan}
                         disabled={processingAction}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {processingAction ? 'Traitement en cours...' : 'Changer de plan'}
                       </button>
@@ -512,7 +512,7 @@ const BillingPage = () => {
                     <button 
                       onClick={handleChangePlan}
                       disabled={processingAction}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {processingAction ? 'Traitement en cours...' : 'Réactiver l\'abonnement'}
                     </button>
@@ -535,7 +535,7 @@ const BillingPage = () => {
                       <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
                         <div
                           style={{ width: `${currentPlan.usageStats.interviews.percentage}%` }}
-                          className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                          className={`shadow-none flex flex-col text-center whitespace-nowrap text-black justify-center ${
                             currentPlan.usageStats.interviews.percentage > 90 ? 'bg-red-500' : 'bg-indigo-500'
                           }`}
                         ></div>
@@ -554,7 +554,7 @@ const BillingPage = () => {
                       <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
                         <div
                           style={{ width: `${currentPlan.usageStats.positions.percentage}%` }}
-                          className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                          className={`shadow-none flex flex-col text-center whitespace-nowrap text-black justify-center ${
                             currentPlan.usageStats.positions.percentage > 90 ? 'bg-red-500' : 'bg-indigo-500'
                           }`}
                         ></div>
@@ -724,7 +724,7 @@ const BillingPage = () => {
                 </p>
                 <button
                   onClick={handleAddPaymentMethod}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   Ajouter une carte
                 </button>
@@ -854,7 +854,7 @@ const BillingPage = () => {
                     <button
                       type="submit"
                       disabled={processingAction}
-                      className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {processingAction ? (
                         <span className="flex items-center">
@@ -985,7 +985,7 @@ const BillingPage = () => {
                     type="button"
                     onClick={handleConfirmPlanChange}
                     disabled={processingAction || !selectedPlan || (selectedPlan.id === currentPlan.id && billingPeriod === currentPlan.billingPeriod)}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-black hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingAction ? (
                       <span className="flex items-center">
@@ -1066,7 +1066,7 @@ const BillingPage = () => {
                     type="button"
                     onClick={handleCancelSubscription}
                     disabled={processingAction}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-black hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingAction ? (
                       <span className="flex items-center">

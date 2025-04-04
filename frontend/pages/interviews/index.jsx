@@ -21,7 +21,7 @@ const InterviewsIndexPage =() => {
         setLoading(true);
         
         // En environnement de développement, utiliser des données factices
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === 'testing') {
           await new Promise(resolve => setTimeout(resolve, 800)); // Simuler un délai réseau
           
           const mockInterviews = [
@@ -163,7 +163,7 @@ const InterviewsIndexPage =() => {
             <div className="mt-4 md:mt-0">
               <Link 
                 href="/interviews/new" 
-                className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="inline-flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -222,7 +222,7 @@ const InterviewsIndexPage =() => {
               <p className="text-red-600">{error}</p>
               <button 
                 onClick={() => window.location.reload()} 
-                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="mt-4 px-4 py-2 bg-red-600 text-black rounded-md hover:bg-red-700"
               >
                 Réessayer
               </button>
@@ -247,7 +247,7 @@ const InterviewsIndexPage =() => {
                   <p className="text-gray-600 mb-4">Vous n'avez pas encore d'entretiens.</p>
                   <Link 
                     href="/interviews/new" 
-                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

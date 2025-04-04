@@ -113,7 +113,7 @@ const EditAIAssistant = () => {
           </p>
           <div className="mt-6">
             <Link href="/ai-assistants" legacyBehavior>
-              <a className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+              <a className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                 <DocumentTextIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
                 Retour à la liste des assistants
               </a>

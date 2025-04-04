@@ -253,7 +253,7 @@ const DashboardPage = () => {
               <p className="text-red-600">{error}</p>
               <button 
                 onClick={() => window.location.reload()} 
-                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="mt-4 px-4 py-2 bg-red-600 text-black rounded-md hover:bg-red-700"
               >
                 Réessayer
               </button>

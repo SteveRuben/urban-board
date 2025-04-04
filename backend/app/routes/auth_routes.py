@@ -59,8 +59,6 @@ def register():
         password=data['password'],
         first_name=data['first_name'],
         last_name=data['last_name'],
-        job_title=data.get('job_title'),
-        department=data.get('department'),
         role=data.get('role', 'user')
     )
     

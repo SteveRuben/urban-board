@@ -1,5 +1,6 @@
 # backend/app/models/notification_setting.py
 import datetime
+import json
 from sqlalchemy import Column, String, Boolean, ForeignKey, UniqueConstraint
 from app import db
 
@@ -61,32 +62,42 @@ class NotificationPreference(db.Model):
     
     def __init__(self, user_id, email_preferences=None, push_preferences=None, desktop_preferences=None, created_at=None, updated_at=None):
         self.user_id = user_id
-        self.email_preferences = email_preferences or {
+        
+        # Utiliser json.dumps pour convertir les dictionnaires en chaînes JSON
+        default_email = {
             'newMessages': True,
             'interviewReminders': True,
             'weeklyReports': True,
             'marketingEmails': False
         }
-        self.push_preferences = push_preferences or {
+        
+        default_push = {
             'newMessages': True,
             'interviewReminders': True,
             'candidateUpdates': True,
             'teamNotifications': True
         }
-        self.desktop_preferences = desktop_preferences or {
+        
+        default_desktop = {
             'newMessages': True,
             'interviewReminders': True,
             'candidateUpdates': False,
             'teamNotifications': True
         }
+        
+        # Convertir en JSON si c'est un dictionnaire
+        self.email_preferences = json.dumps(email_preferences) if email_preferences else json.dumps(default_email)
+        self.push_preferences = json.dumps(push_preferences) if push_preferences else json.dumps(default_push)
+        self.desktop_preferences = json.dumps(desktop_preferences) if desktop_preferences else json.dumps(default_desktop)
+        
         self.created_at = created_at or datetime.datetime.now()
         self.updated_at = updated_at or datetime.datetime.now()
     
     def to_dict(self):
         return {
-            'email': self.email_preferences,
-            'push': self.push_preferences,
-            'desktop': self.desktop_preferences
+            'email': json.loads(self.email_preferences),
+            'push': json.loads(self.push_preferences),
+            'desktop': json.loads(self.desktop_preferences)
         }
     
     @property
@@ -96,4 +107,20 @@ class NotificationPreference(db.Model):
     @email_prefs.setter
     def email_prefs(self, value):
         self.email_preferences = json.dumps(value)
+    
+    @property
+    def push_prefs(self):
+        return json.loads(self.push_preferences)
+
+    @push_prefs.setter
+    def push_prefs(self, value):
+        self.push_preferences = json.dumps(value)
+
+    @property
+    def desktop_prefs(self):
+        return json.loads(self.desktop_preferences)
+
+    @desktop_prefs.setter
+    def desktop_prefs(self, value):
+        self.desktop_preferences = json.dumps(value)
         

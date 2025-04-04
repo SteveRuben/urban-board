@@ -129,7 +129,7 @@ const RequestAIAnalysis = ({ interviewId, teamId }) => {
         <div className="text-red-500 mb-4">{error}</div>
         <button 
           onClick={() => window.location.reload()}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-blue-500 hover:bg-blue-700 text-black font-bold py-2 px-4 rounded"
         >
           Réessayer
         </button>
@@ -167,7 +167,7 @@ const RequestAIAnalysis = ({ interviewId, teamId }) => {
           
           <button 
             onClick={() => setShowModal(true)}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg flex items-center justify-center"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-black font-medium py-2.5 px-4 rounded-lg flex items-center justify-center"
           >
             <Brain className="mr-2 h-5 w-5" />
             Lancer une analyse IA
@@ -248,7 +248,7 @@ const RequestAIAnalysis = ({ interviewId, teamId }) => {
                     <button
                       type="button"
                       onClick={() => setResult(null)}
-                      className="px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700"
+                      className="px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-black hover:bg-indigo-700"
                     >
                       Nouvelle analyse
                     </button>
@@ -273,7 +273,7 @@ const RequestAIAnalysis = ({ interviewId, teamId }) => {
                         onClick={() => setSelectedAssistant(assistant.id)}
                       >
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-black">
                             <Brain size={14} />
                           </div>
                           <div className="ml-3">
@@ -384,7 +384,7 @@ const RequestAIAnalysis = ({ interviewId, teamId }) => {
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
                     !selectedAssistant || !selectedAnalysisType || processing
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-indigo-600 text-black hover:bg-indigo-700'
                   }`}
                 >
                   {processing ? 'Traitement en cours...' : 'Lancer l\'analyse'}

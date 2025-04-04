@@ -74,7 +74,7 @@ const CurrentPlanCard = ({
                   <button 
                     onClick={onChangePlan}
                     disabled={processingAction}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingAction ? 'Traitement en cours...' : 'Changer de plan'}
                   </button>
@@ -92,7 +92,7 @@ const CurrentPlanCard = ({
                 <button 
                   onClick={onChangePlan}
                   disabled={processingAction}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processingAction ? 'Traitement en cours...' : 'Réactiver l\'abonnement'}
                 </button>
@@ -115,7 +115,7 @@ const CurrentPlanCard = ({
                   <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
                     <div
                       style={{ width: `${currentPlan.usageStats.interviews.percentage}%` }}
-                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-black justify-center ${
                         currentPlan.usageStats.interviews.percentage > 90 ? 'bg-red-500' : 'bg-indigo-500'
                       }`}
                     ></div>
@@ -134,7 +134,7 @@ const CurrentPlanCard = ({
                   <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
                     <div
                       style={{ width: `${currentPlan.usageStats.positions.percentage}%` }}
-                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-black justify-center ${
                         currentPlan.usageStats.positions.percentage > 90 ? 'bg-red-500' : 'bg-indigo-500'
                       }`}
                     ></div>

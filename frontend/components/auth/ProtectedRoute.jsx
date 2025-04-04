@@ -33,6 +33,7 @@ const withAuth = (Component, options = {}) => {
       }
     }, [loading, isAuthenticated, router, user]);
     
+
     // Afficher un écran de chargement pendant la vérification
     if (loading || !isAuthenticated) {
       return (

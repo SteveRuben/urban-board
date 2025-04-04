@@ -368,7 +368,7 @@ const TestAssistant = ({ assistant, onError }) => {
             <div className="flex justify-end">
               <button
                 type="button"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 onClick={handleTest}
                 disabled={loading || !question.trim()}
               >
@@ -502,7 +502,7 @@ const AIAssistantDetails = () => {
           </p>
           <div className="mt-6">
             <Link href="/ai-assistants" legacyBehavior>
-              <a className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+              <a className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                 <ArrowLeftIcon className="-ml-1 mr-2 h-4 w-4" />
                 Retour à la liste des assistants
               </a>
@@ -583,7 +583,7 @@ const AIAssistantDetails = () => {
             <button
               type="button"
               onClick={handleCreateInterview}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <VideoCameraIcon className="-ml-0.5 mr-1.5 h-4 w-4" />
               Nouvel entretien

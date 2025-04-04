@@ -264,7 +264,7 @@ const InterviewPage = () => {
   const interviewMode = interview?.interview_mode || 'autonomous';
   
   return (
-    <DashboardLayout>
+    <>
       <Head>
         <title>Entretien | RecruteIA</title>
       </Head>
@@ -407,15 +407,16 @@ const InterviewPage = () => {
       {interviewMode === 'collaborative' && activeTab === 'interview' && !isAIChatOpen && (
         <button
           onClick={() => setIsAIChatOpen(true)}
-          className="fixed bottom-6 right-6 bg-primary-600 text-white rounded-full p-3 shadow-lg hover:bg-primary-700 flex items-center"
+          className="fixed bottom-6 right-6 bg-primary-600 text-black rounded-full p-3 shadow-lg hover:bg-primary-700 flex items-center"
         >
           <MessageCircle className="h-6 w-6" />
           <span className="ml-2 mr-1">Assistant IA</span>
         </button>
       )}
-    </DashboardLayout>
+    </>
   );
 };
+// DashboardLayout
 
 /**
  * Interface principale d'entretien
@@ -715,4 +716,5 @@ const AnalyticsDashboard = ({
   );
 };
 
+InterviewPage.getLayout = (page) => <DashboardLayout>{page}</DashboardLayout>;
 export default InterviewPage;

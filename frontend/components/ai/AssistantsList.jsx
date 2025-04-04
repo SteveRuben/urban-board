@@ -70,7 +70,7 @@ const AssistantsList = () => {
         <div className="text-red-500 mb-4">{error}</div>
         <button 
           onClick={() => window.location.reload()}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-blue-500 hover:bg-blue-700 text-black font-bold py-2 px-4 rounded"
         >
           Réessayer
         </button>
@@ -85,7 +85,7 @@ const AssistantsList = () => {
           <h2 className="text-2xl font-bold text-gray-800">Mes assistants IA</h2>
           <Link 
             href="/ai-assistants/create" 
-            className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg"
+            className="flex items-center bg-blue-500 hover:bg-blue-600 text-black font-medium py-2 px-4 rounded-lg"
           >
             <Plus size={18} className="mr-1" />
             Créer un assistant
@@ -101,7 +101,7 @@ const AssistantsList = () => {
             <p className="text-gray-600 mb-4">Vous n'avez pas encore créé d'assistant IA. Créez-en un pour améliorer votre processus de recrutement.</p>
             <Link 
               href="/ai-assistants/create" 
-              className="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg"
+              className="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-black font-medium py-2 px-4 rounded-lg"
             >
               <Plus size={18} className="mr-1" />
               Créer mon premier assistant
@@ -119,7 +119,7 @@ const AssistantsList = () => {
               <div className="p-6">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-white">
+                    <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-black">
                       {getTypeIcon(assistant.assistant_type)}
                     </div>
                     <div className="ml-4">

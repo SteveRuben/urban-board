@@ -1,6 +1,74 @@
-// services/user-service.js
+// frontend/services/user-service.js
 import axios from 'axios';
-// import { API_URL } from '../config/constants'; ${API_URL}
+
+// Configuration d'axios avec les intercepteurs pour gérer automatiquement les tokens
+const api = axios.create({
+  baseURL: '/api'
+});
+
+// Ajouter un intercepteur pour les requêtes
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Ajouter un intercepteur pour les réponses
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Si l'erreur est 401 (non autorisé) et que la requête n'a pas déjà été retentée
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        
+        // Tenter de rafraîchir le token
+        const response = await axios.post('/api/auth/refresh', {
+          refresh_token: refreshToken
+        });
+        
+        // Si le rafraîchissement a réussi
+        if (response.data.tokens) {
+          const { access_token, refresh_token } = response.data.tokens;
+          
+          // Mettre à jour les tokens
+          localStorage.setItem('accessToken', access_token);
+          localStorage.setItem('refreshToken', refresh_token);
+          
+          // Mettre à jour le header d'autorisation pour toutes les requêtes futures
+          api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+          axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+          
+          // Retenter la requête originale avec le nouveau token
+          originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing token:', refreshError);
+        
+        // Rediriger vers la page de connexion
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/auth/login';
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 export class UserService {
   /**
@@ -9,7 +77,7 @@ export class UserService {
    */
   static async getProfile() {
     try {
-      const response = await axios.get(`/api/users/profile`);
+      const response = await api.get('/users/profile');
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération du profil:', error);
@@ -24,7 +92,7 @@ export class UserService {
    */
   static async updateProfile(profileData) {
     try {
-      const response = await axios.put(`/api/users/profile`, profileData);
+      const response = await api.put('/users/profile', profileData);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du profil:', error);
@@ -39,7 +107,7 @@ export class UserService {
    */
   static async updateAvatar(formData) {
     try {
-      const response = await axios.post(`/api/users/profile/avatar`, formData, {
+      const response = await api.post('/users/profile/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -58,7 +126,7 @@ export class UserService {
    */
   static async updatePassword(passwordData) {
     try {
-      const response = await axios.put(`/api/users/profile/password`, passwordData);
+      const response = await api.post('/users/profile/password', passwordData);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du mot de passe:', error);
@@ -72,7 +140,7 @@ export class UserService {
    */
   static async initTwoFactorSetup() {
     try {
-      const response = await axios.post(`/api/users/profile/2fa/init`);
+      const response = await api.post('/users/profile/2fa/init');
       return response.data;
     } catch (error) {
       console.error("Erreur lors de l'initialisation de l'authentification à deux facteurs:", error);
@@ -87,7 +155,7 @@ export class UserService {
    */
   static async verifyTwoFactor(verificationData) {
     try {
-      const response = await axios.post(`/api/users/profile/2fa/verify`, verificationData);
+      const response = await api.post('/users/profile/2fa/verify', verificationData);
       return response.data;
     } catch (error) {
       console.error("Erreur lors de la vérification de l'authentification à deux facteurs:", error);
@@ -101,7 +169,7 @@ export class UserService {
    */
   static async disableTwoFactor() {
     try {
-      const response = await axios.delete(`/api/users/profile/2fa`);
+      const response = await api.post('/users/profile/2fa');
       return response.data;
     } catch (error) {
       console.error("Erreur lors de la désactivation de l'authentification à deux facteurs:", error);
@@ -116,7 +184,7 @@ export class UserService {
    */
   static async updateNotificationPreferences(preferences) {
     try {
-      const response = await axios.put(`/api/users/profile/notifications`, preferences);
+      const response = await api.put('/users/profile/notifications', preferences);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour des préférences de notification:', error);
@@ -131,7 +199,7 @@ export class UserService {
    */
   static async getIntegrationAuthUrl(integrationId) {
     try {
-      const response = await axios.get(`/api/integrations/${integrationId}/auth-url`);
+      const response = await api.get(`/integrations/${integrationId}/auth-url`);
       return response.data.authUrl;
     } catch (error) {
       console.error("Erreur lors de la récupération de l'URL d'authentification:", error);
@@ -146,7 +214,7 @@ export class UserService {
    */
   static async disconnectIntegration(integrationId) {
     try {
-      const response = await axios.delete(`/api/integrations/${integrationId}`);
+      const response = await api.delete(`/integrations/${integrationId}`);
       return response.data;
     } catch (error) {
       console.error("Erreur lors de la déconnexion de l'intégration:", error);
@@ -160,7 +228,7 @@ export class UserService {
    */
   static async getLoginHistory() {
     try {
-      const response = await axios.get(`/api/users/profile/login-history`);
+      const response = await api.get('/users/profile/login-history');
       return response.data;
     } catch (error) {
       console.error("Erreur lors de la récupération de l'historique des connexions:", error);

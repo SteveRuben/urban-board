@@ -9,6 +9,22 @@ from ..services.interview_service import (
     update_interview_status
 )
 
+@interview_bp.route('/', methods=['GET'])
+def list_interviews_route():
+    """Crée un nouvel entretien"""
+    data = request.json
+    
+    # Vérifier les champs obligatoires
+    required_fields = ['job_role', 'candidate_name']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
+    
+    # Créer l'entretien
+    interview = create_interview(data)
+    
+    return jsonify(interview), 201
+
 @interview_bp.route('/', methods=['POST'])
 def create_interview_route():
     """Crée un nouvel entretien"""

@@ -151,7 +151,7 @@ const TeamAIAssistants = ({ teamId }) => {
             disabled={userAssistants.length === 0}
             className={`flex items-center ${
               userAssistants.length > 0
-                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                ? 'bg-blue-500 hover:bg-blue-600 text-black'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             } font-medium py-2 px-4 rounded-lg`}
           >
@@ -176,7 +176,7 @@ const TeamAIAssistants = ({ teamId }) => {
                 disabled={userAssistants.length === 0}
                 className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md ${
                   userAssistants.length > 0
-                    ? 'text-white bg-blue-600 hover:bg-blue-700'
+                    ? 'text-black bg-blue-600 hover:bg-blue-700'
                     : 'text-gray-500 bg-gray-300 cursor-not-allowed'
                 }`}
               >
@@ -191,7 +191,7 @@ const TeamAIAssistants = ({ teamId }) => {
               <div key={assistant.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-white">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-black">
                       <Brain size={18} />
                     </div>
                     <div className="ml-3">
@@ -279,7 +279,7 @@ const TeamAIAssistants = ({ teamId }) => {
                           onClick={() => setSelectedAssistant(assistant.id)}
                         >
                           <div className="flex items-center">
-                            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-white">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center text-black">
                               <Brain size={14} />
                             </div>
                             <div className="ml-3">
@@ -330,7 +330,7 @@ const TeamAIAssistants = ({ teamId }) => {
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
                   !selectedAssistant || processing
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-600 text-black hover:bg-blue-700'
                 }`}
               >
                 {processing ? 'Ajout en cours...' : 'Ajouter à l\'équipe'}

@@ -65,32 +65,67 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Fonction pour obtenir le jeton d'accès frais
+  const getAccessToken = () => {
+    return localStorage.getItem('accessToken');
+  };
+
+  // Fonction pour vérifier si une réponse indique un problème d'authentification
+  const isAuthError = (status) => {
+    return status === 401 || status === 403;
+  };
+
   // Charger les notifications
-  const fetchNotifications = useCallback(async (filter = 'all') => {
+  const fetchNotifications = useCallback(async (filter = 'all', forceRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
+      // Construire l'URL avec les paramètres
       let url = '/api/notifications';
+      const params = new URLSearchParams();
+      
       if (filter !== 'all') {
-        url += `?filter=${filter}`;
+        params.append('filter', filter);
+      }
+      
+      // Ajouter un paramètre timestamp pour éviter la mise en cache
+      if (forceRefresh) {
+        params.append('_t', Date.now());
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      // Obtenir le jeton d'accès au moment de la requête
+      const token = getAccessToken();
+      
+      if (!token) {
+        throw new Error('Aucun jeton d\'authentification trouvé');
+      }
+          
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        // Désactiver la mise en cache au niveau de la requête
+        cache: 'no-store'
+      });
+
+      if (isAuthError(response.status)) {
+        // Si problème d'authentification, notifier l'utilisateur
+        showToast('error', 'Session expirée. Veuillez vous reconnecter.');
+        // Ici, vous pourriez également déclencher une déconnexion ou rafraîchir le token
+        throw new Error('Erreur d\'authentification');
       }
 
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+      if (!response.ok) throw new Error('Erreur lors du chargement des notifications');
 
-        if (!response.ok) throw new Error('Erreur lors du chargement des notifications');
-
-        const data = await response.json();
-        setNotifications(data);
-        updateUnreadCount(data);
-      }
-
-    } catch (err) {
+      const data = await response.json();
+      setNotifications(data);
+      updateUnreadCount(data);
+     } catch (err) {
       console.error('Erreur:', err);
       setError(err.message);
     } finally {
@@ -100,7 +135,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Fonction pour afficher une notification toast
   const showToast = useCallback((type, message, duration = 4000) => {
-    const id = Date.now().toString();;
+    const id = Date.now().toString();
 
     // Ajouter le nouveau toast
     setToasts(prevToasts => [...prevToasts, { id, type, message, duration }]);
@@ -124,25 +159,39 @@ export const NotificationProvider = ({ children }) => {
 
   // Charger les notifications au premier rendu
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications('all', true);
 
     // Optionnel: configuration d'un polling pour les mises à jour en temps réel
     const interval = setInterval(() => {
-      fetchNotifications();
+      fetchNotifications('all', true);
     }, 60000); // Toutes les minutes
 
     return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  // Function pour créer des entêtes d'authentification
+  const getAuthHeaders = () => {
+    const token = getAccessToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    };
+  };
 
   // Marquer une notification comme lue
   const markAsRead = async (id) => {
     try {
       const response = await fetch(`/api/notifications/${id}/read`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: getAuthHeaders(),
+        cache: 'no-store'
       });
+
+      if (isAuthError(response.status)) {
+        showToast('error', 'Session expirée. Veuillez vous reconnecter.');
+        throw new Error('Erreur d\'authentification');
+      }
 
       if (!response.ok) throw new Error('Erreur lors de la mise à jour');
 
@@ -163,10 +212,14 @@ export const NotificationProvider = ({ children }) => {
     try {
       const response = await fetch('/api/notifications/mark-all-read', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: getAuthHeaders(),
+        cache: 'no-store'
       });
+
+      if (isAuthError(response.status)) {
+        showToast('error', 'Session expirée. Veuillez vous reconnecter.');
+        throw new Error('Erreur d\'authentification');
+      }
 
       if (!response.ok) throw new Error('Erreur lors de la mise à jour');
 
@@ -184,8 +237,15 @@ export const NotificationProvider = ({ children }) => {
   const deleteNotification = async (id) => {
     try {
       const response = await fetch(`/api/notifications/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        cache: 'no-store'
       });
+
+      if (isAuthError(response.status)) {
+        showToast('error', 'Session expirée. Veuillez vous reconnecter.');
+        throw new Error('Erreur d\'authentification');
+      }
 
       if (!response.ok) throw new Error('Erreur lors de la suppression');
 
@@ -207,6 +267,11 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  // Fonction pour rafraîchir manuellement les notifications
+  const refreshNotifications = () => {
+    return fetchNotifications('all', true);
+  };
+
   // Exposer les valeurs et fonctions à travers le contexte
   const value = {
     notifications,
@@ -220,12 +285,23 @@ export const NotificationProvider = ({ children }) => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    addNotification
+    addNotification,
+    refreshNotifications
   };
 
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      <div className="fixed bottom-0 right-0 p-4 z-50">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            type={toast.type}
+            message={toast.message}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
     </NotificationContext.Provider>
   );
 };

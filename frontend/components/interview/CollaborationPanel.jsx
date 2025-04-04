@@ -458,7 +458,7 @@ const handleShare = async (e) => {
                 <button
                   onClick={handleSendComment}
                   disabled={!newComment.trim() || processingAction}
-                  className="p-2 bg-indigo-600 text-white rounded-r-md hover:bg-indigo-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 bg-indigo-600 text-black rounded-r-md hover:bg-indigo-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processingAction ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -479,7 +479,7 @@ const handleShare = async (e) => {
               {!sharing && (
                 <button
                   onClick={() => setSharing(true)}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <UserPlus className="h-4 w-4 mr-1" /> Nouveau partage
                 </button>
@@ -548,7 +548,7 @@ const handleShare = async (e) => {
                     <button
                       type="submit"
                       disabled={!shareEmail.trim() || processingAction}
-                      className="px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {processingAction ? 'Partage en cours...' : 'Partager'}
                     </button>

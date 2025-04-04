@@ -43,8 +43,6 @@ class AuthService:
             first_name=first_name,
             last_name=last_name,
             role=kwargs.get('role', 'user'),
-            job_title=kwargs.get('job_title'),
-            department=kwargs.get('department'),
             is_active=True,
             created_at=datetime.utcnow(),
             last_password_change=datetime.utcnow()

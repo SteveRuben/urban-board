@@ -116,7 +116,7 @@ const Tab = ({
       base: 'pb-2 border-b',
     },
     filled: {
-      active: 'bg-primary-600 text-white',
+      active: 'bg-primary-600 text-black',
       inactive: 'bg-gray-100 text-gray-600 hover:bg-gray-200',
       disabled: 'bg-gray-100 text-gray-300 cursor-not-allowed',
       base: 'rounded-md',
@@ -128,7 +128,7 @@ const Tab = ({
       base: 'rounded-full',
     },
     buttonFilled: {
-      active: 'bg-primary-600 text-white rounded-md',
+      active: 'bg-primary-600 text-black rounded-md',
       inactive: 'bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-md',
       disabled: 'bg-gray-100 text-gray-300 cursor-not-allowed rounded-md',
       base: '',

@@ -27,7 +27,7 @@ const Spinner = ({
     info: 'text-blue-600',
     light: 'text-gray-300',
     dark: 'text-gray-800',
-    white: 'text-white',
+    white: 'text-black',
   };
 
   // Assembler les classes

@@ -260,7 +260,7 @@ const NewInterviewPage = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    step >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'
+                    step >= 1 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
                   }`}>
                     1
                   </div>
@@ -269,7 +269,7 @@ const NewInterviewPage = () => {
                 <div className={`h-0.5 flex-1 mx-4 ${step > 1 ? 'bg-primary-600' : 'bg-gray-200'}`}></div>
                 <div className="flex items-center">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    step >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'
+                    step >= 2 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
                   }`}>
                     2
                   </div>
@@ -278,7 +278,7 @@ const NewInterviewPage = () => {
                 <div className={`h-0.5 flex-1 mx-4 ${step > 2 ? 'bg-primary-600' : 'bg-gray-200'}`}></div>
                 <div className="flex items-center">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    step >= 3 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'
+                    step >= 3 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
                   }`}>
                     3
                   </div>
@@ -511,7 +511,7 @@ const NewInterviewPage = () => {
                           <a 
                             href="/ai-assistants/create"
                             target="_blank"
-                            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                            className="inline-flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
                           >
                             Créer un assistant IA
                           </a>
@@ -530,7 +530,7 @@ const NewInterviewPage = () => {
                             >
                               <div className="flex-shrink-0">
                                 <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
-                                  <Brain className="h-5 w-5 text-white" />
+                                  <Brain className="h-5 w-5 text-black" />
                                 </div>
                               </div>
                               <div className="ml-3 flex-1">
@@ -754,7 +754,7 @@ const NewInterviewPage = () => {
                   <button
                     type="button"
                     onClick={validateAndProceed}
-                    className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                    className="px-6 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
                   >
                     Suivant
                   </button>
@@ -762,12 +762,12 @@ const NewInterviewPage = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className={`px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center ${
+                    className={`px-6 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700 flex items-center ${
                       isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                     }`}
                   >
                     {isSubmitting && (
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>

@@ -21,32 +21,32 @@ const Button = ({
   // Couleur
   const colorClasses = {
     primary: {
-      filled: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
+      filled: 'bg-primary-600 text-black hover:bg-primary-700 focus:ring-primary-500',
       outlined: 'border border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-primary-500',
       ghost: 'text-primary-600 hover:bg-primary-50 focus:ring-primary-500',
     },
     secondary: {
-      filled: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
+      filled: 'bg-gray-600 text-black hover:bg-gray-700 focus:ring-gray-500',
       outlined: 'border border-gray-600 text-gray-600 hover:bg-gray-50 focus:ring-gray-500',
       ghost: 'text-gray-600 hover:bg-gray-50 focus:ring-gray-500',
     },
     success: {
-      filled: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
+      filled: 'bg-green-600 text-black hover:bg-green-700 focus:ring-green-500',
       outlined: 'border border-green-600 text-green-600 hover:bg-green-50 focus:ring-green-500',
       ghost: 'text-green-600 hover:bg-green-50 focus:ring-green-500',
     },
     danger: {
-      filled: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+      filled: 'bg-red-600 text-black hover:bg-red-700 focus:ring-red-500',
       outlined: 'border border-red-600 text-red-600 hover:bg-red-50 focus:ring-red-500',
       ghost: 'text-red-600 hover:bg-red-50 focus:ring-red-500',
     },
     warning: {
-      filled: 'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500',
+      filled: 'bg-amber-500 text-black hover:bg-amber-600 focus:ring-amber-500',
       outlined: 'border border-amber-500 text-amber-500 hover:bg-amber-50 focus:ring-amber-500',
       ghost: 'text-amber-500 hover:bg-amber-50 focus:ring-amber-500',
     },
     info: {
-      filled: 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500',
+      filled: 'bg-blue-500 text-black hover:bg-blue-600 focus:ring-blue-500',
       outlined: 'border border-blue-500 text-blue-500 hover:bg-blue-50 focus:ring-blue-500',
       ghost: 'text-blue-500 hover:bg-blue-50 focus:ring-blue-500',
     },

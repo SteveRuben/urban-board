@@ -17,21 +17,21 @@ import { useRouter } from 'next/router';
 const getNotificationIcon = (type) => {
   switch (type) {
     case 'interview_completed':
-      return <MessageSquare className="h-5 w-5 text-white" />;
+      return <MessageSquare className="h-5 w-5 text-black" />;
     case 'resume_analyzed':
-      return <FileText className="h-5 w-5 text-white" />;
+      return <FileText className="h-5 w-5 text-black" />;
     case 'candidate_feedback':
-      return <Users className="h-5 w-5 text-white" />;
+      return <Users className="h-5 w-5 text-black" />;
     case 'interview_scheduled':
-      return <Calendar className="h-5 w-5 text-white" />;
+      return <Calendar className="h-5 w-5 text-black" />;
     case 'error':
-      return <AlertTriangle className="h-5 w-5 text-white" />;
+      return <AlertTriangle className="h-5 w-5 text-black" />;
     case 'success':
-      return <CheckCircle className="h-5 w-5 text-white" />;
+      return <CheckCircle className="h-5 w-5 text-black" />;
     case 'info':
-      return <Info className="h-5 w-5 text-white" />;
+      return <Info className="h-5 w-5 text-black" />;
     default:
-      return <Bell className="h-5 w-5 text-white" />;
+      return <Bell className="h-5 w-5 text-black" />;
   }
 };
 
@@ -118,16 +118,16 @@ const NotificationToast = ({ notification, onClose, autoClose = true }) => {
               {getNotificationIcon(notification.type)}
             </div>
             <div className="ml-3 w-0 flex-1 pt-0.5">
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-black">
                 {notification.title}
               </p>
-              <p className="mt-1 text-sm text-white opacity-90">
+              <p className="mt-1 text-sm text-black opacity-90">
                 {notification.message}
               </p>
               {notification.reference_id && (
                 <button
                   onClick={handleClick}
-                  className="mt-2 text-xs font-medium text-white underline"
+                  className="mt-2 text-xs font-medium text-black underline"
                 >
                   Voir les détails
                 </button>
@@ -135,7 +135,7 @@ const NotificationToast = ({ notification, onClose, autoClose = true }) => {
             </div>
             <div className="ml-4 flex-shrink-0 flex">
               <button
-                className="inline-flex text-white focus:outline-none focus:ring-2 focus:ring-white"
+                className="inline-flex text-black focus:outline-none focus:ring-2 focus:ring-white"
                 onClick={() => {
                   setVisible(false);
                   setTimeout(onClose, 300);

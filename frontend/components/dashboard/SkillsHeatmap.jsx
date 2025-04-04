@@ -50,14 +50,14 @@ const SkillsHeatmap = ({ data }) => {
   const getScoreColor = (score) => {
     if (score === null) return 'bg-gray-100'; // Pas de données
     
-    if (score >= 9) return 'bg-green-800 text-white';
-    if (score >= 8) return 'bg-green-600 text-white';
-    if (score >= 7) return 'bg-green-500 text-white';
-    if (score >= 6) return 'bg-blue-500 text-white';
-    if (score >= 5) return 'bg-blue-400 text-white';
+    if (score >= 9) return 'bg-green-800 text-black';
+    if (score >= 8) return 'bg-green-600 text-black';
+    if (score >= 7) return 'bg-green-500 text-black';
+    if (score >= 6) return 'bg-blue-500 text-black';
+    if (score >= 5) return 'bg-blue-400 text-black';
     if (score >= 4) return 'bg-yellow-400 text-gray-800';
     if (score >= 3) return 'bg-yellow-300 text-gray-800';
-    return 'bg-red-400 text-white';
+    return 'bg-red-400 text-black';
   };
 
   return (

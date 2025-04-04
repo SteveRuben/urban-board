@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Check, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import Layout from '../components/layout/Layout';
 
 const PricingPage = () => {
   const { user } = useAuth();
@@ -96,7 +97,7 @@ const PricingPage = () => {
               onClick={() => setBillingPeriod('monthly')}
               className={`relative py-2 px-6 text-sm font-medium rounded-md whitespace-nowrap focus:outline-none ${
                 billingPeriod === 'monthly'
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-indigo-600 text-black'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -106,7 +107,7 @@ const PricingPage = () => {
               onClick={() => setBillingPeriod('annual')}
               className={`relative py-2 px-6 ml-0.5 text-sm font-medium rounded-md whitespace-nowrap focus:outline-none ${
                 billingPeriod === 'annual'
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-indigo-600 text-black'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -128,7 +129,7 @@ const PricingPage = () => {
               }`}
             >
               {plan.highlighted && (
-                <div className="bg-indigo-500 py-1 text-center text-sm font-semibold text-white rounded-t-lg">
+                <div className="bg-indigo-500 py-1 text-center text-sm font-semibold text-black rounded-t-lg">
                   Le plus populaire
                 </div>
               )}
@@ -156,7 +157,7 @@ const PricingPage = () => {
                   href={user ? '/dashboard/billing' : plan.ctaLink}
                   className={`mt-6 block w-full py-3 px-4 rounded-md shadow text-center text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                     plan.highlighted
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      ? 'bg-indigo-600 text-black hover:bg-indigo-700'
                       : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                   }`}
                 >
@@ -216,7 +217,7 @@ const PricingPage = () => {
             <div className="mt-6">
               <Link
                 href="/contact"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Contacter notre équipe
               </Link>
@@ -260,4 +261,5 @@ const PricingPage = () => {
   );
 };
 
+PricingPage.getLayout = (page) => <Layout>{page}</Layout>;
 export default PricingPage;

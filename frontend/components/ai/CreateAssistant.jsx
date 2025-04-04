@@ -175,7 +175,7 @@ const CreateAssistant = () => {
                 key={type.id}
                 className={`px-3 py-1 rounded-full cursor-pointer text-sm ${
                   formData.capabilities.analysis_types.includes(type.id) 
-                    ? 'bg-blue-500 text-white' 
+                    ? 'bg-blue-500 text-black' 
                     : 'bg-gray-200 text-gray-700'
                 }`}
                 onClick={() => handleAnalysisTypeChange(type.id)}
@@ -214,7 +214,7 @@ const CreateAssistant = () => {
           </button>
           <button
             type="submit"
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="bg-blue-500 hover:bg-blue-700 text-black font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             disabled={loading}
           >
             {loading ? 'Création en cours...' : 'Créer l\'assistant'}

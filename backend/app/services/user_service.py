@@ -12,6 +12,7 @@ import uuid
 import pyotp
 import qrcode
 import io
+import json
 import base64
 from sqlalchemy.exc import SQLAlchemyError
 from flask import current_app
@@ -137,7 +138,7 @@ class UserService:
             avatar_url = f"/uploads/avatars/{new_filename}"
             
             # Supprimer l'ancien avatar si existant
-            if user.avatar_url and user.avatar_url != "/images/default-avatar.png":
+            if user.avatar_url and user.avatar_url != "/images/default.png":
                 old_avatar_path = os.path.join(
                     current_app.root_path, 
                     'static', 
@@ -435,14 +436,15 @@ class UserService:
             
             # Mettre à jour les préférences
             if 'email' in data:
-                preferences.email_preferences = data['email']
+                preferences.email_preferences = json.dumps(data['email'])
             
             if 'push' in data:
-                preferences.push_preferences = data['push']
+                preferences.push_preferences = json.dumps(data['push'])
             
             if 'desktop' in data:
-                preferences.desktop_preferences = data['desktop']
+                preferences.desktop_preferences = json.dumps(data['desktop'])
             
+
             preferences.updated_at = datetime.datetime.now()
             db.session.commit()
             

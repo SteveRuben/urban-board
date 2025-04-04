@@ -56,7 +56,7 @@ const Header = ({ variant = 'public' }) => {
               <div className="flex items-center space-x-4">
                 <Link
                   href="/dashboard"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-black bg-indigo-600 hover:bg-indigo-700"
                 >
                   Tableau de bord
                 </Link>
@@ -71,7 +71,7 @@ const Header = ({ variant = 'public' }) => {
                 </Link>
                 <Link
                   href="/auth/register"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-black bg-indigo-600 hover:bg-indigo-700"
                 >
                   Inscription
                 </Link>

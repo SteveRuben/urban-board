@@ -221,7 +221,7 @@ const RequestAIAnalysis = ({ interviewId, teamId, onRequestAnalysis }) => {
           </p>
           <a
             href="/ai-assistants/create"
-            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Brain className="h-4 w-4 mr-2" />
             Créer un assistant IA
@@ -243,7 +243,7 @@ const RequestAIAnalysis = ({ interviewId, teamId, onRequestAnalysis }) => {
                 {selectedAssistant ? (
                   <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-indigo-600 flex items-center justify-center mr-2">
-                      <Brain className="h-4 w-4 text-white" />
+                      <Brain className="h-4 w-4 text-black" />
                     </div>
                     <div>
                       <span className="block text-sm font-medium">{selectedAssistant.name}</span>
@@ -269,7 +269,7 @@ const RequestAIAnalysis = ({ interviewId, teamId, onRequestAnalysis }) => {
                       }}
                     >
                       <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-indigo-600 flex items-center justify-center mr-2">
-                        <Brain className="h-4 w-4 text-white" />
+                        <Brain className="h-4 w-4 text-black" />
                       </div>
                       <div>
                         <span className="block text-sm font-medium">{assistant.name}</span>
@@ -342,7 +342,7 @@ const RequestAIAnalysis = ({ interviewId, teamId, onRequestAnalysis }) => {
             <button
               type="submit"
               disabled={!selectedAssistant || !analysisType || isLoading}
-              className={`w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+              className={`w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black ${
                 !selectedAssistant || !analysisType || isLoading
                   ? 'bg-gray-300 cursor-not-allowed'
                   : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'

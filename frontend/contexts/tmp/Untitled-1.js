@@ -53,7 +53,7 @@ const Layout = ({ children }) => {
               onClick={() => setSidebarOpen(false)}
             >
               <span className="sr-only">Fermer la navigation</span>
-              <X className="h-6 w-6 text-white" />
+              <X className="h-6 w-6 text-black" />
             </button>
           </div>
           

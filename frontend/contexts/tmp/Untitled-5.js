@@ -62,7 +62,7 @@ const DashboardLayout = ({ children }) => {
       {/* Sidebar pour mobile */}
       <div 
         className={`
-          fixed inset-y-0 left-0 flex flex-col z-50 w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
+          fixed inset-y-0 left-0 flex flex-col z-50 w-64 bg-gray-800 text-black transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:static md:inset-0
         `}
@@ -77,7 +77,7 @@ const DashboardLayout = ({ children }) => {
             <span className="ml-2 text-xl font-semibold">RecruteIA</span>
           </Link>
           <button 
-            className="md:hidden text-white" 
+            className="md:hidden text-black" 
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-6 w-6" />
@@ -94,8 +94,8 @@ const DashboardLayout = ({ children }) => {
                 className={`
                   flex items-center px-4 py-2 text-sm font-medium rounded-md
                   ${isActiveLink(item.href)
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'}
+                    ? 'bg-gray-900 text-black'
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-black'}
                 `}
               >
                 <item.icon className="mr-3 h-5 w-5" />
@@ -123,8 +123,8 @@ const DashboardLayout = ({ children }) => {
                 className={`
                   flex items-center px-4 py-2 text-sm font-medium rounded-md
                   ${isActiveLink(item.href)
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'}
+                    ? 'bg-gray-900 text-black'
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-black'}
                 `}
               >
                 <item.icon className="mr-3 h-5 w-5" />
@@ -133,7 +133,7 @@ const DashboardLayout = ({ children }) => {
             ))}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white"
+              className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-black"
             >
               <LogOut className="mr-3 h-5 w-5" />
               Déconnexion

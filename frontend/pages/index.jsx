@@ -18,7 +18,7 @@ export default function Home() {
       </Head>
 
       {/* Section Hero */}
-      <section className="bg-gradient-to-r from-primary-600 to-secondary-700 text-white py-16">
+      <section className="bg-gradient-to-r from-primary-600 to-secondary-700 text-black py-16">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
@@ -37,7 +37,7 @@ export default function Home() {
                   Commencer gratuitement
                 </Link>
               )}
-              <Link href="#fonctionnalites" className="bg-transparent border-2 border-white text-white font-bold py-3 px-6 rounded-lg hover:bg-white/10 transition duration-300">
+              <Link href="#fonctionnalites" className="bg-transparent border-2 border-white text-black font-bold py-3 px-6 rounded-lg hover:bg-white/10 transition duration-300">
                 Découvrir les fonctionnalités
               </Link>
             </div>
@@ -123,14 +123,14 @@ export default function Home() {
                     <span>Email support</span>
                   </li>
                 </ul>
-                <button className="w-full mt-6 bg-primary-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-primary-700 transition">
+                <button className="w-full mt-6 bg-primary-600 text-black py-2 px-4 rounded-lg font-medium hover:bg-primary-700 transition">
                   Choisir ce plan
                 </button>
               </div>
             </div>
             
             <div className="bg-white border-2 border-primary-500 rounded-lg shadow-lg overflow-hidden relative">
-              <div className="absolute top-0 right-0 bg-primary-500 text-white text-xs font-bold px-3 py-1 rounded-bl">
+              <div className="absolute top-0 right-0 bg-primary-500 text-black text-xs font-bold px-3 py-1 rounded-bl">
                 POPULAIRE
               </div>
               <div className="p-6 bg-primary-100">
@@ -164,7 +164,7 @@ export default function Home() {
                     <span>3 utilisateurs inclus</span>
                   </li>
                 </ul>
-                <button className="w-full mt-6 bg-primary-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-primary-700 transition">
+                <button className="w-full mt-6 bg-primary-600 text-black py-2 px-4 rounded-lg font-medium hover:bg-primary-700 transition">
                   Choisir ce plan
                 </button>
               </div>
@@ -249,7 +249,7 @@ export default function Home() {
       </section>
 
       {/* Section CTA */}
-      <section className="py-16 bg-primary-700 text-white">
+      <section className="py-16 bg-primary-700 text-black">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-6">Prêt à transformer votre processus de recrutement ?</h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">Rejoignez les entreprises innovantes qui utilisent RecruteIA pour trouver les meilleurs talents plus rapidement et plus efficacement.</p>
@@ -257,7 +257,7 @@ export default function Home() {
             <Link href="/auth/register" className="bg-white text-primary-700 font-bold py-3 px-8 rounded-lg hover:bg-primary-50 transition duration-300">
               Commencer gratuitement
             </Link>
-            <Link href="/auth/login" className="bg-transparent border-2 border-white text-white font-bold py-3 px-8 rounded-lg hover:bg-white/10 transition duration-300">
+            <Link href="/auth/login" className="bg-transparent border-2 border-white text-black font-bold py-3 px-8 rounded-lg hover:bg-white/10 transition duration-300">
               Se connecter
             </Link>
           </div>

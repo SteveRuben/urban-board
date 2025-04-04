@@ -152,8 +152,8 @@ const AudioRecorder = ({ onTranscriptionComplete, isRecordingEnabled }) => {
           className={`px-4 py-2 rounded-md flex items-center ${
             isRecordingEnabled 
               ? isRecording 
-                ? 'bg-red-600 hover:bg-red-700 text-white' 
-                : 'bg-primary-600 hover:bg-primary-700 text-white'
+                ? 'bg-red-600 hover:bg-red-700 text-black' 
+                : 'bg-primary-600 hover:bg-primary-700 text-black'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >

@@ -334,7 +334,7 @@ const DashboardPage = () => {
                 {/* Nouveau menu d'entretien avec options */}
                 <div className="relative">
                   <button
-                    className="flex items-center px-3 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="flex items-center px-3 py-2 text-sm bg-primary-600 text-black rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                     onClick={handleInterviewMenuClick}
                   >
                     <Plus className="h-4 w-4 mr-1" />
@@ -394,7 +394,7 @@ const DashboardPage = () => {
               <p className="text-red-600 mb-4">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-black rounded-md hover:bg-red-700"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Réessayer
@@ -516,7 +516,7 @@ const DashboardPage = () => {
                       </p>
                       <Link
                         href="/interviews/new"
-                        className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                        className="inline-flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Démarrer une analyse

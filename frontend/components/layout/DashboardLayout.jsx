@@ -154,7 +154,7 @@ const DashboardLayout = ({ children }) => {
               onClick={() => setSidebarOpen(false)}
             >
               <span className="sr-only">Fermer la barre latérale</span>
-              <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
+              <XMarkIcon className="h-6 w-6 text-black" aria-hidden="true" />
             </button>
           </div>
           
@@ -180,6 +180,7 @@ const DashboardLayout = ({ children }) => {
                       <Image 
                         src={user?.avatar || '/images/avatars/default.png'} 
                         alt={user?.name || ''}
+                        sizes='(w-full)'
                         layout="fill"
                         className="object-cover"
                       />
@@ -285,7 +286,7 @@ const DashboardLayout = ({ children }) => {
                   <span className="sr-only">Voir les notifications</span>
                   <BellIcon className="h-6 w-6" aria-hidden="true" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute top-0 right-0 block h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                    <span className="absolute top-0 right-0 block h-5 w-5 rounded-full bg-red-500 text-black text-xs flex items-center justify-center">
                       {unreadNotifications}
                     </span>
                   )}

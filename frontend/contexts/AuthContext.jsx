@@ -23,6 +23,11 @@ export const AuthProvider = ({ children }) => {
   const [initialized, setInitialized] = useState(false);
   const router = useRouter();
 
+  // Fonction pour mettre à jour l'utilisateur
+  const updateUser = useCallback((updatedUserData) => {
+    setUser(updatedUserData);
+  }, []);
+
   // Charger l'utilisateur depuis le token lors du chargement initial
   useEffect(() => {
     const loadUserFromToken = async () => {
@@ -370,6 +375,7 @@ export const AuthProvider = ({ children }) => {
     requestPasswordReset,
     resetPassword,
     changePassword,
+    updateUser, // Ajout crucial de la fonction updateUser
     hasPermission
   };
 

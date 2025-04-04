@@ -584,7 +584,7 @@ const InterviewRoom = ({
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={handleNextQuestion}
-                    className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-md"
+                    className="bg-primary-600 hover:bg-primary-700 text-black px-6 py-2 rounded-md"
                   >
                     {currentQuestionIndex < questions.length - 1 ? 'Question suivante' : 'Terminer l\'entretien'}
                   </button>

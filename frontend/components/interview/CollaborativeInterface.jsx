@@ -243,7 +243,7 @@ const CollaborativeInterface = ({ videoRef }) => {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={goToNextQuestion}
-                className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
               >
                 {currentQuestionIndex < questions.length - 1 
                   ? 'Question suivante' 
@@ -270,7 +270,7 @@ const CollaborativeInterface = ({ videoRef }) => {
       {!showChat && (
         <button
           onClick={() => setShowChat(true)}
-          className="fixed bottom-6 right-6 bg-primary-600 text-white rounded-full p-3 shadow-lg hover:bg-primary-700 flex items-center"
+          className="fixed bottom-6 right-6 bg-primary-600 text-black rounded-full p-3 shadow-lg hover:bg-primary-700 flex items-center"
         >
           <MessageCircle className="h-6 w-6 mr-2" />
           <span>Consulter l'IA</span>

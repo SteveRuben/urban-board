@@ -66,8 +66,8 @@ const ResponseInput = ({ initialValue = '', onSubmit, disabled = false }) => {
               type="submit"
               className={`px-4 py-2 rounded-md ${
                 disabled || submitted
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
+                  ? 'bg-gray-400 text-black cursor-not-allowed'
+                  : 'bg-primary-600 text-black hover:bg-primary-700'
               }`}
               disabled={disabled || submitted || !response.trim()}
             >

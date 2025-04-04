@@ -156,7 +156,7 @@ const AIAssistantChat = ({ interviewId }) => {
             className={`p-2 rounded-r-md ${
               isLoading 
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                : 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'bg-primary-600 text-black hover:bg-primary-700'
             }`}
             disabled={isLoading}
           >

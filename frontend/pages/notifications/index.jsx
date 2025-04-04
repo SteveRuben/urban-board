@@ -391,7 +391,7 @@ const NotificationsPage = () => {
                 <>
                   <button
                     onClick={() => markMultipleAsRead(selectedNotifications)}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   >
                     <CheckCircleIcon className="h-4 w-4 mr-1" />
                     Marquer comme lu
@@ -407,7 +407,7 @@ const NotificationsPage = () => {
               ) : (
                 <button
                   onClick={() => markMultipleAsRead(notifications.filter(n => !n.read).map(n => n.id))}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   disabled={!notifications.some(n => !n.read)}
                 >
                   <CheckCircleIcon className="h-4 w-4 mr-1" />
@@ -460,7 +460,7 @@ const NotificationsPage = () => {
                 <p className="mt-4 text-red-500">{error}</p>
                 <button 
                   onClick={() => window.location.reload()} 
-                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Réessayer
                 </button>

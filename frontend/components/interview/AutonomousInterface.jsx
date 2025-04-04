@@ -351,7 +351,7 @@ const AutonomousInterface = ({ videoRef }) => {
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={goToNextQuestion}
-                  className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                  className="flex items-center px-4 py-2 bg-primary-600 text-black rounded-md hover:bg-primary-700"
                 >
                   Terminer l'entretien
                   <ArrowRight className="h-4 w-4 ml-2" />

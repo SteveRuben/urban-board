@@ -18,6 +18,7 @@ class User(db.Model):
     role = db.Column(db.String(50), default='user')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    last_password_change = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     last_login = db.Column(db.DateTime)
     
@@ -25,15 +26,15 @@ class User(db.Model):
     job_title = db.Column(db.String(100))
     department = db.Column(db.String(100))
     phone = db.Column(db.String(20))
-    profile_image = db.Column(db.String(255))
+    avatar_url = db.Column(db.String(255))
     preferences = db.Column(db.JSON, default=lambda: {})
     
     """
     Modèle pour représenter un utilisateur dans le système
     """
     def __init__(self, id=None, email=None, password=None, first_name=None, 
-                 last_name=None, role="user", is_active=True, created_at=None, 
-                 updated_at=None, last_login=None):
+                 last_name=None, role="user", is_active=True, created_at=None,
+                 last_password_change=None, updated_at=None, last_login=None):
         """
         Initialise un utilisateur.
         
@@ -57,6 +58,7 @@ class User(db.Model):
         self.role = role
         self.is_active = is_active
         self.created_at = created_at or datetime.now()
+        last_password_change = last_password_change or datetime.now()
         self.updated_at = updated_at
         self.last_login = last_login
         
@@ -64,7 +66,7 @@ class User(db.Model):
         self.job_title = None
         self.department = None
         self.phone = None
-        self.profile_image = None
+        self.avatar_url = None
         self.preferences = {}
         self.permissions = []
     
@@ -96,7 +98,7 @@ class User(db.Model):
             'job_title': self.job_title,
             'department': self.department,
             'phone': self.phone,
-            'profile_image': self.profile_image,
+            'avatar_url': self.avatar_url,
             'preferences': self.preferences,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -145,7 +147,7 @@ class User(db.Model):
         user.job_title = data.get('job_title')
         user.department = data.get('department')
         user.phone = data.get('phone')
-        user.profile_image = data.get('profile_image')
+        user.avatar_url = data.get('avatar_url')
         user.preferences = data.get('preferences', {})
         user.permissions = data.get('permissions', [])
         
