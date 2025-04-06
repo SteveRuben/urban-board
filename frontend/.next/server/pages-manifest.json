@@ -2,7 +2,7 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/auth/login": "pages/auth/login.js",
-  "/settings/profile": "pages/settings/profile.js",
-  "/interviews": "pages/interviews.js"
+  "/": "pages/index.js",
+  "/dashboard": "pages/dashboard.js",
+  "/auth/login": "pages/auth/login.js"
 }

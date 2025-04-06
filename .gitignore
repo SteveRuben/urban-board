@@ -5,7 +5,6 @@
 **/migrations/**
 **/instance/**
 **/**/node_modules/**
-**/**/.next/**
 **/.env.local
 **/.env.development.local
 **/.env.production.local
@@ -14,3 +13,5 @@
 **/.env.development
 **/.env.production
 **/.env.test
+frontend/.next/**
+frontend/.next/**/**
