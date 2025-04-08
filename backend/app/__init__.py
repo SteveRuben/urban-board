@@ -1,7 +1,7 @@
 # backend/app/__init__.py
 import os
 import logging
-#import stripe
+import stripe
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request
 from flask_cors import CORS
@@ -46,7 +46,7 @@ def create_app(config_name='dev'):
     migrate.init_app(app, db)
     jwt.init_app(app)
     # Initialiser Stripe
-    #stripe.api_key = app.config['STRIPE_SECRET_KEY']
+    stripe.api_key = app.config['STRIPE_SECRET_KEY']
     
     # Configurer la journalisation
     configure_logging(app)
