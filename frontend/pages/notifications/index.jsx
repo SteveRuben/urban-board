@@ -526,7 +526,7 @@ const NotificationsPage = () => {
                                 {getNotificationIcon(notification.type)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <Link href={notification.link}>
+                                <Link href={notification.link} legacyBehavior>
                                   <a
                                     className="block"
                                     onClick={() => !notification.read && markAsRead(notification.id)}
@@ -583,8 +583,8 @@ const NotificationsPage = () => {
           </div>
 
           {/* Lien vers les paramètres de notification */}
-          <div className="mt-6 text-right">
-            <Link href="/notifications/settings">
+          <div className="mt-6 text-right" legacyBehavior>
+            <Link href="/notifications/settings" legacyBehavior>
               <a className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                 Paramètres de notification
               </a>

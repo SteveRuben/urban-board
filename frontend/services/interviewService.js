@@ -114,8 +114,15 @@ class InterviewService {
    */
   async getUserInterviews(filters = {}) {
     try {
-      const response = await axios.get('/api/interviews', { params: filters });
-      return response.data;
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get('/api/interviews', {
+        params: filters,
+        headers: {
+         'Content-Type': 'application/json',
+         'Authorization': token ? `Bearer ${token}` : ''
+       }
+     });
+     return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des entretiens:', error);
       throw error;

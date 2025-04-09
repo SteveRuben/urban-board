@@ -35,7 +35,7 @@ function AppWithLayout({ Component, pageProps }) {
   if (Component.getLayout) {
     return Component.getLayout(<Component {...pageProps} />);
   }
-  
+
   // Pour les pages d'authentification, pas de layout
   if (authPaths.some(path => router.pathname.startsWith(path))) {
     return <Component {...pageProps} />;
@@ -67,13 +67,8 @@ function MyApp({ Component, pageProps }) {
         <title>RecruteIA</title>
       </Head>
 
-      <NotificationProvider>
-        <AppWithLayout Component={Component} pageProps={pageProps} />
-        <ToastContainer />
-      </NotificationProvider>
+      <AppWithLayout Component={Component} pageProps={pageProps} />
 
-      {/* Gestionnaire de notifications toast */}
-      <ToastManager />
     </AuthProvider>
   );
 }

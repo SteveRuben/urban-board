@@ -8,7 +8,7 @@ import Layout from '../components/layout/Layout';
 
 export default function Home() {
   const { user } = useAuth();
-  
+
   return (
     <Layout>
       <Head>
@@ -128,7 +128,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            
+
             <div className="bg-white border-2 border-primary-500 rounded-lg shadow-lg overflow-hidden relative">
               <div className="absolute top-0 right-0 bg-primary-500 text-black text-xs font-bold px-3 py-1 rounded-bl">
                 POPULAIRE
@@ -169,7 +169,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            
+
             <div className="bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden">
               <div className="p-6 bg-primary-50">
                 <h3 className="text-xl font-bold mb-2 text-primary-700">Enterprise</h3>
@@ -221,24 +221,24 @@ export default function Home() {
           <p className="text-xl text-center text-gray-600 mb-12 max-w-3xl mx-auto">
             Choisissez le plan qui correspond à vos besoins. Tous nos plans incluent une période d'essai gratuite de 14 jours.
           </p>
-          
-          <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-200">
-              <div className="p-6">
+
+          <div className="max-w-3xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="font-semibold text-lg mb-2">Frais d'abonnement</h3>
                 <p className="text-gray-600">À partir de 49€/mois selon le plan choisi</p>
               </div>
-              <div className="p-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="font-semibold text-lg mb-2">Entretiens supplémentaires</h3>
                 <p className="text-gray-600">5€ par entretien au-delà du quota mensuel</p>
               </div>
-              <div className="p-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="font-semibold text-lg mb-2">Utilisateurs supplémentaires</h3>
                 <p className="text-gray-600">25€/mois par utilisateur supplémentaire</p>
               </div>
             </div>
           </div>
-          
+
           <div className="mt-8 text-center">
             <Link href="/pricing" className="text-primary-600 font-medium hover:text-primary-700 flex items-center justify-center">
               Voir tous les détails de tarification

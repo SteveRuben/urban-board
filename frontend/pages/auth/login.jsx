@@ -9,18 +9,51 @@ import { useAuth } from '../../contexts/AuthContext';
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savedUsers, setSavedUsers] = useState([]);
+  const [showSavedUsers, setShowSavedUsers] = useState(false);
   
   const { login, isAuthenticated, loading, error } = useAuth();
   const router = useRouter();
   
+  // Charger les utilisateurs précédemment connectés au chargement de la page
+  useEffect(() => {
+    const loadSavedUsers = () => {
+      try {
+        const savedUsersData = localStorage.getItem('recruteIA_savedUsers');
+        if (savedUsersData) {
+          const parsedUsers = JSON.parse(savedUsersData);
+          setSavedUsers(parsedUsers);
+          
+          // Afficher la liste si des utilisateurs sont enregistrés
+          if (parsedUsers.length > 0) {
+            setShowSavedUsers(true);
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des utilisateurs sauvegardés:', err);
+      }
+    };
+    
+    loadSavedUsers();
+  }, []);
+  
   // Rediriger vers le tableau de bord si déjà authentifié
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      router.push('/dashboard');
+      const redirectTimer = setTimeout(() => {
+        if (router.query.redirect) {
+          router.push(router.query.redirect);
+        }
+        router.push('/dashboard');
+      }, 100);
+      
+      // Nettoyer le timer si le composant est démonté
+      return () => clearTimeout(redirectTimer);
     }
+    
   }, [isAuthenticated, loading, router]);
   
   // Mettre à jour l'erreur du formulaire si une erreur d'authentification se produit
@@ -29,6 +62,35 @@ const LoginPage = () => {
       setFormError(error);
     }
   }, [error]);
+  
+  const saveUserToLocalStorage = (userEmail) => {
+    try {
+      // Vérifier si l'utilisateur existe déjà
+      const existingUsers = [...savedUsers];
+      const userExists = existingUsers.some(user => user.email === userEmail);
+      
+      if (!userExists) {
+        const updatedUsers = [
+          { email: userEmail, lastLogin: new Date().toISOString() },
+          ...existingUsers.slice(0, 4) // Garder max 5 utilisateurs
+        ];
+        
+        localStorage.setItem('recruteIA_savedUsers', JSON.stringify(updatedUsers));
+        setSavedUsers(updatedUsers);
+      } else {
+        // Mettre à jour la date de dernière connexion
+        const updatedUsers = existingUsers.map(user => 
+          user.email === userEmail 
+            ? { ...user, lastLogin: new Date().toISOString() }
+            : user
+        );
+        localStorage.setItem('recruteIA_savedUsers', JSON.stringify(updatedUsers));
+        setSavedUsers(updatedUsers);
+      }
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde de l\'utilisateur:', err);
+    }
+  };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,7 +112,12 @@ const LoginPage = () => {
       
       const result = await login(email, password);
       
-      if (!result.success) {
+      if (result.success) {
+        // Sauvegarder l'utilisateur si "se souvenir de moi" est coché
+        if (rememberMe) {
+          saveUserToLocalStorage(email);
+        }
+      } else {
         setFormError(result.error || 'Échec de la connexion. Veuillez vérifier vos identifiants.');
       }
     } catch (err) {
@@ -58,6 +125,25 @@ const LoginPage = () => {
       console.error('Erreur de connexion:', err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  const selectSavedUser = (userEmail) => {
+    setEmail(userEmail);
+    setFormError('');
+    // Focus sur le champ de mot de passe
+    document.getElementById('password')?.focus();
+  };
+  
+  const removeSavedUser = (e, userEmail) => {
+    e.stopPropagation(); // Empêcher la sélection de l'utilisateur
+    
+    const updatedUsers = savedUsers.filter(user => user.email !== userEmail);
+    localStorage.setItem('recruteIA_savedUsers', JSON.stringify(updatedUsers));
+    setSavedUsers(updatedUsers);
+    
+    if (updatedUsers.length === 0) {
+      setShowSavedUsers(false);
     }
   };
   
@@ -69,6 +155,22 @@ const LoginPage = () => {
       </div>
     );
   }
+  
+  // Formater la date pour affichage
+  const formatLastLogin = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (e) {
+      return 'Date inconnue';
+    }
+  };
   
   return (
     <>
@@ -108,6 +210,47 @@ const LoginPage = () => {
                 </Link>
               </p>
             </div>
+            
+            {/* Utilisateurs précédemment connectés */}
+            {showSavedUsers && savedUsers.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Comptes récemment utilisés</h3>
+                <div className="space-y-2">
+                  {savedUsers.map((user, index) => (
+                    <div 
+                      key={index}
+                      onClick={() => selectSavedUser(user.email)}
+                      className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200 cursor-pointer hover:bg-gray-50"
+                    >
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-600">
+                          {user.email.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                          <p className="text-xs text-gray-500">Dernière connexion: {formatLastLogin(user.lastLogin)}</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={(e) => removeSavedUser(e, user.email)}
+                        className="text-gray-400 hover:text-gray-500"
+                        aria-label="Supprimer cet utilisateur"
+                      >
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center">
+                  <div className="flex-grow border-t border-gray-200"></div>
+                  <p className="mx-3 text-xs text-gray-500">ou</p>
+                  <div className="flex-grow border-t border-gray-200"></div>
+                </div>
+              </div>
+            )}
             
             <form className="space-y-6" onSubmit={handleSubmit}>
               {formError && (
@@ -191,12 +334,12 @@ const LoginPage = () => {
                   type="submit"
                   disabled={isSubmitting}
                   className="w-full flex justify-center py-2 px-4 border border-transparent 
-                  rounded-md shadow-sm text-sm font-medium text-black bg-primary-600 hover:bg-primary-700 
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
