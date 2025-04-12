@@ -1,29 +1,25 @@
 # backend/app/routes/interview.py
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, g
 from . import interview_bp
+from ..middleware.auth_middleware import token_required
+from ..middleware.rate_limit import standard_limit
 from ..services.interview_service import (
     generate_interview_questions,
     evaluate_response,
     create_interview,
     complete_interview,
-    update_interview_status
+    update_interview_status,
+    get_user_interviews
 )
 
 @interview_bp.route('/', methods=['GET'])
+@token_required
+@standard_limit
 def list_interviews_route():
-    """Crée un nouvel entretien"""
-    data = request.json
-    
-    # Vérifier les champs obligatoires
-    required_fields = ['job_role', 'candidate_name']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
-    
-    # Créer l'entretien
-    interview = create_interview(data)
-    
-    return jsonify(interview), 201
+    """liste les entretiens de l'utilisateur connecté"""
+    user_id = g.current_user.user_id
+    interviews = get_user_interviews(user_id)
+    return jsonify(interviews), 201
 
 @interview_bp.route('/', methods=['POST'])
 def create_interview_route():

@@ -5,6 +5,9 @@ from .email_notification_service import EmailNotificationService
 import json
 import uuid
 from datetime import datetime
+from ..models.interview import Interview
+from app import db
+from sqlalchemy import desc
 
 # Initialisation des services
 notification_service = NotificationService()
@@ -138,24 +141,32 @@ def create_interview(interview_data):
     Returns:
         dict: Entretien créé avec ID généré
     """
-    # Dans une implémentation réelle, cette fonction sauvegarderait
-    # l'entretien dans une base de données
-    
-    # Générer un ID unique
-    interview_id = str(uuid.uuid4())
-    
-    # Ajouter des métadonnées
-    interview = {
-        **interview_data,
-        "id": interview_id,
-        "status": "scheduled",
-        "created_at": datetime.now().isoformat()
-    }
-    
-    # Ici, nous devrions sauvegarder l'entretien dans la base de données
-    # ...
-    
-    return interview
+    try:
+        # Créer une nouvelle instance du modèle Interview
+        new_interview = Interview(
+            title=interview_data.get('title', 'Entretien sans titre'),
+            job_title=interview_data.get('job_title', ''),
+            job_description=interview_data.get('job_description'),
+            experience_level=interview_data.get('experience_level'),
+            interview_mode=interview_data.get('interview_mode', 'autonomous'),
+            status=interview_data.get('status', 'draft'),
+            candidate_name=interview_data.get('candidate_name'),
+            candidate_email=interview_data.get('candidate_email'),
+            cv_file_path=interview_data.get('cv_file_path'),
+            created_by=interview_data.get('created_by'),
+            scheduled_for=interview_data.get('scheduled_for')
+        )
+        
+        # Ajouter et committer à la base de données
+        db.session.add(new_interview)
+        db.session.commit()
+        
+        # Retourner l'entretien sous forme de dictionnaire
+        return new_interview.to_dict()
+        
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 def complete_interview(interview_id, interview_data, recruiter_id=None, recruiter_email=None):
     """
@@ -170,31 +181,42 @@ def complete_interview(interview_id, interview_data, recruiter_id=None, recruite
     Returns:
         dict: Entretien mis à jour
     """
-    # Dans une implémentation réelle, nous mettrions à jour l'entretien dans la base de données
-    # ...
-    
-    # Mettre à jour le statut et ajouter un timestamp
-    updated_interview = {
-        **interview_data,
-        "status": "completed",
-        "completed_at": datetime.now().isoformat()
-    }
-    
-    # Si un ID de recruteur est fourni, envoyer une notification
-    if recruiter_id:
-        notification_service.create_interview_completed_notification(
-            user_id=recruiter_id,
-            interview_data=updated_interview
-        )
-    
-    # Si un email de recruteur est fourni, envoyer un email
-    if recruiter_email:
-        email_service.send_interview_completed_notification(
-            recipient_email=recruiter_email,
-            interview_data=updated_interview
-        )
-    
-    return updated_interview
+    try:
+        # Récupérer l'entretien
+        interview = Interview.query.get(interview_id)
+        if not interview:
+            return None
+        
+        # Mettre à jour les champs
+        interview.status = 'completed'
+        interview.completed_at = datetime.utcnow()
+        
+        # Mettre à jour d'autres champs si fournis
+        for key, value in interview_data.items():
+            if hasattr(interview, key) and key not in ['id', 'created_at', 'created_by']:
+                setattr(interview, key, value)
+        
+        # Sauvegarder les modifications
+        db.session.commit()
+        
+        # Envoyer des notifications
+        if recruiter_id:
+            notification_service.create_interview_completed_notification(
+                user_id=recruiter_id,
+                interview_data=interview.to_dict()
+            )
+        
+        if recruiter_email:
+            email_service.send_interview_completed_notification(
+                recipient_email=recruiter_email,
+                interview_data=interview.to_dict()
+            )
+        
+        return interview.to_dict()
+        
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 def get_interview(interview_id):
     """
@@ -206,11 +228,11 @@ def get_interview(interview_id):
     Returns:
         dict: Données de l'entretien ou None si non trouvé
     """
-    # Dans une implémentation réelle, nous récupérerions l'entretien depuis la base de données
-    # ...
+    interview = Interview.query.get(interview_id)
+    if not interview:
+        return None
     
-    # Pour la démo, on retourne None
-    return None
+    return interview.to_dict_with_relations()
 
 def update_interview_status(interview_id, status, additional_data=None):
     """
@@ -224,41 +246,177 @@ def update_interview_status(interview_id, status, additional_data=None):
     Returns:
         dict: Entretien mis à jour ou None si non trouvé
     """
-    # Récupérer l'entretien existant
-    interview = get_interview(interview_id)
-    if not interview:
-        return None
-    
-    # Mettre à jour le statut
-    interview['status'] = status
-    
-    # Ajouter des timestamps selon le statut
-    if status == 'in_progress':
-        interview['started_at'] = datetime.now().isoformat()
-    elif status == 'completed':
-        interview['completed_at'] = datetime.now().isoformat()
-    elif status == 'cancelled':
-        interview['cancelled_at'] = datetime.now().isoformat()
-    
-    # Ajouter des données supplémentaires si fournies
-    if additional_data:
-        interview.update(additional_data)
-    
-    # Dans une implémentation réelle, sauvegarder les modifications
-    # ...
-    
-    # Si l'entretien est terminé, envoyer des notifications
-    if status == 'completed':
-        # Récupérer l'ID du recruteur depuis l'entretien
-        recruiter_id = interview.get('recruiter_id')
-        recruiter_email = interview.get('recruiter_email')
+    try:
+        # Récupérer l'entretien
+        interview = Interview.query.get(interview_id)
+        if not interview:
+            return None
         
-        if recruiter_id or recruiter_email:
-            complete_interview(
-                interview_id=interview_id,
-                interview_data=interview,
-                recruiter_id=recruiter_id,
-                recruiter_email=recruiter_email
-            )
+        # Mettre à jour le statut
+        interview.status = status
+        
+        # Ajouter des timestamps selon le statut
+        if status == 'in_progress':
+            interview.started_at = datetime.utcnow()
+        elif status == 'completed':
+            interview.completed_at = datetime.utcnow()
+        
+        # Ajouter des données supplémentaires si fournies
+        if additional_data:
+            for key, value in additional_data.items():
+                if hasattr(interview, key) and key not in ['id', 'created_at', 'created_by']:
+                    setattr(interview, key, value)
+        
+        # Sauvegarder les modifications
+        db.session.commit()
+        
+        # Si l'entretien est terminé, envoyer des notifications
+        if status == 'completed':
+            creator = interview.creator
+            if creator:
+                complete_interview(
+                    interview_id=interview_id,
+                    interview_data={},  # Pas besoin de données supplémentaires ici
+                    recruiter_id=creator.id,
+                    recruiter_email=creator.email if hasattr(creator, 'email') else None
+                )
+        
+        return interview.to_dict()
+        
+    except Exception as e:
+        db.session.rollback()
+        raise e
+
+def get_user_interviews(user_id, page=1, per_page=10, status=None, search=None, sort_by='created_at', sort_dir='desc'):
+    """
+    Récupère la liste des entretiens créés par un utilisateur avec pagination.
     
-    return interview
+    Args:
+        user_id (int): ID de l'utilisateur créateur
+        page (int, optional): Numéro de page. Defaults to 1.
+        per_page (int, optional): Nombre d'entretiens par page. Defaults to 10.
+        status (str, optional): Filtrer par statut ('draft', 'scheduled', etc). Defaults to None.
+        search (str, optional): Terme de recherche pour le titre ou le nom du candidat. Defaults to None.
+        sort_by (str, optional): Champ de tri. Defaults to 'created_at'.
+        sort_dir (str, optional): Direction du tri ('asc' ou 'desc'). Defaults to 'desc'.
+    
+    Returns:
+        dict: Contient les éléments suivants:
+            - items: Liste des entretiens pour la page demandée
+            - total: Nombre total d'entretiens correspondant aux critères
+            - pages: Nombre total de pages
+            - page: Numéro de la page actuelle
+            - per_page: Nombre d'éléments par page
+    """
+    try:
+        # Construire la requête de base
+        query = Interview.query.filter_by(created_by=user_id)
+        
+        # Appliquer les filtres
+        if status:
+            query = query.filter_by(status=status)
+            
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                (Interview.title.ilike(search_term)) | 
+                (Interview.candidate_name.ilike(search_term)) |
+                (Interview.job_title.ilike(search_term))
+            )
+        
+        # Appliquer le tri
+        if hasattr(Interview, sort_by):
+            sort_attr = getattr(Interview, sort_by)
+            if sort_dir.lower() == 'desc':
+                query = query.order_by(desc(sort_attr))
+            else:
+                query = query.order_by(sort_attr)
+        else:
+            # Par défaut, trier par date de création décroissante
+            query = query.order_by(desc(Interview.created_at))
+        
+        # Paginer les résultats
+        paginated_interviews = query.paginate(page=page, per_page=per_page)
+        
+        # Préparer le résultat
+        result = {
+            'items': [interview.to_dict() for interview in paginated_interviews.items],
+            'total': paginated_interviews.total,
+            'pages': paginated_interviews.pages,
+            'page': page,
+            'per_page': per_page
+        }
+        
+        return result
+        
+    except Exception as e:
+        # Log l'erreur et la propager
+        print(f"Erreur lors de la récupération des entretiens: {str(e)}")
+        raise e
+
+def delete_interview(interview_id, user_id=None):
+    """
+    Supprime un entretien. Si user_id est fourni, vérifie que l'utilisateur est bien le créateur.
+    
+    Args:
+        interview_id (int): ID de l'entretien à supprimer
+        user_id (int, optional): ID de l'utilisateur qui demande la suppression. Defaults to None.
+    
+    Returns:
+        bool: True si la suppression a réussi, False sinon
+    """
+    try:
+        interview = Interview.query.get(interview_id)
+        if not interview:
+            return False
+        
+        # Vérifier que l'utilisateur est autorisé à supprimer cet entretien
+        if user_id is not None and interview.created_by != user_id:
+            return False
+        
+        # Supprimer l'entretien
+        db.session.delete(interview)
+        db.session.commit()
+        
+        return True
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erreur lors de la suppression de l'entretien {interview_id}: {str(e)}")
+        return False
+
+def update_interview(interview_id, update_data, user_id=None):
+    """
+    Met à jour un entretien. Si user_id est fourni, vérifie que l'utilisateur est bien le créateur.
+    
+    Args:
+        interview_id (int): ID de l'entretien à mettre à jour
+        update_data (dict): Données à mettre à jour
+        user_id (int, optional): ID de l'utilisateur qui demande la mise à jour. Defaults to None.
+    
+    Returns:
+        dict: Entretien mis à jour ou None si non trouvé ou non autorisé
+    """
+    try:
+        interview = Interview.query.get(interview_id)
+        if not interview:
+            return None
+        
+        # Vérifier que l'utilisateur est autorisé à mettre à jour cet entretien
+        if user_id is not None and interview.created_by != user_id:
+            return None
+        
+        # Mettre à jour les champs
+        for key, value in update_data.items():
+            if hasattr(interview, key) and key not in ['id', 'created_at', 'created_by']:
+                setattr(interview, key, value)
+        
+        # Sauvegarder les modifications
+        db.session.commit()
+        
+        return interview.to_dict()
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erreur lors de la mise à jour de l'entretien {interview_id}: {str(e)}")
+        return None
