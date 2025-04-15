@@ -1,11 +1,14 @@
 # backend/routes/organization_routes.py
+from datetime import datetime
+import uuid
 from flask import Blueprint, request, jsonify, g, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from services.audit_service import AuditService
 from models.user import User
 from models.organization import Organization, OrganizationDomain, OrganizationMember
-from .. import db
+from app import db
 from services.organization_service import OrganizationService
-from ..middleware.tenant_middleware import organization_required, get_current_organization
+from middleware.tenant_middleware import organization_required, get_current_organization
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 from . import organizations_bp
 
@@ -634,6 +637,42 @@ def invite_user_to_organization():
         "invitation_token": invitation_token  # En production, ne pas exposer ce token
     }), 201
 
+@organizations_bp.route('/api/invitations/<token>/accept', methods=['POST'])
+def accept_invitation(token):
+    # Récupérer l'ID utilisateur depuis le token JWT si connecté
+    # Appeler invitation_service.accept_invitation()
+    # Retourner le résultat
+    pass
+
+# Route pour annuler une invitation
+@organizations_bp.route('/api/organizations/<org_id>/invitations/<invitation_id>', methods=['DELETE'])
+@jwt_required()
+@organization_required
+def cancel_invitation(org_id, invitation_id):
+    # Vérifier les droits de l'utilisateur
+    # Appeler invitation_service.cancel_invitation()
+    # Retourner le résultat
+    pass
+
+# Route pour renvoyer une invitation
+@organizations_bp.route('/api/organizations/<org_id>/invitations/<invitation_id>/resend', methods=['POST'])
+@jwt_required()
+@organization_required
+def resend_invitation(org_id, invitation_id):
+    # Vérifier les droits de l'utilisateur
+    # Appeler invitation_service.resend_invitation()
+    # Retourner le résultat
+    pass
+
+# Route pour lister les invitations en cours
+@organizations_bp.route('/api/organizations/<org_id>/invitations', methods=['GET'])
+@jwt_required()
+@organization_required
+def list_invitations(org_id):
+    # Récupérer les invitations actives pour l'organisation
+    # Retourner la liste
+    pass
+
 # Statistiques de l'organisation
 @organizations_bp.route('/current/stats', methods=['GET'])
 @jwt_required()
@@ -690,3 +729,52 @@ def get_organization_stats():
         "ai_assistants": ai_assistant_count,
         # Vous pouvez ajouter d'autres statistiques spécifiques à votre application
     })
+    
+
+@organizations_bp.route('/api/organizations/<org_id>/audit-logs', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_audit_logs(org_id):
+    """Récupère les logs d'audit de l'organisation avec filtrage et pagination."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # Construction des filtres à partir des query params
+    filters = {}
+    for param in ['user_id', 'action', 'entity_type', 'entity_id']:
+        if param in request.args:
+            filters[param] = request.args.get(param)
+    
+    # Filtres de date
+    if 'date_from' in request.args:
+        try:
+            filters['date_from'] = datetime.fromisoformat(request.args.get('date_from'))
+        except ValueError:
+            return jsonify({"error": "Format de date invalide pour date_from"}), 400
+            
+    if 'date_to' in request.args:
+        try:
+            filters['date_to'] = datetime.fromisoformat(request.args.get('date_to'))
+        except ValueError:
+            return jsonify({"error": "Format de date invalide pour date_to"}), 400
+    
+    audit_service = AuditService()
+    logs = audit_service.get_organization_logs(org_id, filters, page, per_page)
+    
+    # Transformation en dictionnaire pour la réponse JSON
+    return jsonify({
+        "items": [log.to_dict() for log in logs.items],
+        "total": logs.total,
+        "pages": logs.pages,
+        "page": logs.page
+    })
+
+@organizations_bp.route('/api/organizations/<org_id>/audit-logs/entity/<entity_type>/<entity_id>', methods=['GET'])
+@jwt_required()
+@organization_required
+def get_entity_history(org_id, entity_type, entity_id):
+    """Récupère l'historique complet d'une entité spécifique."""
+    audit_service = AuditService()
+    logs = audit_service.get_entity_history(org_id, entity_type, entity_id)
+    
+    return jsonify([log.to_dict() for log in logs])

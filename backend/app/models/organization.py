@@ -17,7 +17,6 @@ class Organization(db.Model):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
     # Plan et facturation
-    plan = Column(String(50), default="free")
     trial_ends_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     
@@ -25,6 +24,7 @@ class Organization(db.Model):
     domains = relationship("OrganizationDomain", back_populates="organization", cascade="all, delete-orphan")
     members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
     ai_assistants = relationship("AIAssistant", back_populates="organization")
+    
     
     def __repr__(self):
         return f"<Organization {self.name}>"

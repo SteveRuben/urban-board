@@ -1,4 +1,5 @@
 # backend/services/organization_service.py
+from datetime import datetime
 from models.organization import Organization, OrganizationDomain, OrganizationMember
 from models.user import User
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from app import db
 class OrganizationService:
    
     
-    def create_organization(self, name: str, user_id: str, plan: str = "free") -> Organization:
+    def create_organization(self, name: str, user_id: str) -> Organization:
         """Crée une nouvelle organisation et ajoute l'utilisateur comme propriétaire"""
         # Générer un slug à partir du nom
         slug = re.sub(r'[^a-z0-9]', '-', name.lower())
@@ -28,7 +29,6 @@ class OrganizationService:
             id=str(uuid.uuid4()),
             name=name,
             slug=slug,
-            plan=plan
         )
         db.add(organization)
         
@@ -193,7 +193,7 @@ class OrganizationService:
         return True
     
     def update_organization(self, organization_id: str, name: str = None, logo_url: str = None, 
-                           plan: str = None, is_active: bool = None) -> Optional[Organization]:
+                           is_active: bool = None) -> Optional[Organization]:
         """Met à jour les informations d'une organisation"""
         organization = self.get_organization_by_id(organization_id)
         
@@ -206,8 +206,7 @@ class OrganizationService:
         if logo_url is not None:
             organization.logo_url = logo_url
             
-        if plan is not None:
-            organization.plan = plan
+        organization.updated_at = datetime.utcnow()
             
         if is_active is not None:
             organization.is_active = is_active
