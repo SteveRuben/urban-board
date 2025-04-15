@@ -7,7 +7,7 @@ class Subscription(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    organization_id = db.Column(db.String(36), db.ForeignKey('organisations.id'), nullable=True)  # Organisation à laquelle la souscription appartient (si applicable)
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=True)  # Organisation à laquelle la souscription appartient (si applicable)
     plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False, default='active')  # active, canceled, expired
     billing_cycle = db.Column(db.String(20), nullable=False)  # monthly, yearly
