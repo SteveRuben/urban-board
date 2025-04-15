@@ -22,6 +22,7 @@ const nextConfig = {
         },
       ];
     },
+    assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || '',
   };
   
   module.exports = nextConfig;

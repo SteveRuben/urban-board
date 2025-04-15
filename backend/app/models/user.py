@@ -2,7 +2,8 @@
 from datetime import datetime
 import uuid
 from flask_sqlalchemy import SQLAlchemy
-from app import db  # Importez l'instance db créée dans votre app/__init__.py
+from app import db
+from .organization import OrganizationMember  # Import le modèle OrganizationMember
 
 class User(db.Model):
     """
@@ -28,6 +29,11 @@ class User(db.Model):
     phone = db.Column(db.String(20))
     avatar_url = db.Column(db.String(255))
     preferences = db.Column(db.JSON, default=lambda: {})
+    permissions = db.Column(db.JSON, default=lambda: [])
+    
+    # Relations pour les organisations
+    organizations = db.relationship("OrganizationMember", back_populates="user", cascade="all, delete-orphan")
+    current_organization_id = db.Column(db.String(36), nullable=True)
     
     """
     Modèle pour représenter un utilisateur dans le système
@@ -181,3 +187,20 @@ class User(db.Model):
         }
         
         return permission in role_permissions.get(user.role, [])
+    
+    # Méthode utilitaire pour obtenir l'organisation active
+    @property
+    def current_organization(self):
+        if not self.current_organization_id:
+            # Si pas d'organisation active, prendre la première
+            org_member = OrganizationMember.query.filter_by(user_id=self.id).first()
+            if org_member:
+                return org_member.organization
+            return None
+        
+        # Sinon, chercher l'organisation active
+        org_member = OrganizationMember.query.filter_by(
+            user_id=self.id, 
+            organization_id=self.current_organization_id
+        ).first()
+        return org_member.organization if org_member else None

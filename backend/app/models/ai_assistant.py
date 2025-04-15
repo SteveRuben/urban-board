@@ -68,6 +68,8 @@ class AIAssistant(db.Model):
     user = relationship('User', back_populates='ai_assistants')
     documents = relationship('AIAssistantDocument', back_populates='assistant', cascade='all, delete-orphan')
     interviews = relationship('Interview', back_populates='ai_assistant')
+    organization_id = db.Column(db.String(36), db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    organization = relationship("Organization", back_populates="ai_assistants_org")
     
     def __repr__(self):
         return f'<AIAssistant {self.name}>'
