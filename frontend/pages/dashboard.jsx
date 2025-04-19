@@ -9,9 +9,8 @@ import CandidateScoreChart from '../components/dashboard/CandidateScoreChart';
 import JobPositionPieChart from '../components/dashboard/JobPositionPieChart';
 import InterviewsByStatusChart from '../components/dashboard/InterviewsByStatusChart';
 import SkillsHeatmap from '../components/dashboard/SkillsHeatmap';
-import axios from 'axios';
-import withAuth from '../hooks/withAuth';
-import { Calendar, Clock, ArrowDown, BarChart2, RefreshCw, Plus, ChevronDown } from 'lucide-react';
+
+import { Calendar, Clock, ArrowDown, BarChart2, RefreshCw, Plus, ChevronDown, AlertCircle, BotIcon, UserPlus } from 'lucide-react';
 
 const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -19,6 +18,8 @@ const DashboardPage = () => {
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('month'); // 'week', 'month', 'quarter', 'year'
   const [menuOpen, setMenuOpen] = useState(false);
+  const [interviewMenuOpen, setInterviewMenuOpen] = useState(false);
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -26,8 +27,17 @@ const DashboardPage = () => {
         setLoading(true);
 
         // En environnement de développement, utiliser des données fictives
-        const response = await axios.get(`/api/dashboard?timeRange=${timeRange}`);
-        setDashboardData(response.data);
+        if (process.env.NODE_ENV === 'development') {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Simuler un délai réseau
+          
+          const mockData = generateMockDashboardData(timeRange);
+          setDashboardData(mockData);
+        } else {
+          // En production, appeler l'API
+          const response = await fetch(`/api/dashboard?timeRange=${timeRange}`);
+          const data = await response.json();
+          setDashboardData(data);
+        }
 
         setLoading(false);
       } catch (err) {
@@ -535,4 +545,4 @@ const DashboardPage = () => {
 
 DashboardPage.getLayout = (page) => <DashboardLayout>{page}</DashboardLayout>;
 
-export default withAuth(DashboardPage);
+export default DashboardPage;

@@ -26,31 +26,6 @@ const DashboardLayout = ({ children }) => {
   const { user, loading, logout, isAuthenticated } = useAuth();
   const websocketService = useWebSocketInit();
 
-
-  /* useEffect(() => {
-    // Récupérer les informations utilisateur et les notifications
-    // Cette fonction serait remplacée par un appel API réel
-    const fetchUserData = async () => {
-      // Simuler un appel API
-      setTimeout(() => {
-        setUnreadNotifications(3); // Exemple: 3 notifications non lues
-      }, 1000);
-    };
-    
-    fetchUserData();
-    
-    // Fermer la barre latérale sur les écrans plus petits lors du changement de route
-    const handleRouteChange = () => {
-      setSidebarOpen(false);
-    };
-    
-    router.events.on('routeChangeComplete', handleRouteChange);
-    
-    return () => {
-      router.events.off('routeChangeComplete', handleRouteChange);
-    };
-  }, [router.events]); */
-
   useEffect(() => {
     // Rediriger vers la page de connexion si l'utilisateur n'est pas authentifié
     if (!loading && !isAuthenticated) {
@@ -181,8 +156,8 @@ const DashboardLayout = ({ children }) => {
                       <div>
                         <div className="relative h-9 w-9 rounded-full overflow-hidden bg-gray-100">
                           <Image
-                            src={user?.avatar || '/images/avatars/default.png'}
-                            alt={user?.name || ''}
+                            src={user?.avatar_url || '/images/avatars/default.png'}
+                            alt={user?.first_name || ''}
                             sizes='(w-full)'
                             layout="fill"
                             className="object-cover"
@@ -190,7 +165,7 @@ const DashboardLayout = ({ children }) => {
                         </div>
                       </div>
                       <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{user?.name}</p>
+                        <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{user?.first_name}</p>
                         <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700">
                           {user?.role === 'admin' ? 'Administrateur' : 'Recruteur'}
                         </p>
@@ -227,15 +202,15 @@ const DashboardLayout = ({ children }) => {
                         <div>
                           <div className="relative h-9 w-9 rounded-full overflow-hidden bg-gray-100">
                             <Image
-                              src={user?.avatar || '/images/avatars/default.png'}
-                              alt={user?.name || ''}
+                              src={user?.avatar_url || '/images/avatars/default.png'}
+                              alt={user?.first_name || ''}
                               layout="fill"
                               className="object-cover"
                             />
                           </div>
                         </div>
                         <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{user?.name}</p>
+                          <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{user?.first_name}</p>
                           <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700">
                             {user?.role === 'admin' ? 'Administrateur' : 'Recruteur'}
                           </p>
