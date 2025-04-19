@@ -108,6 +108,15 @@ class OrganizationService:
             
         return False
     
+    def is_member(self, organization_id: str, user_id: str) -> bool:
+        """Vérifie si un utilisateur est membre d'une organisation"""
+        member = db.query(OrganizationMember).filter(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == user_id
+        ).first()
+        
+        return member is not None
+
     def get_organization_by_domain(self, domain: str) -> Optional[Organization]:
         """Obtient l'organisation correspondant à un domaine"""
         domain_entry = db.query(OrganizationDomain).filter(
