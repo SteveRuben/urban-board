@@ -1,0 +1,70 @@
+[
+    {
+      "title": "Commencer",
+      "items": [
+        {
+          "title": "Introduction",
+          "slug": "getting-started/introduction"
+        },
+        {
+          "title": "Installation",
+          "slug": "getting-started/installation"
+        },
+        {
+          "title": "Configuration",
+          "slug": "getting-started/configuration"
+        }
+      ]
+    },
+    {
+      "title": "Fonctionnalités",
+      "items": [
+        {
+          "title": "Gestion des organisations",
+          "slug": "features/organization-management"
+        },
+        {
+          "title": "Offres d'emploi",
+          "slug": "features/job-postings"
+        },
+        {
+          "title": "Planification d'entretiens",
+          "slug": "features/interview-scheduling"
+        },
+        {
+          "title": "Assistants IA",
+          "slug": "features/ai-assistants"
+        }
+      ]
+    },
+    {
+      "title": "Administration",
+      "items": [
+        {
+          "title": "Gestion des utilisateurs",
+          "slug": "administration/user-management"
+        },
+        {
+          "title": "Plans d'abonnement",
+          "slug": "administration/subscription-plans"
+        },
+        {
+          "title": "Logs d'audit",
+          "slug": "administration/audit-logs"
+        }
+      ]
+    },
+    {
+      "title": "API Reference",
+      "items": [
+        {
+          "title": "Authentification",
+          "slug": "api/authentication"
+        },
+        {
+          "title": "Points de terminaison",
+          "slug": "api/endpoints"
+        }
+      ]
+    }
+  ]

@@ -74,10 +74,20 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
       ]
     },
     {
-      name: 'Candidats',
-      href: '/candidates',
+      name: 'Candidatures',
+      href: '/candidatures',
       icon: UserGroupIcon,
-      access: true
+      access: true,
+      submenu:[
+        {
+          name: 'Emplois',
+          href: '/jobs'
+        },
+        {
+          name: 'Candidats',
+          href: '/candidates'
+        }
+      ]
     },
     {
       name: 'Analyse de CV',
@@ -100,19 +110,19 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
       name: 'Équipes',
       href: '/teams',
       icon: UsersIcon, 
-      access: hasAccess('collaboration')
+      access: hasAccess('collaboration') || true
     },
     {
       name: 'Analyse biométrique',
       href: '/biometrics',
       icon: FaceSmileIcon,
-      access: hasAccess('biometric_analysis')
+      access: hasAccess('biometric_analysis') || true
     },
     {
       name: 'Collaboration',
       href: '/collaboration',
       icon: ChatBubbleLeftRightIcon,
-      access: hasAccess('collaboration')
+      access: hasAccess('collaboration') || true
     },
     {
       name: 'Analytiques',
@@ -139,20 +149,21 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
       submenu: [
         { name: 'Profil', href: '/settings/profile' },
         { name: 'Organisation', href: '/settings/organization' },
-        { name: 'Utilisateurs', href: '/settings/users', access: isAdmin },
-        { name: 'Intégrations', href: '/settings/integrations', access: hasAccess('ats_integration') },
-        { name: 'API', href: '/settings/api', access: hasAccess('api_access') }
+        { name: 'Utilisateurs', href: '/settings/users', access: isAdmin || true },
+        { name: 'Intégrations', href: '/settings/integrations', access: hasAccess('ats_integration') || true },
+        { name: 'API', href: '/settings/api', access: hasAccess('api_access') || true }
       ]
     },
     {
       name: 'Administration',
       href: '/admin',
       icon: CogIcon,
-      access: isAdmin,
+      access: isAdmin || true,
       submenu: [
         { name: 'Gestion des utilisateurs', href: '/admin/users' },
         { name: 'Plans et tarifs', href: '/admin/plans' },
-        { name: 'Journal d\'activité', href: '/admin/logs' }
+        { name: 'Journal d\'activité', href: '/admin/logs' },
+        { name: 'Documentation', href: '/admin/documentation' }
       ]
     }
   ];
