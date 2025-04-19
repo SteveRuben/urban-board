@@ -19,8 +19,9 @@ import {
 
 const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
   const router = useRouter();
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   
+  
+/*   const [unreadNotifications, setUnreadNotifications] = useState(0);
   useEffect(() => {
     // Charger le nombre de notifications non lues
     // Cette fonction serait remplacée par un appel API réel
@@ -32,7 +33,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
     };
     
     fetchUnreadNotifications();
-  }, []);
+  }, []); */
 
   // Vérifier si l'utilisateur a accès à une fonctionnalité en fonction de son plan
   const hasAccess = (feature) => {
@@ -193,7 +194,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
                   }`}
                   aria-hidden="true"
                 />
-                <span className="flex-1">{item.name}</span>
+                <span>{item.name}</span>
                 <svg
                   className={`ml-3 h-5 w-5 transform transition-transform duration-150 ${
                     isSubmenuOpen ? 'rotate-90' : ''
@@ -266,7 +267,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
       })}
       
       {/* Élément spécial pour les notifications avec compteur */}
-      <Link href="/notifications" legacyBehavior>
+      {/* <Link href="/notifications" legacyBehavior>
         <a className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 hover:text-gray-900">
           <BellIcon
             className="mr-3 flex-shrink-0 h-5 w-5 text-gray-500 group-hover:text-gray-600"
@@ -279,7 +280,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
             </span>
           )}
         </a>
-      </Link>
+      </Link> */}
     </nav>
   );
 };

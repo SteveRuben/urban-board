@@ -23,7 +23,7 @@ class Organization(db.Model):
     # Relations
     domains = relationship("OrganizationDomain", back_populates="organization", cascade="all, delete-orphan")
     members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
-    ai_assistants = relationship("AIAssistant", back_populates="organization")
+    #ai_assistants = relationship("AIAssistant", back_populates="organization")
     
     
     def __repr__(self):
@@ -75,3 +75,6 @@ class OrganizationMember(db.Model):
     
     def __repr__(self):
         return f"<OrganizationMember {self.organization_id}:{self.user_id}>"
+    
+
+#Organization.ai_assistants = relationship("AIAssistant", back_populates="organization")

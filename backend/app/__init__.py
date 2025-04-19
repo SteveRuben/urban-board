@@ -7,6 +7,7 @@ from flask import Flask, request
 from flask_cors import CORS
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
@@ -14,7 +15,16 @@ from flask_socketio import SocketIO
 # Initialisez les extensions sans fournir l'application
 socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 # Créer l'instance db avant de créer l'application
-db = SQLAlchemy()
+convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+metadata = MetaData(naming_convention=convention)
+db = SQLAlchemy(metadata=metadata)
 jwt = JWTManager()
 migrate = Migrate()
 
