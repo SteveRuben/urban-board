@@ -58,6 +58,9 @@ class InterviewSchedule(db.Model):
     recruiter = relationship("User", foreign_keys=[recruiter_id])
     ai_assistant = relationship("AIAssistant")
     interview = relationship("Interview")
+    # Ajouter ce champ à models/interview_scheduling.py dans la classe InterviewSchedule
+    job_posting_id = db.Column(db.String(36), db.ForeignKey("job_postings.id"), nullable=True)
+    job_posting = relationship("JobPosting", back_populates="interview_schedules")
     
     def __repr__(self):
         return f"<InterviewSchedule {self.candidate_name} - {self.scheduled_at}>"

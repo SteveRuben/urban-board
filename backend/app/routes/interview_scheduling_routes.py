@@ -5,10 +5,11 @@ from services.interview_scheduling_service import InterviewSchedulingService
 from services.organization_service import OrganizationService
 from services.audit_service import AuditService
 from datetime import datetime
+from . import scheduling_bp
 from app import db
 
 
-scheduling_bp = Blueprint('scheduling', __name__)
+
 scheduling_service = InterviewSchedulingService()
 organization_service = OrganizationService()
 audit_service = AuditService()
