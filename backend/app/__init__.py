@@ -81,6 +81,27 @@ def create_app(config_name='dev'):
     @app.route('/health')
     def health_check():
         return {"status": "ok", "env": app.config['ENV']}
+
+    @app.route('/api/docs')
+    def list_routes():
+        routes = []
+        for rule in app.url_map.iter_rules():
+            # Ignore les routes internes Flask
+            if rule.endpoint == 'static':
+                continue
+            route_info = {
+                "endpoint": rule.endpoint,
+                "methods": list(rule.methods - {"HEAD", "OPTIONS"}),
+                "rule": str(rule)
+            }
+            routes.append(route_info)
+        return {"routes": routes}
+
+    # Afficher toutes les routes disponibles
+    print("\n🧭 Liste des routes disponibles :")
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods))
+        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
