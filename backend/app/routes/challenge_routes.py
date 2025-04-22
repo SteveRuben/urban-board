@@ -4,6 +4,7 @@ from app.models.challenge import Challenge
 from app.schemas.challenge_schema import ChallengeSchema
 from app import db
 from app.services.challenge_service import create_challenge as create_challenge_service
+from flask import jsonify
 
 challenge_bp = Blueprint('challenge', __name__, url_prefix='/api/challenges')
 
@@ -19,22 +20,22 @@ def create_challenge():
         return jsonify(errors), 400
 
     challenge = create_challenge_service(data)
-    return challenge_schema.jsonify(challenge), 201
+    return jsonify(challenge_schema.dump(challenge)), 201
 
 # List all challenges
-@challenge_bp.route('/', methods=['GET'])
+@challenge_bp.route('', methods=['GET'])
 def get_challenges():
     challenges = Challenge.query.all()
     return challenges_schema.jsonify(challenges)
 
 # Get a challenge by ID
-@challenge_bp.route('/<int:challenge_id>', methods=['GET'])
+@challenge_bp.route('<int:challenge_id>', methods=['GET'])
 def get_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     return challenge_schema.jsonify(challenge)
 
 # Update a challenge
-@challenge_bp.route('/<int:challenge_id>', methods=['PUT'])
+@challenge_bp.route('<int:challenge_id>', methods=['PUT'])
 def update_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     data = request.json
@@ -44,7 +45,7 @@ def update_challenge(challenge_id):
     return challenge_schema.jsonify(challenge)
 
 # Delete a challenge
-@challenge_bp.route('/<int:challenge_id>', methods=['DELETE'])
+@challenge_bp.route('<int:challenge_id>', methods=['DELETE'])
 def delete_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     db.session.delete(challenge)
