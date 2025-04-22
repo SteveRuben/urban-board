@@ -33,12 +33,6 @@ if __name__ == '__main__':
     use_reloader = env == 'dev'
     debug = env == 'dev'
 
-    # Afficher toutes les routes disponibles
-print("\n🧭 Liste des routes disponibles :")
-for rule in app.url_map.iter_rules():
-    methods = ','.join(rule.methods)
-    print(f"{rule.endpoint:30s} {methods:20s} {rule.rule}")
-
     # Démarrer le serveur
     socketio.run(app, host=host, port=port, debug=debug, use_reloader=debug)
     """ app.run(
