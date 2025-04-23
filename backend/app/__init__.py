@@ -5,6 +5,8 @@ import stripe
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request
 from flask_cors import CORS
+
+from app.utils.error_handlers import register_error_handlers
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -139,6 +141,9 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
     app.register_blueprint(challenge_bp)
+
+    # Gestion des erreurs
+    register_error_handlers(app)
     
 def register_hooks(app):
     """
