@@ -91,6 +91,27 @@ def create_app(config_name='dev'):
     @app.route('/health')
     def health_check():
         return {"status": "ok", "env": app.config['ENV']}
+
+    @app.route('/api/docs')
+    def list_routes():
+        routes = []
+        for rule in app.url_map.iter_rules():
+            # Ignore les routes internes Flask
+            if rule.endpoint == 'static':
+                continue
+            route_info = {
+                "endpoint": rule.endpoint,
+                "methods": list(rule.methods - {"HEAD", "OPTIONS"}),
+                "rule": str(rule)
+            }
+            routes.append(route_info)
+        return {"routes": routes}
+
+    # Afficher toutes les routes disponibles
+    print("\n🧭 Liste des routes disponibles :")
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods))
+        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
@@ -107,6 +128,7 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
+    from .routes.challenge_routes import challenge_bp
     
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
@@ -116,6 +138,7 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
+    app.register_blueprint(challenge_bp)
     
 def register_hooks(app):
     """
