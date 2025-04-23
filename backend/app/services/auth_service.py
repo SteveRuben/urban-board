@@ -1,4 +1,5 @@
 # backend/app/services/auth_service.py
+import geoip2
 from .. import db
 from ..models.user import User
 from ..models.login_history import LoginHistory
