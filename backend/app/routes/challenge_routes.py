@@ -1,4 +1,7 @@
-from flask import Blueprint, request, jsonify
+import uuid
+from flask import Blueprint, g, request, jsonify
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.routes.user import token_required
 from app.schemas.challenge_schema import ChallengeSchema
 from app.services.challenge_service import (
     create_challenge as create_challenge_service,
@@ -14,12 +17,16 @@ challenge_schema = ChallengeSchema()
 challenges_schema = ChallengeSchema(many=True)
 
 @challenge_bp.route('', methods=['POST'])
+@token_required
 def create_challenge():
+    user_id = g.current_user.user_id
     data = request.get_json()
     errors = challenge_schema.validate(data)
     if errors:
         return jsonify(errors), 400
 
+    data["owner_id"] = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    
     challenge = create_challenge_service(data)
     return jsonify(challenge_schema.dump(challenge)), 201
 

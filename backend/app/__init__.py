@@ -110,10 +110,10 @@ def create_app(config_name='dev'):
         return {"routes": routes}
 
     # Afficher toutes les routes disponibles
-    print("\n🧭 Liste des routes disponibles :")
-    for rule in app.url_map.iter_rules():
-        methods = ','.join(sorted(rule.methods))
-        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
+    # print("\n🧭 Liste des routes disponibles :")
+    # for rule in app.url_map.iter_rules():
+    #     methods = ','.join(sorted(rule.methods))
+    #     print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
