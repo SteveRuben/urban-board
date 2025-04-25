@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, g, request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.routes.user import token_required
-from app.schemas.challenge_schema import ChallengeSchema
-from app.services.challenge_service import (
+from app.schemas.challenge.challenge_schema import ChallengeSchema
+from app.services.challenge.challenge_service import (
     create_challenge as create_challenge_service,
     get_all_challenges,
     get_challenge_by_id,

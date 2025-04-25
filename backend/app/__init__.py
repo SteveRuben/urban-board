@@ -130,7 +130,7 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
-    from .routes.challenge_routes import challenge_bp
+    from .routes.challenge.challenge_routes import challenge_bp
     
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
