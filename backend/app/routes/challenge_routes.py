@@ -31,22 +31,38 @@ def create_challenge():
     return jsonify(challenge_schema.dump(challenge)), 201
 
 @challenge_bp.route('', methods=['GET'])
+@token_required
 def get_challenges():
-    challenges = get_all_challenges()
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+
+    challenges = get_all_challenges(user_id)
     return jsonify(challenges_schema.dump(challenges)), 200
 
 @challenge_bp.route('/<int:challenge_id>', methods=['GET'])
+@token_required
 def get_challenge(challenge_id):
-    challenge = get_challenge_by_id(challenge_id)
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+    
+    challenge = get_challenge_by_id(challenge_id, user_id)
     return jsonify(challenge_schema.dump(challenge)), 200
 
 @challenge_bp.route('/<int:challenge_id>', methods=['PUT'])
+@token_required
 def update_challenge(challenge_id):
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+    
     data = request.get_json()
-    challenge = update_challenge_service(challenge_id, data)
+    challenge = update_challenge_service(challenge_id, user_id, data)
     return jsonify(challenge_schema.dump(challenge)), 200
 
 @challenge_bp.route('/<int:challenge_id>', methods=['DELETE'])
+@token_required
 def delete_challenge(challenge_id):
-    delete_challenge_service(challenge_id)
-    return jsonify({"message": "Challenge supprimé avec succès"}), 200
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+    
+    result = delete_challenge_service(challenge_id, user_id)
+    return jsonify({"success": result}), 200
