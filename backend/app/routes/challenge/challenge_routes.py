@@ -4,9 +4,11 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.routes.user import token_required
 from app.schemas.challenge.challenge_schema import ChallengeSchema
 from app.services.challenge.challenge_service import (
+    archive_challenge_service,
     create_challenge as create_challenge_service,
     get_all_challenges,
     get_challenge_by_id,
+    publish_challenge_service,
     update_challenge as update_challenge_service,
     delete_challenge as delete_challenge_service
 )
@@ -66,3 +68,21 @@ def delete_challenge(challenge_id):
     
     result = delete_challenge_service(challenge_id, user_id)
     return jsonify({"success": result}), 200
+
+@challenge_bp.route('/<int:challenge_id>/publish', methods=['PUT'])
+@token_required
+def publish_challenge(challenge_id):
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+    
+    challenge = publish_challenge_service(challenge_id, user_id)
+    return jsonify(challenge_schema.dump(challenge)), 200
+
+@challenge_bp.route('/<int:challenge_id>/archive', methods=['PUT'])
+@token_required
+def archive_challenge(challenge_id):
+    user = g.current_user.user_id
+    user_id = uuid.UUID(user) if isinstance(user, str) else user
+    
+    challenge = archive_challenge_service(challenge_id, user_id)
+    return jsonify(challenge_schema.dump(challenge)), 200
