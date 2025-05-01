@@ -2,7 +2,8 @@
 from datetime import datetime
 import uuid
 from flask_sqlalchemy import SQLAlchemy
-from app import db  # Importez l'instance db créée dans votre app/__init__.py
+from app import db
+from .organization import OrganizationMember  # Import le modèle OrganizationMember
 
 class User(db.Model):
     """
@@ -21,6 +22,7 @@ class User(db.Model):
     last_password_change = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     last_login = db.Column(db.DateTime)
+    onboarding_completed = db.Column(db.Boolean, default=False)
     
     # Champs supplémentaires
     job_title = db.Column(db.String(100))
@@ -28,6 +30,11 @@ class User(db.Model):
     phone = db.Column(db.String(20))
     avatar_url = db.Column(db.String(255))
     preferences = db.Column(db.JSON, default=lambda: {})
+    permissions = db.Column(db.JSON, default=lambda: [])
+    
+    # Relations pour les organisations
+    organizations = db.relationship("OrganizationMember", back_populates="user")
+    current_organization_id = db.Column(db.String(36), nullable=True)
     
     """
     Modèle pour représenter un utilisateur dans le système
@@ -87,6 +94,8 @@ class User(db.Model):
         Returns:
             dict: Représentation de l'utilisateur sous forme de dictionnaire
         """
+        orgs = [member.organization for member in self.organizations]
+        has_organization = len(orgs) > 0
         return {
             'id': self.id,
             'email': self.email,
@@ -101,8 +110,9 @@ class User(db.Model):
             'avatar_url': self.avatar_url,
             'preferences': self.preferences,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            "has_organization": has_organization,
+            "onboarding_completed": self.onboarding_completed
         }
     
     @classmethod
@@ -181,3 +191,20 @@ class User(db.Model):
         }
         
         return permission in role_permissions.get(user.role, [])
+    
+    # Méthode utilitaire pour obtenir l'organisation active
+    @property
+    def current_organization(self):
+        if not self.current_organization_id:
+            # Si pas d'organisation active, prendre la première
+            org_member = OrganizationMember.query.filter_by(user_id=self.id).first()
+            if org_member:
+                return org_member.organization
+            return None
+        
+        # Sinon, chercher l'organisation active
+        org_member = OrganizationMember.query.filter_by(
+            user_id=self.id, 
+            organization_id=self.current_organization_id
+        ).first()
+        return org_member.organization if org_member else None

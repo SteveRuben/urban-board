@@ -4,6 +4,7 @@ from ..models.user import User
 from ..models.login_history import LoginHistory
 from ..models.notification_setting import NotificationPreference
 from ..models.two_factor_auth import TwoFactorAuth
+from ..models.organization import OrganizationMember
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import datetime
@@ -501,3 +502,68 @@ class UserService:
             return True, f"Intégration {integration_id} déconnectée avec succès"
         except Exception as e:
             return False, f"Erreur lors de la déconnexion de l'intégration: {str(e)}"
+    
+    @staticmethod
+    def get_user_by_id(user_id):
+        """
+        Récupère un utilisateur par son ID
+        """
+        return User.query.filter_by(id=user_id).first()
+
+    @staticmethod
+    def update_onboarding_status(user_id, completed=True):
+        """Mettre à jour le statut d'onboarding de l'utilisateur"""
+        user = UserService.get_user_by_id(user_id)
+        if user:
+            user.onboarding_completed = completed
+            db.session.commit()
+            return True
+        return False
+    
+    @staticmethod
+    def get_user_organizations(user_id):
+        """Récupérer les organisations de l'utilisateur"""
+        memberships = OrganizationMember.query.filter_by(user_id=user_id).all()
+        return [membership.organization for membership in memberships]
+
+    @staticmethod
+    def check_onboarding_required(user_id):
+        """Vérifier si l'onboarding est requis pour l'utilisateur"""
+        user = UserService.get_user_by_id(user_id)
+        if not user:
+            return True
+        
+        # Si l'utilisateur a déjà complété l'onboarding, pas besoin de le refaire
+        if user.onboarding_completed:
+            return False
+        
+        # Si l'utilisateur a au moins une organisation, considérer l'onboarding comme complété
+        organizations = UserService.get_user_organizations(user_id)
+        if organizations:
+            # Mettre à jour le statut d'onboarding si nécessaire
+            if not user.onboarding_completed:
+                UserService.update_onboarding_status(user_id)
+            return False
+        
+        # L'utilisateur n'a pas d'organisation et n'a pas complété l'onboarding
+        return True
+
+    @staticmethod
+    def get_user_organization_status(user_id):
+        """Récupérer l'état des organisations de l'utilisateur pour le frontend"""
+        user = UserService.get_user_by_id(user_id)
+        if not user:
+            return {
+                "has_organization": False,
+                "onboarding_completed": False,
+                "onboarding_required": True
+            }
+        
+        organizations = UserService.get_user_organizations(user_id)
+        has_organization = len(organizations) > 0
+        
+        return {
+            "has_organization": has_organization,
+            "onboarding_completed": user.onboarding_completed,
+            "onboarding_required": not has_organization and not user.onboarding_completed
+        }

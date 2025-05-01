@@ -12,6 +12,7 @@ class AIAssistant(db.Model):
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=False)
+    organization_id = db.Column(db.String(36), db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     
     # Informations de base
     name = db.Column(db.String(100), nullable=False)
@@ -68,6 +69,7 @@ class AIAssistant(db.Model):
     user = relationship('User', back_populates='ai_assistants')
     documents = relationship('AIAssistantDocument', back_populates='assistant', cascade='all, delete-orphan')
     interviews = relationship('Interview', back_populates='ai_assistant')
+    organization = relationship("Organization", back_populates="ai_assistants_org")
     
     def __repr__(self):
         return f'<AIAssistant {self.name}>'

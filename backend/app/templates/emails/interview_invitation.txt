@@ -1,0 +1,35 @@
+<!-- templates/emails/interview_invitation.txt -->
+Bonjour {{ candidate_name }},
+
+Nous sommes heureux de vous inviter à un entretien pour "{{ interview_title }}".
+
+DÉTAILS DE L'ENTRETIEN :
+------------------------
+Date et heure : {{ scheduled_at }}
+Durée : {{ duration_minutes }} minutes
+Fuseau horaire : {{ timezone }}
+Recruteur : {{ recruiter_name }}
+{% if description %}Description : {{ description }}{% endif %}
+
+L'entretien se déroulera en ligne via notre plateforme RecruteIA. 
+Veuillez accéder à votre entretien à l'heure prévue en utilisant ce lien :
+{{ interview_url }}
+
+Pour une expérience optimale, nous vous recommandons de :
+- Utiliser un navigateur récent (Chrome, Firefox, Edge)
+- Tester votre microphone et caméra à l'avance
+- Vous installer dans un environnement calme avec une bonne connexion internet
+
+Vous pouvez ajouter cet entretien à votre calendrier avec ce lien :
+{{ add_to_calendar_url }}
+
+Si vous avez des questions ou si vous devez reporter cet entretien, veuillez contacter directement {{ recruiter_name }} ou répondre à cet email.
+
+Nous nous réjouissons de vous rencontrer !
+
+Cordialement,
+L'équipe RecruteIA
+
+---
+Ce message a été envoyé automatiquement par RecruteIA. Merci de ne pas y répondre directement.
+© 2025 RecruteIA. Tous droits réservés.
