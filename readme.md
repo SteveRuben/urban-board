@@ -1,6 +1,7 @@
-# Résumé du projet RecruteIA et état actuel du développement
+# Résumé du projet RecruteIA (SaaS multi-tenant)
 
-# État du projet RecruteIA - Mars 2025
+RecruteIA est une plateforme de recrutement assistée par IA qui permet aux recruteurs de mener des entretiens automatisés ou collaboratifs avec l'aide d'assistants IA. Nous avons travaillé sur l'ajout de fonctionnalités de collaboration entre humains et assistants IA, permettant à une équipe de recruteurs de travailler ensemble, éventuellement avec des assistants IA spécialisés.
+
 
 ## Architecture technique
 
@@ -12,7 +13,7 @@
 - **APIs externes** : Intégration Claude/GPT-4o, Whisper pour traitement audio
 
 ### Frontend
-- **Framework** : Next.js (React)
+- **Framework** : Next.js (React Typescript)
 - **Styles** : Tailwind CSS, HeadlessUI
 - **État global** : Contextes React
 - **Communication API** : Axios
@@ -24,7 +25,7 @@
 - **CI/CD** : GitHub Actions
 - **Monitoring** : Prometheus, Grafana, Loki
 
-## Modèles de données
+## Modèles de données (SQLAlchemy)
 
 ### Utilisateurs et authentification
 - **User** : Informations de base utilisateur (UUID comme ID)
@@ -91,3 +92,4 @@
 - ✅ Système de commentaires horodatés
 - ✅ Intégration d'assistants IA spécialisés
 
+[Plus d'information](/docs/index.md)
