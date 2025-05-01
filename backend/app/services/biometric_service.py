@@ -2,7 +2,8 @@
 from flask import current_app
 import numpy as np
 from ..models.biometric import FacialAnalysis, BiometricSummary
-from ..models.interview import Interview, InterviewQuestion
+from ..models.interview import Interview
+from ..models.interview_question import InterviewQuestion
 from app import db
 from datetime import datetime
 

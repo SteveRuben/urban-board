@@ -16,9 +16,12 @@ class AIAssistant(db.Model):
     
     # Informations de base
     name = db.Column(db.String(100), nullable=False)
+    assistant_type = db.Column(db.String(50), nullable=False)  # 'general', 'recruiter', 'evaluator', etc.
     description = db.Column(db.Text, nullable=True)
     avatar = db.Column(db.String(255), nullable=True, default='/images/ai-assistant-default.png')
     model = db.Column(db.String(50), nullable=False, default='claude-3-7-sonnet')
+    capabilities = db.Column(db.JSON, nullable=True)  # Fonctionnalités disponibles pour cette IA
+    
     
     # Classification
     industry = db.Column(db.String(50), nullable=True)
@@ -140,4 +143,56 @@ class AIAssistantDocument(db.Model):
             'vectorIndexStatus': self.vector_index_status,
             'createdAt': self.created_at.isoformat(),
             'updatedAt': self.updated_at.isoformat()
+        }
+
+
+class TeamAIAssistant(db.Model):
+    """Association entre une équipe et un assistant IA"""
+    __tablename__ = 'team_ai_assistants'
+    
+    team_id = db.Column(db.String(36), db.ForeignKey('teams.id'), primary_key=True)
+    ai_assistant_id = db.Column(db.String(36), db.ForeignKey('ai_assistants.id'), primary_key=True)
+    role = db.Column(db.String(20), nullable=False, default='assistant')  # 'assistant', 'evaluator', 'analyzer'
+    added_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relations
+    team = db.relationship('Team', backref='ai_assistants')
+    ai_assistant = db.relationship('AIAssistant', backref='teams')
+    adder = db.relationship('User', backref='added_ai_assistants')
+    
+    def __repr__(self):
+        return f"<TeamAIAssistant {self.ai_assistant_id} in {self.team_id}>"
+
+
+class AIGeneratedContent(db.Model):
+    """Contenu généré par une IA dans le cadre d'une équipe"""
+    __tablename__ = 'ai_generated_contents'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.String(36), db.ForeignKey('teams.id'), nullable=False)
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
+    ai_assistant_id = db.Column(db.String(36), db.ForeignKey('ai_assistants.id'), nullable=False)
+    content_type = db.Column(db.String(50), nullable=False)  # 'comment', 'analysis', 'summary', 'question', 'evaluation'
+    content = db.Column(db.Text, nullable=False)
+    data = db.Column(db.JSON, nullable=True)  # Informations supplémentaires sur la génération
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relations
+    team = db.relationship('Team', backref='ai_contents')
+    interview = db.relationship('Interview', backref='ai_contents')
+    ai_assistant = db.relationship('AIAssistant', backref='generated_contents')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'team_id': self.team_id,
+            'interview_id': self.interview_id,
+            'ai_assistant_id': self.ai_assistant_id,
+            'ai_assistant_name': self.ai_assistant.name,
+            'content_type': self.content_type,
+            'content': self.content,
+            'data': self.data,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

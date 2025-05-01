@@ -5,15 +5,13 @@ import json
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm.exc import NoResultFound
-
 from app import db
-from app.models.ai_assistant import AIAssistant, AIAssistantDocument
-from app.models.user import User
-from app.services.llm_service import LLMService
+from ..models.ai_assistant import AIAssistant, AIAssistantDocument
+from ..models.user import User
+from ..services.llm_service import get_llm_response
 
 class AIAssistantService:
     def __init__(self):
-        self.llm_service = LLMService()
         self.upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'assistant_docs')
         
         # Créer le dossier d'upload s'il n'existe pas
@@ -512,7 +510,7 @@ class AIAssistantService:
             prompt = self._generate_prompt(assistant_data, params.get('question', ''))
             
             # Appeler le service LLM
-            response = self.llm_service.generate_response(
+            response = generate_response(
                 prompt=prompt,
                 model=assistant_data.get('model', 'claude-3-7-sonnet')
             )
@@ -533,7 +531,7 @@ class AIAssistantService:
             prompt = self._generate_prompt(assistant.to_dict(), params.get('question', ''))
             
             # Appeler le service LLM
-            response = self.llm_service.generate_response(
+            response = generate_response(
                 prompt=prompt,
                 model=assistant.model
             )
