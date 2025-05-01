@@ -83,9 +83,8 @@ def create_app(config_name='dev'):
     register_hooks(app)
     
     from .services.ai_interview_service import init_app as init_ai_service
-    from .routes.ai_routes import init_app as init_ai_routes
     init_ai_service(app)
-    init_ai_routes(app)
+
 
     # Route de vérification de santé
     @app.route('/health')
@@ -130,6 +129,12 @@ def register_blueprints(app):
     from .routes.integration_routes import integration_bp
     from .routes.challenge_routes import challenge_bp
     from .routes.organization_routes import organizations_bp
+    from .routes.collaboration_routes import collab_bp
+    from .routes.ai_routes import ai_bp
+    from .routes.ai_assistant_routes import ai_assistant_bp
+    from .routes.biometric_routes import biometric_bp
+    from .routes.ai_collaboration_routes import ai_collab_bp
+    from .routes.interview_scheduling_routes import scheduling_bp
     
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
@@ -139,8 +144,14 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
-    app.register_blueprint(challenge_bp)
-    app.register_blueprint(organizations_bp)
+    app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
+    app.register_blueprint(organizations_bp, url_prefix='/api/organizations')
+    app.register_blueprint(collab_bp, url_prefix='/api/collaboration')
+    app.register_blueprint(scheduling_bp, url_prefix='/api/scheduling')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(ai_assistant_bp, url_prefix='/api/ai-assistants')
+    app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
+    app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
     
 def register_hooks(app):
     """

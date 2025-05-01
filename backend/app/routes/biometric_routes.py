@@ -1,9 +1,9 @@
 # backend/routes/biometric_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from services.biometric_service import BiometricService
-from models.interview import Interview
-from services.subscription_service import SubscriptionService
+from ..services.biometric_service import BiometricService
+from ..models.interview import Interview
+from ..services.subscription_service import SubscriptionService
 from app import db
 
 biometric_bp = Blueprint('biometric', __name__)

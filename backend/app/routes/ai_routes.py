@@ -274,6 +274,3 @@ def analyze_response_clarity():
         current_app.logger.error(f"Erreur lors de l'analyse de la clarté: {str(e)}")
         return jsonify({"error": "Erreur lors de l'analyse de la clarté de la réponse"}), 500
     
-def init_app(app):
-    """Initialise les routes avec l'application Flask"""
-    app.register_blueprint(ai_bp)
