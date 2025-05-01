@@ -14,13 +14,15 @@ from ..services.interview_service import (
 
 @interview_bp.route('/', methods=['GET'])
 @token_required
-@standard_limit
+# @standard_limit
 def list_interviews_route():
     """liste les entretiens de l'utilisateur connecté"""
-    user_id = g.current_user.user_id
+    user_id = 1 #g.current_user.user_id
+    print(user_id)
     interviews = get_user_interviews(user_id)
     return jsonify(interviews), 201
 
+@token_required
 @interview_bp.route('/', methods=['POST'])
 def create_interview_route():
     """Crée un nouvel entretien"""
@@ -37,6 +39,7 @@ def create_interview_route():
     
     return jsonify(interview), 201
 
+@token_required
 @interview_bp.route('/<interview_id>', methods=['GET'])
 def get_interview_route(interview_id):
     """Récupère les détails d'un entretien spécifique"""
@@ -60,6 +63,7 @@ def get_interview_route(interview_id):
     
     return jsonify(interview)
 
+@token_required
 @interview_bp.route('/<interview_id>', methods=['PUT'])
 def update_interview_route(interview_id):
     """Met à jour un entretien existant"""
@@ -95,6 +99,7 @@ def update_interview_route(interview_id):
     
     return jsonify(updated_interview)
 
+@token_required
 @interview_bp.route('/<interview_id>/questions', methods=['GET'])
 def get_questions(interview_id):
     """Récupère les questions pour un entretien spécifique"""
@@ -107,6 +112,7 @@ def get_questions(interview_id):
     
     return jsonify({"interview_id": interview_id, "questions": questions})
 
+@token_required
 @interview_bp.route('/<interview_id>/evaluate', methods=['POST'])
 def evaluate_interview(interview_id):
     """Évalue une réponse d'entretien"""

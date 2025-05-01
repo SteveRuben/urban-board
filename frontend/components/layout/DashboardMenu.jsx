@@ -19,21 +19,6 @@ import {
 
 const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
   const router = useRouter();
-  
-  
-/*   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  useEffect(() => {
-    // Charger le nombre de notifications non lues
-    // Cette fonction serait remplacée par un appel API réel
-    const fetchUnreadNotifications = async () => {
-      // Simuler un appel API
-      setTimeout(() => {
-        setUnreadNotifications(3); // Exemple: 3 notifications non lues
-      }, 1000);
-    };
-    
-    fetchUnreadNotifications();
-  }, []); */
 
   // Vérifier si l'utilisateur a accès à une fonctionnalité en fonction de son plan
   const hasAccess = (feature) => {
@@ -222,7 +207,7 @@ const DashboardMenu = ({ userRole = 'recruiter', subscription = null }) => {
                 </svg>
               </button>
             ) : (
-              <Link href={item.href} legacyBehavior>
+              <Link href={item.href} prefetch={false} legacyBehavior>
                 <a
                   className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
                     isActive

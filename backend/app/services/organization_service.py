@@ -1,7 +1,7 @@
 # backend/services/organization_service.py
 from datetime import datetime
-from models.organization import Organization, OrganizationDomain, OrganizationMember
-from models.user import User
+from ..models.organization import Organization, OrganizationDomain, OrganizationMember
+from ..models.user import User
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid

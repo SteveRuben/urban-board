@@ -22,7 +22,9 @@ class Interview(db.Model):
     scheduled_for = db.Column(db.DateTime, nullable=True)
     started_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
-    
+    # relative à l'integration
+    meet_link = db.Column(db.String(255))
+    calendar_event_id = db.Column(db.String(255))
     # Méta-données
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

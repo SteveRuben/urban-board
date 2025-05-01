@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Fond avec dégradé doux -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5f7fa"/>
+      <stop offset="100%" stop-color="#e4e8f0"/>
+    </linearGradient>
+    
+    <!-- Ombre pour les éléments -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- Fond -->
+  <rect width="400" height="300" fill="url(#bg-gradient)" rx="8" ry="8"/>
+  
+  <!-- Éléments décoratifs - bulles -->
+  <circle cx="50" cy="50" r="15" fill="#6366f1" opacity="0.1"/>
+  <circle cx="350" cy="70" r="25" fill="#6366f1" opacity="0.1"/>
+  <circle cx="320" cy="250" r="20" fill="#6366f1" opacity="0.1"/>
+  <circle cx="80" cy="240" r="18" fill="#6366f1" opacity="0.1"/>
+  
+  <!-- Formulaire de connexion stylisé -->
+  <rect x="120" y="70" width="160" height="180" rx="8" ry="8" fill="white" filter="url(#shadow)"/>
+  
+  <!-- Icône utilisateur -->
+  <circle cx="200" cy="110" r="25" fill="#6366f1" opacity="0.2"/>
+  <circle cx="200" cy="100" r="10" fill="#6366f1"/>
+  <path d="M180 125 Q200 145 220 125" stroke="#6366f1" stroke-width="10" fill="none" stroke-linecap="round"/>
+  
+  <!-- Champs de formulaire -->
+  <rect x="140" y="150" width="120" height="16" rx="3" ry="3" fill="#e4e8f0"/>
+  <rect x="140" y="180" width="120" height="16" rx="3" ry="3" fill="#e4e8f0"/>
+  
+  <!-- Bouton de connexion -->
+  <rect x="160" y="210" width="80" height="24" rx="12" ry="12" fill="#6366f1"/>
+  <text x="200" y="227" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">Se connecter</text>
+  
+  <!-- Éléments de sécurité -->
+  <circle cx="150" cy="240" r="3" fill="#6366f1"/>
+  <rect x="160" y="237" width="80" height="6" rx="3" ry="3" fill="#e4e8f0"/>
+  
+  <!-- Petits détails décoratifs -->
+  <path d="M30 150 Q40 130 50 150 Q60 170 70 150" stroke="#6366f1" stroke-width="2" fill="none" opacity="0.3"/>
+  <path d="M330 120 Q340 100 350 120 Q360 140 370 120" stroke="#6366f1" stroke-width="2" fill="none" opacity="0.3"/>
+</svg>

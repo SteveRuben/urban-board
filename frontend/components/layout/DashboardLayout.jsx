@@ -31,7 +31,14 @@ const DashboardLayout = ({ children }) => {
     if (!loading && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, loading, router]);
+
+    // Rediriger vers l'onboarding si l'utilisateur n'a pas complété l'onboarding
+    if (!loading && user && !user.onboarding_completed) {
+      router.push('/onboarding');
+      return;
+    }
+
+  }, [isAuthenticated, loading, router, user]);
 
   useEffect(() => {
     // Récupérer le nombre de notifications non lues

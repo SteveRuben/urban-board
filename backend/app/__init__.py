@@ -64,7 +64,7 @@ def create_app(config_name='dev'):
     # Activer CORS pour permettre les requêtes depuis le frontend
     CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}}, supports_credentials=True)
     socketio.init_app(app, 
-                      cors_allowed_origins="*", 
+                      cors_allowed_origins=app.config['CORS_ORIGINS'], 
                       async_mode='eventlet',
                       logger=True,
                       engineio_logger=True)
@@ -129,6 +129,7 @@ def register_blueprints(app):
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
     from .routes.challenge_routes import challenge_bp
+    from .routes.organization_routes import organizations_bp
     
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
@@ -139,6 +140,7 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
     app.register_blueprint(challenge_bp)
+    app.register_blueprint(organizations_bp)
     
 def register_hooks(app):
     """

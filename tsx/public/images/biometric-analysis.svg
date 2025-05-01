@@ -1,0 +1,90 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f7f9fc" />
+  
+  <!-- Dashboard Container -->
+  <rect x="50" y="50" width="700" height="400" rx="10" fill="white" stroke="#e0e6ed" stroke-width="2" />
+  
+  <!-- Header -->
+  <rect x="50" y="50" width="700" height="60" rx="10" fill="#4f46e5" />
+  <text x="100" y="85" font-family="Arial" font-size="20" fill="white" font-weight="bold">Analyse Biométrique - Jean</text>
+  
+  <!-- Left Panel - Face Detection -->
+  <rect x="70" y="130" width="250" height="290" rx="5" fill="#f3f4f6" />
+  
+  <!-- Face Outline -->
+  <ellipse cx="195" cy="220" rx="100" ry="120" fill="#d1d5db" stroke="#4b5563" stroke-width="1" stroke-dasharray="5,5" />
+  
+  <!-- Face Recognition Points -->
+  <circle cx="155" cy="190" r="5" fill="#4f46e5" />
+  <circle cx="235" cy="190" r="5" fill="#4f46e5" />
+  <circle cx="195" cy="230" r="5" fill="#4f46e5" />
+  <circle cx="155" cy="270" r="5" fill="#4f46e5" />
+  <circle cx="235" cy="270" r="5" fill="#4f46e5" />
+  
+  <!-- Connection Lines -->
+  <line x1="155" y1="190" x2="235" y2="190" stroke="#4f46e5" stroke-width="1" />
+  <line x1="155" y1="190" x2="195" y2="230" stroke="#4f46e5" stroke-width="1" />
+  <line x1="235" y1="190" x2="195" y2="230" stroke="#4f46e5" stroke-width="1" />
+  <line x1="155" y1="190" x2="155" y2="270" stroke="#4f46e5" stroke-width="1" />
+  <line x1="235" y1="190" x2="235" y2="270" stroke="#4f46e5" stroke-width="1" />
+  <line x1="155" y1="270" x2="235" y2="270" stroke="#4f46e5" stroke-width="1" />
+  
+  <!-- Eyes -->
+  <ellipse cx="155" cy="190" rx="25" ry="15" fill="none" stroke="#4f46e5" stroke-width="1" />
+  <ellipse cx="235" cy="190" rx="25" ry="15" fill="none" stroke="#4f46e5" stroke-width="1" />
+  <circle cx="155" cy="190" r="8" fill="#1f2937" />
+  <circle cx="235" cy="190" r="8" fill="#1f2937" />
+  
+  <!-- Mouth -->
+  <path d="M155 270 Q195 290 235 270" fill="none" stroke="#4f46e5" stroke-width="1" />
+  
+  <!-- Right Top Panel - Emotional Analysis -->
+  <rect x="340" y="130" width="380" height="140" rx="5" fill="#f3f4f6" />
+  <text x="360" y="160" font-family="Arial" font-size="16" fill="#1f2937" font-weight="bold">Analyse émotionnelle en temps réel</text>
+  
+  <!-- Emotion Bars -->
+  <text x="360" y="190" font-family="Arial" font-size="14" fill="#374151">Neutre</text>
+  <rect x="450" y="180" width="250" height="12" rx="6" fill="#e5e7eb" />
+  <rect x="450" y="180" width="175" height="12" rx="6" fill="#818cf8" />
+  
+  <text x="360" y="215" font-family="Arial" font-size="14" fill="#374151">Engagement</text>
+  <rect x="450" y="205" width="250" height="12" rx="6" fill="#e5e7eb" />
+  <rect x="450" y="205" width="150" height="12" rx="6" fill="#34d399" />
+  
+  <text x="360" y="240" font-family="Arial" font-size="14" fill="#374151">Stress</text>
+  <rect x="450" y="230" width="250" height="12" rx="6" fill="#e5e7eb" />
+  <rect x="450" y="230" width="50" height="12" rx="6" fill="#f87171" />
+  
+  <!-- Right Bottom Panel - Time Series Data -->
+  <rect x="340" y="280" width="380" height="140" rx="5" fill="#f3f4f6" />
+  <text x="360" y="310" font-family="Arial" font-size="16" fill="#1f2937" font-weight="bold">Tendances au cours de l'entretien</text>
+  
+  <!-- Chart Axis -->
+  <line x1="360" y1="390" x2="700" y2="390" stroke="#9ca3af" stroke-width="1" />
+  <line x1="360" y1="390" x2="360" y2="330" stroke="#9ca3af" stroke-width="1" />
+  
+  <!-- Chart Data -->
+  <polyline points="360,370 380,365 400,380 420,360 440,350 460,370 480,365 500,350 520,345 540,360 560,330 580,340 600,335 620,350 640,340 660,345 680,335 700,350" 
+           fill="none" stroke="#10b981" stroke-width="2" />
+  
+  <polyline points="360,380 380,375 400,385 420,370 440,390 460,385 480,380 500,385 520,375 540,380 560,365 580,375 600,365 620,380 640,370 660,375 680,365 700,370" 
+           fill="none" stroke="#f43f5e" stroke-width="2" />
+  
+  <!-- Legend -->
+  <rect x="610" y="315" width="12" height="12" fill="#10b981" />
+  <text x="630" y="325" font-family="Arial" font-size="12" fill="#374151">Confiance</text>
+  
+  <rect x="610" y="335" width="12" height="12" fill="#f43f5e" />
+  <text x="630" y="345" font-family="Arial" font-size="12" fill="#374151">Stress</text>
+  
+  <!-- Time Labels -->
+  <text x="360" y="405" font-family="Arial" font-size="10" fill="#4b5563">0:00</text>
+  <text x="525" y="405" font-family="Arial" font-size="10" fill="#4b5563">5:00</text>
+  <text x="700" y="405" font-family="Arial" font-size="10" fill="#4b5563">10:00</text>
+  
+  <!-- Status Indicators -->
+  <circle cx="90" cy="85" r="8" fill="#10b981" />
+  <circle cx="715" cy="85" r="8" fill="#10b981" />
+  <text x="730" y="90" font-family="Arial" font-size="14" fill="white">Actif</text>
+</svg>

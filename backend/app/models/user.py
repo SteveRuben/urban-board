@@ -22,6 +22,7 @@ class User(db.Model):
     last_password_change = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, onupdate=datetime.now)
     last_login = db.Column(db.DateTime)
+    onboarding_completed = db.Column(db.Boolean, default=False)
     
     # Champs supplémentaires
     job_title = db.Column(db.String(100))
@@ -32,7 +33,7 @@ class User(db.Model):
     permissions = db.Column(db.JSON, default=lambda: [])
     
     # Relations pour les organisations
-    organizations = db.relationship("OrganizationMember", back_populates="user", cascade="all, delete-orphan")
+    organizations = db.relationship("OrganizationMember", back_populates="user")
     current_organization_id = db.Column(db.String(36), nullable=True)
     
     """
@@ -93,6 +94,8 @@ class User(db.Model):
         Returns:
             dict: Représentation de l'utilisateur sous forme de dictionnaire
         """
+        orgs = [member.organization for member in self.organizations]
+        has_organization = len(orgs) > 0
         return {
             'id': self.id,
             'email': self.email,
@@ -107,8 +110,9 @@ class User(db.Model):
             'avatar_url': self.avatar_url,
             'preferences': self.preferences,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            "has_organization": has_organization,
+            "onboarding_completed": self.onboarding_completed
         }
     
     @classmethod

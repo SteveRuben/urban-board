@@ -1,7 +1,7 @@
 # backend/middlewares/tenant_middleware.py
 from flask import g, request
 from functools import wraps
-from services.organization_service import OrganizationService
+from ..services.organization_service import OrganizationService
 
 def setup_tenant_middleware(app):
     """Configure le middleware de tenant pour l'application Flask"""
