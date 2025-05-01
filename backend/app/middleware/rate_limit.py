@@ -2,7 +2,6 @@
 from functools import wraps
 from flask import request, jsonify, current_app, g
 import time
-import redis
 import hashlib
 
 # Réutiliser le client Redis et get_current_user du module auth_middleware

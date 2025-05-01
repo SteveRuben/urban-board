@@ -11,19 +11,6 @@ from werkzeug.utils import secure_filename
 import uuid
 from . import user_bp
 
-@user_bp.route('/register', methods=['POST'])
-def register():
-    """Enregistre un nouvel utilisateur"""
-    data = request.json
-    # Logique pour enregistrer l'utilisateur
-    return jsonify({"message": "Utilisateur enregistré"}), 201
-
-@user_bp.route('/login', methods=['POST'])
-def login():
-    """Connecte un utilisateur"""
-    data = request.json
-    # Logique pour connecter l'utilisateur
-    return jsonify({"token": "sample_jwt_token"})
 
 @user_bp.route('/profile', methods=['GET'])
 @token_required

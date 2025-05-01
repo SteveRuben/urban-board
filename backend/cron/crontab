@@ -1,0 +1,5 @@
+# Regénérer les configurations Nginx toutes les heures
+0 * * * * /path/to/your/app/scripts/generate_domain_configs.py
+
+# Vérifier et renouveler les certificats SSL une fois par jour
+0 0 * * * /path/to/your/app/scripts/get_ssl_certificates.py

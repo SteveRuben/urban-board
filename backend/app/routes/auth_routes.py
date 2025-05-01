@@ -1,5 +1,9 @@
 # backend/app/routes/auth_routes.py
+import datetime
+import os
 from flask import Blueprint, request, jsonify, g
+
+from ..services.user_service import UserService
 from ..services.auth_service import AuthService
 from ..middleware.auth_middleware import token_required
 from ..middleware.rate_limit import auth_limit, standard_limit
@@ -46,7 +50,7 @@ def register():
         description: Utilisateur déjà existant
     """
     data = request.get_json()
-    print(data)
+
     # Vérifier si toutes les données requises sont présentes,123Abc@@@
     required_fields = ['email', 'password', 'first_name', 'last_name']
     for field in required_fields:
@@ -74,7 +78,8 @@ def register():
     return jsonify({
         'message': 'Compte créé avec succès',
         'tokens': tokens,
-        'user': user_data
+        'user': user_data,
+        'onboarding_required': True
     }), 201
 
 @auth_bp.route('/login', methods=['POST'])
@@ -119,10 +124,14 @@ def login():
         import time
         time.sleep(0.5)
         return jsonify({'message': message}), 401
+      
+    print(user['id'])
+    onboarding_required = UserService.check_onboarding_required(user_id=user['id'])
     
     return jsonify({
         'message': 'Authentification réussie',
         'tokens': tokens,
+        'onboarding_required': onboarding_required,
         'user': user
     }), 200
 
@@ -353,18 +362,20 @@ def get_current_user():
     """
     # L'utilisateur est déjà chargé grâce au décorateur token_required
     user = g.current_user
-        
+    
     if not user:
         return jsonify({'message': 'Utilisateur non trouvé'}), 404
     
     # Convertir l'objet utilisateur en dictionnaire
     user_data = user.to_dict()
+    # Récupérer le statut des organisations
+    org_status = UserService.get_user_organization_status(user.id)
     
     # S'assurer que le mot de passe n'est pas inclus dans la réponse
     if 'password' in user_data:
         del user_data['password']
     
-    return jsonify({'user': user_data}), 200
+    return jsonify({'user': user_data, 'organization_status': org_status}), 200
 
 # Nouvelle route pour mettre à jour le profil utilisateur
 @auth_bp.route('/profile', methods=['PUT'])

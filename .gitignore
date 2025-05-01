@@ -30,4 +30,11 @@ frontend/.next/**/*
 **.whl/**/**/**/**/**/**/*
 **.whl/**/**/**/**/**/**/**/*
 **.next/**
-
+**/myenv/**
+**/__pycache__/**
+**/var/**
+**/share/**
+/backend/app/static/*
+***.pyc
+/backend/migrations_bk/***
+/docs/tmp/***

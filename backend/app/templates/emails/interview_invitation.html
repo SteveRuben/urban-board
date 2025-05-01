@@ -1,0 +1,100 @@
+<!-- templates/emails/interview_invitation.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitation à un entretien</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #4F46E5;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        .content {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4F46E5;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .info-box {
+            background-color: white;
+            border-left: 4px solid #4F46E5;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Invitation à un entretien</h1>
+    </div>
+    
+    <div class="content">
+        <p>Bonjour {{ candidate_name }},</p>
+        
+        <p>Nous sommes heureux de vous inviter à un entretien pour <strong>{{ interview_title }}</strong>.</p>
+        
+        <div class="info-box">
+            <p><strong>Date et heure :</strong> {{ scheduled_at }}</p>
+            <p><strong>Durée :</strong> {{ duration_minutes }} minutes</p>
+            <p><strong>Fuseau horaire :</strong> {{ timezone }}</p>
+            <p><strong>Recruteur :</strong> {{ recruiter_name }}</p>
+            {% if description %}
+            <p><strong>Description :</strong> {{ description }}</p>
+            {% endif %}
+        </div>
+        
+        <p>L'entretien se déroulera en ligne via notre plateforme RecruteIA. Veuillez cliquer sur le bouton ci-dessous pour accéder à votre entretien à l'heure prévue :</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ interview_url }}" class="button">Accéder à l'entretien</a>
+        </div>
+        
+        <p>Pour une expérience optimale, nous vous recommandons de :</p>
+        <ul>
+            <li>Utiliser un navigateur récent (Chrome, Firefox, Edge)</li>
+            <li>Tester votre microphone et caméra à l'avance</li>
+            <li>Vous installer dans un environnement calme avec une bonne connexion internet</li>
+        </ul>
+        
+        <p>N'hésitez pas à ajouter cet entretien à votre calendrier :</p>
+        <div style="text-align: center;">
+            <a href="{{ add_to_calendar_url }}" style="color: #4F46E5;">Ajouter à Google Calendar</a>
+        </div>
+        
+        <p>Si vous avez des questions ou si vous devez reporter cet entretien, veuillez contacter directement {{ recruiter_name }} ou répondre à cet email.</p>
+        
+        <p>Nous nous réjouissons de vous rencontrer !</p>
+        
+        <p>Cordialement,<br>L'équipe RecruteIA</p>
+    </div>
+    
+    <div class="footer">
+        <p>Ce message a été envoyé automatiquement par RecruteIA. Merci de ne pas y répondre directement.</p>
+        <p>&copy; 2025 RecruteIA. Tous droits réservés.</p>
+    </div>
+</body>
+</html>

@@ -7,6 +7,7 @@ from flask import Flask, request
 from flask_cors import CORS
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
@@ -14,7 +15,16 @@ from flask_socketio import SocketIO
 # Initialisez les extensions sans fournir l'application
 socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 # Créer l'instance db avant de créer l'application
-db = SQLAlchemy()
+convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+metadata = MetaData(naming_convention=convention)
+db = SQLAlchemy(metadata=metadata)
 jwt = JWTManager()
 migrate = Migrate()
 
@@ -54,7 +64,7 @@ def create_app(config_name='dev'):
     # Activer CORS pour permettre les requêtes depuis le frontend
     CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}}, supports_credentials=True)
     socketio.init_app(app, 
-                      cors_allowed_origins="*", 
+                      cors_allowed_origins=app.config['CORS_ORIGINS'], 
                       async_mode='eventlet',
                       logger=True,
                       engineio_logger=True)
@@ -81,6 +91,27 @@ def create_app(config_name='dev'):
     @app.route('/health')
     def health_check():
         return {"status": "ok", "env": app.config['ENV']}
+
+    @app.route('/api/docs')
+    def list_routes():
+        routes = []
+        for rule in app.url_map.iter_rules():
+            # Ignore les routes internes Flask
+            if rule.endpoint == 'static':
+                continue
+            route_info = {
+                "endpoint": rule.endpoint,
+                "methods": list(rule.methods - {"HEAD", "OPTIONS"}),
+                "rule": str(rule)
+            }
+            routes.append(route_info)
+        return {"routes": routes}
+
+    # Afficher toutes les routes disponibles
+    print("\n🧭 Liste des routes disponibles :")
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods))
+        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
@@ -97,6 +128,8 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
+    from .routes.challenge_routes import challenge_bp
+    from .routes.organization_routes import organizations_bp
     
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
@@ -106,6 +139,8 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
+    app.register_blueprint(challenge_bp)
+    app.register_blueprint(organizations_bp)
     
 def register_hooks(app):
     """
