@@ -33,7 +33,7 @@ def get_token_from_request():
         str: Token JWT ou None si non trouvé
     """
     auth_header = request.headers.get('Authorization')
-    
+
     if auth_header and auth_header.startswith('Bearer '):
         return auth_header.split(' ')[1]
     
@@ -388,6 +388,59 @@ def role_required(roles):
     if isinstance(roles, str):
         roles = [roles]
     
+    return decorator
+
+def check_onboarding_status():
+    """Middleware pour vérifier si l'utilisateur a complété l'onboarding"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            try:
+                # Vérifier le JWT
+                token = get_token_from_request()
+                
+                payload = verify_token(token)
+                if not payload:
+                    return jsonify({'message': 'Token invalide ou expiré'}), 401
+                    
+                # Récupérer l'ID utilisateur du token
+                current_user_id = payload.get('user_id');
+                
+                # Récupérer l'utilisateur avec ses relations
+                user = User.query.filter_by(id=current_user_id).first()
+                
+                if not user:
+                    return jsonify({"message": "Utilisateur non trouvé"}), 404
+                
+                # Vérifier si l'utilisateur a une organisation ou a déjà complété l'onboarding
+                has_completed_onboarding = user.onboarding_completed
+                has_organization = len(user.organizations) > 0
+                
+                # Si l'utilisateur a une organisation mais n'a pas encore complété l'onboarding,
+                # mettre à jour son statut
+                if has_organization and not has_completed_onboarding:
+                    user.onboarding_completed = True
+                    from app import db
+                    db.session.commit()
+                    has_completed_onboarding = True
+                
+                # Stocker le statut d'onboarding dans le contexte g
+                g.onboarding_completed = has_completed_onboarding
+                g.has_organization = has_organization
+                g.current_user = user
+                
+                # Si l'utilisateur n'a pas d'organisation et n'a pas complété l'onboarding
+                # et n'est pas sur le chemin d'onboarding
+                if not has_completed_onboarding and not has_organization and not request.path.startswith('/api/onboarding') and not request.path.startswith('/api/organizations'):
+                    return jsonify({"message": "Onboarding requis", "onboarding_required": True}), 403
+                
+            except Exception as e:
+                print(e)
+                current_app.logger.error(f"Erreur dans auth_middleware: {str(e)}")
+                return jsonify({"message": "Erreur d'authentification"}), 401
+            
+            return f(*args, **kwargs)
+        return decorated_function
     return decorator
 
 def admin_required(f):

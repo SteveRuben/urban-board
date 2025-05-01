@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80">
+  <!-- Fond transparent -->
+  <rect width="240" height="80" fill="none"/>
+  
+  <!-- Logo Lever -->
+  <g fill="#40AD85">
+    <!-- L -->
+    <path d="M40 20h8v32h20v8H40z"/>
+    
+    <!-- E -->
+    <path d="M80 20h28v8H88v8h16v8H88v8h20v8H80z"/>
+    
+    <!-- V -->
+    <path d="M120 20h9l9 32h-9l-4.5-18-4.5 18h-9z"/>
+    
+    <!-- E -->
+    <path d="M150 20h28v8h-20v8h16v8h-16v8h20v8h-28z"/>
+    
+    <!-- R -->
+    <path d="M190 20h20c5 0 10 4 10 10 0 4-2 7-5 9l7 21h-9l-6-18h-9v18h-8V20zm8 16h10c2 0 4-2 4-4s-2-4-4-4h-10v8z"/>
+  </g>
+</svg>

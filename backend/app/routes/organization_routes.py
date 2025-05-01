@@ -1,17 +1,19 @@
 # backend/routes/organization_routes.py
 from datetime import datetime
+import os
 import uuid
-from flask import Blueprint, request, jsonify, g, abort
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from services.audit_service import AuditService
-from models.user import User
-from models.organization import Organization, OrganizationDomain, OrganizationMember
+from flask import Blueprint, current_app, request, jsonify, g, abort
+from ..services.audit_service import AuditService
+from ..models.user import User
+from ..models.organization import Organization, OrganizationDomain, OrganizationMember
 from app import db
-from services.organization_service import OrganizationService
-from middleware.tenant_middleware import organization_required, get_current_organization
+from ..services.organization_service import OrganizationService
+from ..middleware.auth_middleware import token_required
+from ..middleware.tenant_middleware import organization_required, get_current_organization
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
-from . import organizations_bp
+from werkzeug.utils import secure_filename
 
+organizations_bp = Blueprint('organizations', __name__, url_prefix='/api/organizations')
 
 
 # Helper pour vérifier les permissions administrateur
@@ -39,10 +41,10 @@ def require_owner(organization_id, user_id):
     return member
 
 @organizations_bp.route('/', methods=['POST'])
-@jwt_required()
+@token_required
 def create_organization():
     """Crée une nouvelle organisation"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     data = request.get_json()
     
     if not data or 'name' not in data:
@@ -66,10 +68,10 @@ def create_organization():
         abort(400, description=str(e))
 
 @organizations_bp.route('/', methods=['GET'])
-@jwt_required()
+@token_required
 def get_user_organizations():
     """Liste toutes les organisations dont l'utilisateur est membre"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization_service = OrganizationService()
     organizations = organization_service.get_organizations_for_user(user_id)
     
@@ -86,11 +88,11 @@ def get_user_organizations():
     ])
 
 @organizations_bp.route('/current', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_current_organization_details():
     """Obtient les détails de l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     member = OrganizationMember.query.filter_by(
@@ -112,11 +114,11 @@ def get_current_organization_details():
     })
 
 @organizations_bp.route('/current', methods=['PUT'])
-@jwt_required()
+@token_required
 @organization_required
 def update_current_organization():
     """Met à jour les informations de l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -146,11 +148,11 @@ def update_current_organization():
         abort(400, description=str(e))
 
 @organizations_bp.route('/current/domains', methods=['POST'])
-@jwt_required()
+@token_required
 @organization_required
 def add_domain_to_organization():
     """Ajoute un domaine à l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -179,11 +181,11 @@ def add_domain_to_organization():
         abort(400, description=str(e))
 
 @organizations_bp.route('/current/domains', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_organization_domains():
     """Liste tous les domaines de l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier que l'utilisateur est membre
@@ -209,11 +211,11 @@ def get_organization_domains():
 
 
 @organizations_bp.route('/current/domains/<domain_id>/verify-dns', methods=['POST'])
-@jwt_required()
+@token_required
 @organization_required
 def verify_domain_dns(domain_id):
     """Vérifie un domaine en consultant les enregistrements DNS TXT"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -282,11 +284,11 @@ def verify_domain_dns(domain_id):
 
 # Suppression de domaine
 @organizations_bp.route('/current/domains/<domain_id>', methods=['DELETE'])
-@jwt_required()
+@token_required
 @organization_required
 def delete_domain(domain_id):
     """Supprime un domaine de l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -319,11 +321,11 @@ def delete_domain(domain_id):
 
 # Définir un domaine comme primaire
 @organizations_bp.route('/current/domains/<domain_id>/set-primary', methods=['PUT'])
-@jwt_required()
+@token_required
 @organization_required
 def set_primary_domain(domain_id):
     """Définit un domaine comme domaine primaire de l'organisation"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -360,11 +362,11 @@ def set_primary_domain(domain_id):
 
 # Obtenir la liste des membres
 @organizations_bp.route('/current/members', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_organization_members():
     """Liste tous les membres de l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier que l'utilisateur est membre
@@ -397,11 +399,11 @@ def get_organization_members():
 
 # Ajouter un membre
 @organizations_bp.route('/current/members', methods=['POST'])
-@jwt_required()
+@token_required
 @organization_required
 def add_member_to_organization():
     """Ajoute un membre à l'organisation active"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -446,11 +448,11 @@ def add_member_to_organization():
 
 # Mettre à jour le rôle d'un membre
 @organizations_bp.route('/current/members/<user_id>', methods=['PUT'])
-@jwt_required()
+@token_required
 @organization_required
 def update_member_role(user_id):
     """Met à jour le rôle d'un membre de l'organisation active"""
-    current_user_id = get_jwt_identity()
+    current_user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -504,11 +506,11 @@ def update_member_role(user_id):
 
 # Supprimer un membre
 @organizations_bp.route('/current/members/<user_id>', methods=['DELETE'])
-@jwt_required()
+@token_required
 @organization_required
 def remove_member_from_organization(user_id):
     """Supprime un membre de l'organisation active"""
-    current_user_id = get_jwt_identity()
+    current_user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -535,10 +537,10 @@ def remove_member_from_organization(user_id):
 
 # Changer d'organisation active
 @organizations_bp.route('/switch/<organization_id>', methods=['POST'])
-@jwt_required()
+@token_required
 def switch_organization(organization_id):
     """Change l'organisation active de l'utilisateur"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     
     # Vérifier que l'utilisateur est membre de l'organisation
     member = OrganizationMember.query.filter_by(
@@ -570,11 +572,11 @@ def switch_organization(organization_id):
 
 # Inviter un utilisateur par email (créer un compte s'il n'existe pas)
 @organizations_bp.route('/current/invitations', methods=['POST'])
-@jwt_required()
+@token_required
 @organization_required
 def invite_user_to_organization():
     """Invite un utilisateur à rejoindre l'organisation par email"""
-    user_id = get_jwt_identity()
+    user_id = g.current_user.user_id
     organization = get_current_organization()
     
     # Vérifier les permissions d'administration
@@ -646,7 +648,7 @@ def accept_invitation(token):
 
 # Route pour annuler une invitation
 @organizations_bp.route('/api/organizations/<org_id>/invitations/<invitation_id>', methods=['DELETE'])
-@jwt_required()
+@token_required
 @organization_required
 def cancel_invitation(org_id, invitation_id):
     # Vérifier les droits de l'utilisateur
@@ -656,7 +658,7 @@ def cancel_invitation(org_id, invitation_id):
 
 # Route pour renvoyer une invitation
 @organizations_bp.route('/api/organizations/<org_id>/invitations/<invitation_id>/resend', methods=['POST'])
-@jwt_required()
+@token_required
 @organization_required
 def resend_invitation(org_id, invitation_id):
     # Vérifier les droits de l'utilisateur
@@ -666,7 +668,7 @@ def resend_invitation(org_id, invitation_id):
 
 # Route pour lister les invitations en cours
 @organizations_bp.route('/api/organizations/<org_id>/invitations', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def list_invitations(org_id):
     # Récupérer les invitations actives pour l'organisation
@@ -675,7 +677,7 @@ def list_invitations(org_id):
 
 # Statistiques de l'organisation
 @organizations_bp.route('/current/stats', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_organization_stats():
     """Obtient des statistiques sur l'organisation active"""
@@ -732,7 +734,7 @@ def get_organization_stats():
     
 
 @organizations_bp.route('/api/organizations/<org_id>/audit-logs', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_audit_logs(org_id):
     """Récupère les logs d'audit de l'organisation avec filtrage et pagination."""
@@ -770,7 +772,7 @@ def get_audit_logs(org_id):
     })
 
 @organizations_bp.route('/api/organizations/<org_id>/audit-logs/entity/<entity_type>/<entity_id>', methods=['GET'])
-@jwt_required()
+@token_required
 @organization_required
 def get_entity_history(org_id, entity_type, entity_id):
     """Récupère l'historique complet d'une entité spécifique."""
@@ -778,3 +780,48 @@ def get_entity_history(org_id, entity_type, entity_id):
     logs = audit_service.get_entity_history(org_id, entity_type, entity_id)
     
     return jsonify([log.to_dict() for log in logs])
+
+@organizations_bp.route('/upload-logo', methods=['POST'])
+@token_required
+def upload_logo():
+    """Télécharger un logo pour l'organisation"""
+
+    if 'logo' not in request.files:
+        return jsonify({'message': 'Aucun fichier trouvé'}), 400
+    
+    file = request.files['logo']
+    
+    if file.filename == '':
+        return jsonify({'message': 'Aucun fichier sélectionné'}), 400
+    
+    if file and allowed_file(file.filename):
+        try:
+            filename = secure_filename(file.filename)
+            # Générer un nom unique pour le fichier
+            unique_filename = f"{uuid.uuid4()}_{filename}"
+            
+            # Créer le répertoire de stockage si nécessaire
+            upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'logos')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Sauvegarder le fichier
+            file_path = os.path.join(upload_dir, unique_filename)
+            file.save(file_path)
+            
+            # URL publique du logo
+            logo_url = f"/uploads/logos/{unique_filename}"
+            
+            return jsonify({'logo_url': logo_url}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Erreur lors du téléchargement du logo: {str(e)}")
+            return jsonify({'message': 'Une erreur est survenue lors du téléchargement du logo'}), 500
+    
+    return jsonify({'message': 'Type de fichier non autorisé'}), 400
+
+
+def allowed_file(filename):
+    """Vérifier si le type de fichier est autorisé"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

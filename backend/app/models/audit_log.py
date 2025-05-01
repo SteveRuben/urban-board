@@ -7,13 +7,13 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Peut être null pour actions système
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Peut être null pour actions système
     action = db.Column(db.String(50), nullable=False)  # Type d'action (create, update, delete, etc.)
     entity_type = db.Column(db.String(50), nullable=False)  # Type d'entité concernée (user, interview, invitation, etc.)
     entity_id = db.Column(db.String(50), nullable=True)  # ID de l'entité concernée
     description = db.Column(db.Text, nullable=False)  # Description détaillée de l'action
-    metadata = db.Column(db.JSON, nullable=True)  # Données supplémentaires au format JSON
+    data = db.Column(db.JSON, nullable=True)  # Données supplémentaires au format JSON
     ip_address = db.Column(db.String(45), nullable=True)  # Adresse IP de l'utilisateur
     user_agent = db.Column(db.String(255), nullable=True)  # User-Agent du navigateur
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -32,7 +32,7 @@ class AuditLog(db.Model):
             'entity_type': self.entity_type,
             'entity_id': self.entity_id,
             'description': self.description,
-            'metadata': self.metadata,
+            'data': self.data,
             'ip_address': self.ip_address,
             'user_agent': self.user_agent,
             'created_at': self.created_at.isoformat(),

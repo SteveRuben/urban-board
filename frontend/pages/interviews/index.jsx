@@ -4,8 +4,28 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import InterviewService from '../../services/interviewService';
 import { RefreshCw } from 'lucide-react';
+
+
+const getUserInterviews = async(filters = {}) => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    console.log(token)
+    const interviews = await fetch('/api/interviews', {
+      params: filters,
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    console.log(interviews);
+   return [];
+  } catch (error) {
+    console.error('Erreur lors de la récupération des entretiens:', error);
+    throw error;
+  }
+}
 
 const InterviewsIndexPage = () => {
   const router = useRouter();
@@ -16,11 +36,12 @@ const InterviewsIndexPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+
   // Fonction pour charger les entretiens (extraite pour être réutilisée)
   const fetchInterviews = useCallback(async () => {
     try {
       setRefreshing(true);
-      const response = await InterviewService.getUserInterviews();
+      const response = await getUserInterviews();
       setInterviews(response);
       setError(null);
     } catch (err) {

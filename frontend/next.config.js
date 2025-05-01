@@ -4,6 +4,25 @@
 const nextConfig = {
     reactStrictMode: true,
     swcMinify: true,
+    headers: [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-store',
+          },
+        ],
+      },
+    ],
     images: {
       remotePatterns: [
         {
