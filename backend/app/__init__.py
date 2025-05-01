@@ -83,8 +83,9 @@ def create_app(config_name='dev'):
     register_hooks(app)
     
     from .services.ai_interview_service import init_app as init_ai_service
+    #from .routes.ai_routes import init_app as init_ai_routes
     init_ai_service(app)
-
+    # init_ai_routes(app)
 
     # Route de vérification de santé
     @app.route('/health')
