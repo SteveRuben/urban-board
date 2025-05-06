@@ -5,6 +5,8 @@ import stripe
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request
 from flask_cors import CORS
+
+from app.utils.error_handlers import register_error_handlers
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -108,17 +110,17 @@ def create_app(config_name='dev'):
         return {"routes": routes}
 
     # Afficher toutes les routes disponibles
-    print("\n🧭 Liste des routes disponibles :")
-    for rule in app.url_map.iter_rules():
-        methods = ','.join(sorted(rule.methods))
-        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
+    # print("\n🧭 Liste des routes disponibles :")
+    # for rule in app.url_map.iter_rules():
+    #     methods = ','.join(sorted(rule.methods))
+    #     print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
 def register_blueprints(app):
     """
     Enregistre les blueprints de l'application.
-    
+
     Args:
         app (Flask): Application Flask
     """
@@ -128,7 +130,6 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
-    from .routes.challenge_routes import challenge_bp
     from .routes.organization_routes import organizations_bp
     from .routes.collaboration_routes import collab_bp
     from .routes.ai_routes import ai_bp
@@ -136,7 +137,10 @@ def register_blueprints(app):
     from .routes.biometric_routes import biometric_bp
     from .routes.ai_collaboration_routes import ai_collab_bp
     from .routes.interview_scheduling_routes import scheduling_bp
-    
+    from .routes.challenge.challenge_route import challenge_bp
+    from .routes.challenge.user_challenge_route import user_challenge_bp
+    from .routes.challenge.testcase_route import challenge_testcase_bp
+
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
     app.register_blueprint(user_bp, url_prefix='/api/users')
@@ -154,6 +158,13 @@ def register_blueprints(app):
     app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
     app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
     
+    app.register_blueprint(challenge_bp)
+    app.register_blueprint(user_challenge_bp)
+    app.register_blueprint(challenge_testcase_bp)
+
+    # Gestion des erreurs
+    register_error_handlers(app)
+
 def register_hooks(app):
     """
     Enregistre les hooks de l'application.
@@ -180,7 +191,7 @@ def register_hooks(app):
 # Ajouter cette fonction pour émettre des notifications
 def emit_notification(user_id, notification):
     socketio.emit(f'notification:{user_id}', notification)
-    
+
 def configure_logging(app):
     """
     Configure la journalisation de l'application.

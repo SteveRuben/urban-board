@@ -52,6 +52,9 @@ class Config:
     
     # URL du frontend pour les liens dans les emails et les redirections
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+    # URL du l'api
+    API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:5000/api')
     
     # Configuration des notifications
     NOTIFICATION_EXPIRY_DAYS = 30  # Durée de conservation des notifications en jours
