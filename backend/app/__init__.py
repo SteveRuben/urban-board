@@ -120,7 +120,7 @@ def create_app(config_name='dev'):
 def register_blueprints(app):
     """
     Enregistre les blueprints de l'application.
-    
+
     Args:
         app (Flask): Application Flask
     """
@@ -130,8 +130,10 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
-    from .routes.challenge.challenge_routes import challenge_bp
-    
+    from .routes.challenge.challenge_route import challenge_bp
+    from .routes.challenge.user_challenge_route import user_challenge_bp
+    from .routes.challenge.testcase_route import challenge_testcase_bp
+
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
     app.register_blueprint(user_bp, url_prefix='/api/users')
@@ -141,10 +143,12 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
     app.register_blueprint(challenge_bp)
+    app.register_blueprint(user_challenge_bp)
+    app.register_blueprint(challenge_testcase_bp)
 
     # Gestion des erreurs
     register_error_handlers(app)
-    
+
 def register_hooks(app):
     """
     Enregistre les hooks de l'application.
@@ -171,7 +175,7 @@ def register_hooks(app):
 # Ajouter cette fonction pour émettre des notifications
 def emit_notification(user_id, notification):
     socketio.emit(f'notification:{user_id}', notification)
-    
+
 def configure_logging(app):
     """
     Configure la journalisation de l'application.

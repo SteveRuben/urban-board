@@ -1,22 +1,21 @@
 from uuid import UUID
 from flask import Blueprint, abort, g, request, jsonify
-from app.middleware.challenge_participation_token_required import challenge_participation_token_required
 from app.models.challenge import Challenge
 from app.routes.user import token_required
-from app.schemas.challenge.challenge_schema import ChallengeSchema
+from app.schemas.challenge.challenge_schema import ChallengeSchema, ChallengeStepSchema
 from app.services.challenge.challenge_service import (
-    abandoned_challenge_service,
     archive_challenge_service,
     create_challenge_service,
-    generate_participation_token_service,
+    delete_challenge_step_service,
     get_all_challenges_service,
-    get_challenge_participate_service,
     get_challenge_service,
+    get_challenge_step_by_id_service,
+    get_challenge_step_service,
     publish_challenge_service,
     update_challenge_service,
     delete_challenge_service,
-    get_users_challenge_service,
-    delete_user_challenge_service
+    create_challenge_step_service,
+    update_challenge_step_service
 )
 
 
@@ -96,60 +95,75 @@ def archive_challenge(challenge_id):
     return jsonify(challenge_schema.dump(challenge)), 200
 
 
-# User Challenge management
 
-@challenge_bp.route('/<int:challenge_id>/get-participation-link', methods=['POST'])
+
+
+
+
+# Challenge step
+
+
+@challenge_bp.route('/<int:challenge_id>/challenge-steps', methods=['POST'])
 @token_required
-def generate_link(challenge_id):
+def create_challenge_step(challenge_id):
     user = g.current_user.user_id
     user_id = UUID(user) if isinstance(user, str) else user
 
-    result = generate_participation_token_service(challenge_id, user_id)
-    return jsonify({
-        "message": "Lien généré avec succès",
-        "data": result
-    }), 201
+    data = request.get_json()
 
-@challenge_bp.route('/<int:challenge_id>/users', methods=['GET'])
+    step = create_challenge_step_service(challenge_id, user_id, data)
+
+
+    # Sérialisation avec Marshmallow
+    challenge_step_schema = ChallengeStepSchema(many=False)
+    return jsonify(challenge_step_schema.dump(step)), 200
+
+@challenge_bp.route('/<int:challenge_id>/challenge-steps', methods=['GET'])
 @token_required
-def list_challenge_participants(challenge_id):
+def get_challenge_steps(challenge_id):
     user = g.current_user.user_id
     user_id = UUID(user) if isinstance(user, str) else user
 
-    participants = get_users_challenge_service(challenge_id, user_id)
-    return jsonify(participants), 200
+    steps = get_challenge_step_service(challenge_id, user_id)
 
-@challenge_bp.route('/<int:challenge_id>/users/<int:user_challenge_id>', methods=['DELETE'])
+    # Sérialisation avec Marshmallow
+    challenge_step_schema = ChallengeStepSchema(many=True)
+    return jsonify(challenge_step_schema.dump(steps)), 200
+
+@challenge_bp.route('/<int:challenge_id>/challenge-steps/<int:step_id>', methods=['GET'])
 @token_required
-def delete_user_challenge(challenge_id, user_challenge_id):
+def get_challenge_step_by_id(challenge_id, step_id):
     user = g.current_user.user_id
     user_id = UUID(user) if isinstance(user, str) else user
 
-    deleted = delete_user_challenge_service(challenge_id, user_challenge_id, user_id)
+    step = get_challenge_step_by_id_service(challenge_id, step_id, user_id)
 
-    return jsonify({"message": "suppression d'utilisateur effectué avec succès."}), 200
+    challenge_step_schema = ChallengeStepSchema()
+    return jsonify(challenge_step_schema.dump(step)), 200
 
+@challenge_bp.route('/<int:challenge_id>/challenge-steps/<int:step_id>', methods=['PUT'])
+@token_required
+def update_challenge_step(challenge_id, step_id):
+    user = g.current_user.user_id
+    user_id = UUID(user) if isinstance(user, str) else user
 
-# User Challenge participation
+    data = request.get_json()
 
-@challenge_bp.route('/participate/<uuid:token_id>', methods=['GET'])
-@challenge_participation_token_required
-def get_challenge_participate(token_id):
-    participation = g.participation
-    challenge_id = participation.challenge_id
+    # Appel à un service pour mettre à jour le challenge step
+    step = update_challenge_step_service(challenge_id, step_id, user_id, data)
 
-    challenge = get_challenge_participate_service(challenge_id)
-    return jsonify(challenge_schema.dump(challenge)), 200
+    # Sérialisation avec Marshmallow
+    challenge_step_schema = ChallengeStepSchema(many=False)
+    return jsonify(challenge_step_schema.dump(step)), 200
 
-@challenge_bp.route('/participate/<uuid:token_id>/abandoned', methods=['PUT'])
-@challenge_participation_token_required
-def abandoned_challenge(token_id):
-    participation = g.participation
+@challenge_bp.route('/<int:challenge_id>/challenge-steps/<int:step_id>', methods=['DELETE'])
+@token_required
+def delete_challenge_step(challenge_id, step_id):
+    user = g.current_user.user_id
+    user_id = UUID(user) if isinstance(user, str) else user
 
-    challenge = abandoned_challenge_service(participation)
-    return jsonify(challenge_schema.dump(challenge)), 200
+    # Appel à un service pour supprimer le challenge step
+    delete_challenge_step_service(challenge_id, step_id, user_id)
 
-
-
-
+    return jsonify({"message": "ChallengeStep deleted successfully"}), 200
 

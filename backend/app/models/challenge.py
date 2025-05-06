@@ -57,3 +57,32 @@ class UserChallenge(db.Model):
 
     # Relations
     challenge = relationship('Challenge', backref='user_challenges')
+
+
+########## Modele challenge step #############
+
+from sqlalchemy import Text
+
+class ChallengeStep(db.Model):
+    __tablename__ = 'challenge_steps'
+
+    id = db.Column(db.Integer, primary_key=True)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenges.id'), nullable=False)
+    step_number = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    challenge = db.relationship('Challenge', backref=db.backref('steps', lazy=True, cascade="all, delete-orphan"))
+
+
+########## Modele challenge test case #############
+
+class ChallengeStepTestcase(db.Model):
+    __tablename__ = 'challenge_testcases'
+
+    id = db.Column(db.Integer, primary_key=True)
+    step_id = db.Column(db.Integer, db.ForeignKey('challenge_steps.id', ondelete='CASCADE'), nullable=False)
+    input = db.Column(db.Text, nullable=False)
+    expected_output = db.Column(db.Text, nullable=False)
+
+    step = db.relationship('ChallengeStep', backref=db.backref('testcases', lazy=True, cascade="all, delete-orphan"))

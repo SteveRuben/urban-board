@@ -1,47 +1,92 @@
+from app.middleware.challenge_participation_token_required import challenge_participation_token_required
 from uuid import UUID
-from flask import Blueprint, abort, g, request, jsonify
-from app.models.challenge import Challenge, UserChallenge
-from app.services.challenge.user_challenge_service import join_challenge_service, update_user_challenge_service
+from flask import Blueprint, g, request, jsonify
+from app.schemas.challenge.challenge_schema import ChallengeSchema, UserChallengeSchema
 from app.routes.user import token_required
+from app.services.challenge.user_challenge_service import (
+    generate_participation_token_service,
+    get_challenge_participate_step_service,
+    get_users_challenge_service,
+    delete_user_challenge_service,
+    get_challenge_participate_service,
+    submit_challenge_participate_step_service,
+    abandoned_challenge_service
+)
 
-user_challenge_bp = Blueprint('user_challenge', __name__)
+user_challenge_bp = Blueprint('user_challenge', __name__, url_prefix='/api/challenges')
 
-@user_challenge_bp.route('/<int:user_challenge_id>/join', methods=['POST'])
+
+user_challenge_schema = UserChallengeSchema()
+challenges_schema = ChallengeSchema(many=True)
+
+@user_challenge_bp.route('/<int:challenge_id>/get-participation-link', methods=['POST'])
 @token_required
-def join_challenge(challenge_id):
-    user = g.current_user.user_id  # on récupère l'utilisateur connecté grâce au token
+def generate_link(challenge_id):
+    user = g.current_user.user_id
+    user_id = UUID(user) if isinstance(user, str) else user
+    
+    result = generate_participation_token_service(challenge_id, user_id)
+    return jsonify({
+        "message": "Lien généré avec succès",
+        "data": result
+    }), 201
+
+@user_challenge_bp.route('/<int:challenge_id>/users', methods=['GET'])
+@token_required
+def list_challenge_participants(challenge_id):
+    user = g.current_user.user_id
     user_id = UUID(user) if isinstance(user, str) else user
 
-    # Vérification 1 : Est-ce que l'ID du challenge est fourni et valide ?
-    if not challenge_id:
-        abort(400, description="L'ID du challenge est requis.")
+    participants = get_users_challenge_service(challenge_id, user_id)
+    return jsonify(participants), 200
 
-    # Vérification 2 : Est-ce que le challenge existe ?
-    challenge = Challenge.query.get(challenge_id)
-    if not challenge:
-        abort(404, description="Challenge introuvable.")
-
-    # Vérification 3 : Est-ce que l'utilisateur est le propriétaire du challenge ?
-    if challenge.owner_id == user_id:
-        abort(403, description="Vous ne pouvez pas rejoindre votre propre challenge.")
-
-    # # Tout est bon, l'utilisateur peut rejoindre
-    # data = request.get_json()
-    # if not data:
-    #     abort(400, description="Données JSON requises.")
-
-    # # 👇 Validation automatique basée sur ton modèle
-    # validation(UserChallenge)
-
-    participation = join_challenge_service(user_id, challenge_id)
-
-    return jsonify({"message": "Participation réussie.", "participation": participation}), 201
-
-
-
-@user_challenge_bp.route('/user_challenges/<int:user_challenge_id>', methods=['PATCH'])
+@user_challenge_bp.route('/<int:challenge_id>/users/<int:user_challenge_id>', methods=['DELETE'])
 @token_required
-def update_user_challenge(user_challenge_id):
-    updates = request.json
-    participation = update_user_challenge_service(user_challenge_id, updates)
-    return jsonify({"message": "Mise à jour réussie.", "participation_id": participation.id})
+def delete_user_challenge(challenge_id, user_challenge_id):
+    user = g.current_user.user_id
+    user_id = UUID(user) if isinstance(user, str) else user
+
+    deleted = delete_user_challenge_service(challenge_id, user_challenge_id, user_id)
+
+    return jsonify({"message": "suppression d'utilisateur effectué avec succès."}), 200
+
+
+# User Challenge participation
+
+@user_challenge_bp.route('/participate/<uuid:token_id>', methods=['GET'])
+@challenge_participation_token_required
+def get_challenge_participate(token_id):
+    participation = g.participation
+    challenge_id = participation.challenge_id
+
+    challenge = get_challenge_participate_service(challenge_id, token_id)
+    return jsonify(user_challenge_schema.dump(challenge)), 200
+
+@user_challenge_bp.route('/participate/<uuid:token_id>/<int:step_id>', methods=['GET'])
+@challenge_participation_token_required
+def get_challenge_participate_step(token_id, step_id):
+    participation = g.participation
+    challenge_id = participation.challenge_id
+
+    step = get_challenge_participate_step_service(challenge_id, step_id, token_id)
+    return jsonify(step), 200
+
+@user_challenge_bp.route('/participate/<uuid:token_id>/submit', methods=['POST'])
+@challenge_participation_token_required
+def submit_participate_step(token_id):
+    participation = g.participation
+    challenge_id = participation.challenge_id
+
+    data = request.get_json()
+
+    submission = submit_challenge_participate_step_service(challenge_id, token_id, data)
+    return jsonify(submission), 201
+
+@user_challenge_bp.route('/participate/<uuid:token_id>/abandoned', methods=['PUT'])
+@challenge_participation_token_required
+def abandoned_challenge(token_id):
+    participation = g.participation
+
+    challenge = abandoned_challenge_service(participation)
+    return jsonify(user_challenge_schema.dump(challenge)), 200
+

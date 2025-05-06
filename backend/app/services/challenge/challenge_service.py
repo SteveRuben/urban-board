@@ -1,12 +1,9 @@
-import uuid
 from app import db
-from app.models.challenge import Challenge, UserChallenge
+from app.models.challenge import Challenge, ChallengeStep
 from flask import abort
 from sqlalchemy.exc import NoResultFound
-from datetime import datetime, timedelta
 
-from app.types.challenge import ChallengeStatus, UserChallengeStatus
-from app.utils.format_challenge_participation_url import format_challenge_participation_url
+from app.types.challenge import ChallengeStatus
 
 def create_challenge_service(data):
     newChallenge = Challenge(**data)
@@ -37,29 +34,6 @@ def update_challenge_service(challenge_id, user_id, data):
         abort(403, description="Action interdite : ce challenge ne vous appartient pas.")
 
     # Liste des champs autorisés à être modifiés
-    updatable_fields = {'title', 'description'}
-
-    for key, value in data.items():
-        if key in updatable_fields:
-            setattr(challenge, key, value)
-
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print("Erreur lors de la mise à jour :", e)
-        raise e
-
-    return challenge
-
-def update_challenge_service(challenge_id, user_id, data):
-    try:
-        # On s'assure que le challenge appartient à l'utilisateur
-        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).one()
-    except NoResultFound:
-        abort(403, description="Action interdite : ce challenge ne vous appartient pas.")
-
-     # Liste des champs autorisés à être modifiés
     updatable_fields = {'title', 'description'}
 
     for key, value in data.items():
@@ -130,132 +104,134 @@ def archive_challenge_service(challenge_id, user_id):
 # User challenge
 
 
-def generate_participation_token_service(challenge_id, user_id):
-    # Vérifie que le challenge appartient à l'utilisateur et est publié
-    challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
 
-    if not challenge:
-        abort(403, description="Challenge introuvable ou non autorisé")
 
-    if challenge.status != ChallengeStatus.published:
-        abort(403, description="Ce challenge n'est pas encore disponible.")
-
-    # Génération sécurisée et unique du token
-    token_id = uuid.uuid4()
-    while UserChallenge.query.filter_by(token_id=token_id).first():
-        token_id = uuid.uuid4()  # Regénère si déjà existant
-
-    # Définir la date d’expiration (ex: 48h à partir de maintenant)
-    expiration_date = datetime.utcnow() + timedelta(days=7)
-
-    # Création de l’entrée UserChallenge
-    participation = UserChallenge(
-        challenge_id=challenge_id,
-        token_id=token_id,
-        expires_at=expiration_date
-    )
-
-    db.session.add(participation)
+def create_challenge_step_service(challenge_id, user_id, data):
     try:
+        # On récupère le challenge avec filtre sur l'owner
+        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
+
+        if not challenge:
+            abort(403, description="Not found or Unauthorize")
+
+        # Calculer automatiquement du step_number
+        current_max_step = db.session.query(
+            db.func.max(ChallengeStep.step_number)
+        ).filter_by(challenge_id=challenge_id).scalar()
+
+        step_number = (current_max_step or 0) + 1
+
+        # Créer le ChallengeStep
+        new_step = ChallengeStep(
+            challenge_id=challenge_id,
+            step_number=step_number,
+            title=data["title"],
+            description=data.get("description", ""),
+        )
+
+        # Ajouter à la base de données
+        db.session.add(new_step)
         db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print("Erreur génération token :", e)
-        raise e
 
-    # Génère l’URL complète à envoyer
-    participation_url = format_challenge_participation_url(participation.token_id)
-
-    return {
-        "challenge_id": challenge_id,
-        "participation_url": participation_url
-    }
-
-def get_challenge_participate_service(challenge_id):
-    challenge = Challenge.query.filter_by(id=challenge_id).first()
-
-    if not challenge:
-        abort(404, description="Challenge introuvable.")
-
-    if challenge.status != ChallengeStatus.published:
-        abort(403, description="Ce challenge n'est pas encore disponible pour la participation.")
-
-    return {
-        "title": challenge.title,
-        "description": challenge.description
-    }
-
-def get_users_challenge_service(challenge_id, user_id):
-    # Vérifier que le challenge appartient à l'utilisateur
-    challenge = Challenge.query.get(challenge_id)
-    if not challenge:
-        abort(404, description="Challenge introuvable.")
-    if challenge.owner_id != user_id:
-        abort(403, description="Action interdite : vous n'êtes pas le propriétaire de ce challenge.")
-
-    # Récupérer les participations
-    users_challenge = UserChallenge.query.filter_by(challenge_id=challenge_id).all()
-
-    # Formater la reponse
-    users = []
-    for uc in users_challenge:
-        users.append({
-            "user_challenge": uc.id,
-            "user_challenge_token": format_challenge_participation_url(uc.token_id),
-            "owner": user_id,
-            "challenge_id": uc.challenge_id,
-            "status": uc.status.name,
-            "current_step": uc.current_step,
-            "attempts": uc.attempts,
-            "created_at": uc.created_at.isoformat() if uc.created_at else None,
-            "updated_at": uc.updated_at.isoformat() if uc.updated_at else None
-        })
-
-    return users
-
-def delete_user_challenge_service(challenge_id, user_challenge_id, user_id):
-    # Vérifier que le participant existe et appartient bien à ce challenge
-    participation = UserChallenge.query.filter_by(id=user_challenge_id, challenge_id=challenge_id).first()
-    if not participation:
-        abort(404, description="Ce participant ne participe pas à ce challenge.")
-
-    # Vérifier que l'utilisateur connecté est bien le propriétaire du challenge
-    challenge = Challenge.query.get(challenge_id)
-    if not challenge:
-        abort(404, description="Challenge introuvable.")
-    if challenge.owner_id != user_id:
-        abort(403, description="Action interdite : vous n'êtes pas le propriétaire de ce challenge.")
-
-    # Supprimer la participation
-    db.session.delete(participation)
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print("Erreur lors de la suppression :", e)
-        raise e
-
-    return True
-
-def abandoned_challenge_service(participation):
-    try:
-        user_challenge = UserChallenge.query.filter_by(
-            id=participation.id,
-            challenge_id=participation.challenge_id
-        ).one()
-    except NoResultFound:
-        abort(403, description="Ce participant ne participe pas à ce challenge.")
-
-    # Marquer le challenge comme abandonné
-    user_challenge.status = UserChallengeStatus.abandoned
-    user_challenge.expires_at = datetime.utcnow()  # Expire immédiatement le lien
-
-    try:
-        db.session.commit()
+        return new_step
     except Exception as e:
         db.session.rollback()
         print("Erreur lors de l'abandon du challenge :", e)
         raise e
 
-    return user_challenge
+def get_challenge_step_by_id_service(challenge_id, step_id, user_id):
+    try:
+        # Vérifie que l'utilisateur est bien le propriétaire du challenge
+        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
+        if not challenge:
+            abort(403, description="Challenge non trouvé ou accès non autorisé")
+
+        # Récupère le step spécifique
+        step = ChallengeStep.query.filter_by(id=step_id, challenge_id=challenge_id).first()
+        if not step:
+            abort(404, description="Step non trouvé")
+
+        return step
+
+    except Exception as e:
+        db.session.rollback()
+        print("Erreur lors de la récupération du step :", e)
+        raise e
+
+def get_challenge_step_service(challenge_id, user_id):
+    try:
+        # Vérifie si l'utilisateur est bien le propriétaire
+        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
+
+        if not challenge:
+            abort(403, description="Not found or Unauthorized")
+
+        # Récupère tous les steps liés à ce challenge
+        return ChallengeStep.query.filter_by(challenge_id=challenge.id).order_by(ChallengeStep.step_number).all()
+
+    except Exception as e:
+        db.session.rollback()
+        print("Erreur lors de la récupération des steps du challenge :", e)
+        raise e
+
+def update_challenge_step_service(challenge_id, step_id, user_id, data):
+    try:
+        # Vérifie si le challenge appartient à l'utilisateur
+        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
+        if not challenge:
+            abort(403, description="Not found or Unauthorized")
+
+        # Récupère le ChallengeStep à mettre à jour
+        step = ChallengeStep.query.filter_by(id=step_id, challenge_id=challenge_id).first()
+
+        if not step:
+            abort(404, description="ChallengeStep not found")
+
+        # Mettre à jour les données du ChallengeStep
+        step.title = data.get('title', step.title)
+        step.description = data.get('description', step.description)
+
+        # Sauvegarder les changements
+        db.session.commit()
+
+        return step
+
+    except Exception as e:
+        db.session.rollback()
+        print("Erreur lors de la mise à jour du ChallengeStep:", e)
+        raise e
+
+def delete_challenge_step_service(challenge_id, step_id, user_id):
+    try:
+        # Vérifie si le challenge appartient à l'utilisateur
+        challenge = Challenge.query.filter_by(id=challenge_id, owner_id=user_id).first()
+        if not challenge:
+            abort(403, description="Not found or Unauthorized")
+
+        # Récupère le ChallengeStep à supprimer
+        step_to_delete = ChallengeStep.query.filter_by(id=step_id, challenge_id=challenge_id).first()
+
+        if not step_to_delete:
+            abort(404, description="ChallengeStep not found")
+
+        # Supprime le step
+        db.session.delete(step_to_delete)
+        db.session.commit()
+
+        # Récupère tous les autres steps du challenge, triés par step_number
+        remaining_steps = ChallengeStep.query \
+            .filter_by(challenge_id=challenge_id) \
+            .order_by(ChallengeStep.step_number) \
+            .all()
+
+        # Réorganise les step_number (1, 2, 3, ...)
+        for index, step in enumerate(remaining_steps):
+            step.step_number = index + 1
+
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        print("Erreur lors de la suppression du ChallengeStep:", e)
+        raise e
 
