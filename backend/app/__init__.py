@@ -149,7 +149,7 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
-    app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
+    # app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
     app.register_blueprint(organizations_bp, url_prefix='/api/organizations')
     app.register_blueprint(collab_bp, url_prefix='/api/collaboration')
     app.register_blueprint(scheduling_bp, url_prefix='/api/scheduling')
