@@ -6,7 +6,7 @@ class Evaluation(db.Model):
     __tablename__ = 'evaluations'
     
     id = db.Column(db.Integer, primary_key=True)
-    response_id = db.Column(db.Integer, db.ForeignKey('responses.id'), nullable=False, unique=True)
+    response_id = db.Column(db.Integer, db.ForeignKey('interview_responses.id'), nullable=False, unique=True)
     exactitude = db.Column(db.Float, nullable=True)  # Score sur 5
     clarte = db.Column(db.Float, nullable=True)  # Score sur 5
     profondeur = db.Column(db.Float, nullable=True)  # Score sur 5

@@ -7,7 +7,7 @@ class InterviewResponse(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
-    question_id = db.Column(db.Integer, db.ForeignKey('questions.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('interview_questions.id'), nullable=False)
     text = db.Column(db.Text, nullable=False)
     confidence_score = db.Column(db.Float, nullable=True)  # Score de confiance basé sur l'analyse biométrique (0-100)
     relevance_score = db.Column(db.Float, nullable=True)  # Score de pertinence évalué par l'IA (0-100)
@@ -22,8 +22,8 @@ class InterviewResponse(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relations
-    interview = db.relationship('Interview', backref='responses')
-    question = db.relationship('Question', backref='responses')
+    #interview = db.relationship('Interview', backref='responses')
+    # question = db.relationship('Question', backref='responses')
     # biometric_data - défini dans BiometricData
     
     def to_dict(self):

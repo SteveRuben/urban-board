@@ -12,8 +12,8 @@ class BiometricData(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
-    question_id = db.Column(db.Integer, db.ForeignKey('questions.id'), nullable=False)
-    response_id = db.Column(db.Integer, db.ForeignKey('responses.id'), nullable=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('interview_questions.id'), nullable=False)
+    response_id = db.Column(db.Integer, db.ForeignKey('interview_responses.id'), nullable=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     # Données d'engagement
@@ -32,9 +32,9 @@ class BiometricData(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relations
-    interview = db.relationship('Interview', backref='biometric_data')
-    question = db.relationship('Question', backref='biometric_data')
-    response = db.relationship('Response', backref='biometric_data')
+    #interview = db.relationship('Interview', backref='biometric_data')
+    # question = db.relationship('Question', backref='biometric_data')
+    # response = db.relationship('Response', backref='biometric_data')
     
     def to_dict(self):
         return {
