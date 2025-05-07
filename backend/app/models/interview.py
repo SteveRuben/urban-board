@@ -47,7 +47,7 @@ class Interview(db.Model):
     
     # Relations one-to-one (une interview a un seul résumé et un seul résumé biométrique)
     # uselist=False indique une relation one-to-one
-    summary = db.relationship('InterviewSummary', backref=db.backref('interviews', uselist=False), 
+    summary = db.relationship('InterviewSummary', back_populates=db.backref('interviews', uselist=False), 
                            uselist=False, cascade="all, delete-orphan")
     biometric_summary = db.relationship('BiometricSummary', backref=db.backref('interviews', uselist=False), 
                                      uselist=False, cascade="all, delete-orphan")
