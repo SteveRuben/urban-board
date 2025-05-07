@@ -111,6 +111,7 @@ def rate_limit(limit, period, key_prefix='rate_limit'):
                 else:
                     return response
             except Exception as e:
+                print(f"{e.__class__.__name__}: {e}")
                 current_app.logger.error(f"Erreur lors de l'application du rate limit: {str(e)}")
                 # En cas d'erreur avec Redis, laisser passer la requête
                 return f(*args, **kwargs)
@@ -205,6 +206,7 @@ def adaptive_rate_limit(anon_limit, auth_limit, period=60, key_prefix='adaptive'
                 else:
                     return response
             except Exception as e:
+                print(f"Erreur dans adaptive_rate_limit: {str(e)}")
                 current_app.logger.error(f"Erreur lors de l'application du rate limit adaptatif: {str(e)}")
                 # En cas d'erreur avec Redis, laisser passer la requête
                 return f(*args, **kwargs)
