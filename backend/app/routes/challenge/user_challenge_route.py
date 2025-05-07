@@ -12,14 +12,14 @@ from app.services.challenge.user_challenge_service import (
     submit_challenge_participate_step_service,
     abandoned_challenge_service
 )
-
-user_challenge_bp = Blueprint('user_challenge', __name__, url_prefix='/api/challenges')
+from app.routes.challenge.challenge_route import challenge_bp
+#challenge_bp = Blueprint('user_challenge', __name__, url_prefix='/api/challenges')
 
 
 user_challenge_schema = UserChallengeSchema()
 challenges_schema = ChallengeSchema(many=True)
 
-@user_challenge_bp.route('/<int:challenge_id>/get-participation-link', methods=['POST'])
+@challenge_bp.route('/<int:challenge_id>/get-participation-link', methods=['POST'])
 @token_required
 def generate_link(challenge_id):
     user = g.current_user.user_id
@@ -31,7 +31,7 @@ def generate_link(challenge_id):
         "data": result
     }), 201
 
-@user_challenge_bp.route('/<int:challenge_id>/users', methods=['GET'])
+@challenge_bp.route('/<int:challenge_id>/users', methods=['GET'])
 @token_required
 def list_challenge_participants(challenge_id):
     user = g.current_user.user_id
@@ -40,7 +40,7 @@ def list_challenge_participants(challenge_id):
     participants = get_users_challenge_service(challenge_id, user_id)
     return jsonify(participants), 200
 
-@user_challenge_bp.route('/<int:challenge_id>/users/<int:user_challenge_id>', methods=['DELETE'])
+@challenge_bp.route('/<int:challenge_id>/users/<int:user_challenge_id>', methods=['DELETE'])
 @token_required
 def delete_user_challenge(challenge_id, user_challenge_id):
     user = g.current_user.user_id
@@ -53,7 +53,7 @@ def delete_user_challenge(challenge_id, user_challenge_id):
 
 # User Challenge participation
 
-@user_challenge_bp.route('/participate/<uuid:token_id>', methods=['GET'])
+@challenge_bp.route('/participate/<uuid:token_id>', methods=['GET'])
 @challenge_participation_token_required
 def get_challenge_participate(token_id):
     participation = g.participation
@@ -62,7 +62,7 @@ def get_challenge_participate(token_id):
     challenge = get_challenge_participate_service(challenge_id, token_id)
     return jsonify(user_challenge_schema.dump(challenge)), 200
 
-@user_challenge_bp.route('/participate/<uuid:token_id>/<int:step_id>', methods=['GET'])
+@challenge_bp.route('/participate/<uuid:token_id>/<int:step_id>', methods=['GET'])
 @challenge_participation_token_required
 def get_challenge_participate_step(token_id, step_id):
     participation = g.participation
@@ -71,7 +71,7 @@ def get_challenge_participate_step(token_id, step_id):
     step = get_challenge_participate_step_service(challenge_id, step_id, token_id)
     return jsonify(step), 200
 
-@user_challenge_bp.route('/participate/<uuid:token_id>/submit', methods=['POST'])
+@challenge_bp.route('/participate/<uuid:token_id>/submit', methods=['POST'])
 @challenge_participation_token_required
 def submit_participate_step(token_id):
     participation = g.participation
@@ -82,7 +82,7 @@ def submit_participate_step(token_id):
     submission = submit_challenge_participate_step_service(challenge_id, token_id, data)
     return jsonify(submission), 201
 
-@user_challenge_bp.route('/participate/<uuid:token_id>/abandoned', methods=['PUT'])
+@challenge_bp.route('/participate/<uuid:token_id>/abandoned', methods=['PUT'])
 @challenge_participation_token_required
 def abandoned_challenge(token_id):
     participation = g.participation

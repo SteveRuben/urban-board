@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from . import job_posting
 from app import db
 
 class InterviewSchedule(db.Model):
