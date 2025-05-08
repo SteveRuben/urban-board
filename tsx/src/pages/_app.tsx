@@ -45,9 +45,10 @@ function AppWithLayout({ Component, pageProps }: AppPropsWithLayout): React.Reac
 
   useEffect(() => {
     // Rediriger vers l'onboarding si l'utilisateur est connecté mais n'a pas d'organisation
-    if (user && !user.onboarding_completed && !onboardingPaths.includes(router.pathname)) {
+    /* if (user && !user.onboarding_completed && !onboardingPaths.includes(router.pathname)) {
       router.push('/onboarding');
-    }
+    } */
+      router.push('/dashboard');
   }, [user, router.pathname]);
 
 
