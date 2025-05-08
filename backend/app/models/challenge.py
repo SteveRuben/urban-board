@@ -5,6 +5,8 @@ from app import db
 from app.types.challenge import ChallengeStatus, UserChallengeStatus
 from datetime import datetime
 
+from ..models.organization import GUID
+
 class Challenge(db.Model):
     __tablename__ = 'challenges'
 
@@ -21,7 +23,7 @@ class Challenge(db.Model):
     # created_at = db.Column(DateTime, default=datetime.utcnow)
     # updated_at = db.Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    owner_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    owner_id = Column(GUID(), ForeignKey('users.id'), nullable=False)
     owner = db.relationship('User', backref='challenges')
 
 
@@ -41,7 +43,7 @@ class UserChallenge(db.Model):
     current_step = db.Column(Integer, default=0, nullable=True)
     attempts = db.Column(Integer, default=3, nullable=True)
 
-    token_id = db.Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, index=True, nullable=True)
+    token_id = db.Column(GUID(), default=uuid.uuid4, unique=True, index=True, nullable=True)
 
     used = db.Column(Boolean, default=False, nullable=True) # à supprimer...
 

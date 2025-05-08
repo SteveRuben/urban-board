@@ -9,7 +9,7 @@ from flask_cors import CORS
 from app.utils.error_handlers import register_error_handlers
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, inspect
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
@@ -29,6 +29,8 @@ metadata = MetaData(naming_convention=convention)
 db = SQLAlchemy(metadata=metadata)
 jwt = JWTManager()
 migrate = Migrate()
+
+
 
 def create_app(config_name='dev'):
     """
@@ -72,11 +74,20 @@ def create_app(config_name='dev'):
                       engineio_logger=True)
     
     with app.app_context():
+        # import les modèles
+        from .models import user, organization
+        from .models import Interview, InterviewSummary
+        
+        # Then setup relationships
+        from .models.model_setup import setup_all_relationships
+        setup_all_relationships()
+        
         # Enregistrer les blueprints
         register_blueprints(app)
         
         # Créer les tables si elles n'existent pas
-        # db.create_all()
+        db.drop_all() 
+        db.create_all()
     
     # Initialiser les services
     initialize_services(app)

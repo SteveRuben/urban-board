@@ -2,9 +2,12 @@
 from datetime import datetime
 from app import db
 
+
 class InterviewSummary(db.Model):
     __tablename__ = 'interview_summaries'
-    
+    # Use __table_args__ directly without the conditional check
+    __table_args__ = {'extend_existing': True}
+     
     id = db.Column(db.Integer, primary_key=True)
     interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False, unique=True)
     overall_score = db.Column(db.Float, nullable=True)  # Score global (0-100)
@@ -22,9 +25,12 @@ class InterviewSummary(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relations
-    interview = db.relationship('Interview', back_populates='summary', uselist=False)
-    creator = db.relationship('User', backref='created_summaries', foreign_keys=[created_by])
+    # Définir la relation avec back_populates
+    interview_ref = db.relationship('Interview', back_populates='interview_summary', uselist=False)
+    
+    # Relation avec User
+    creator = db.relationship('User', back_populates='created_summaries', foreign_keys=[created_by])
+    
     
     def to_dict(self):
         return {

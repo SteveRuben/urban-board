@@ -45,7 +45,8 @@ class JobPosting(db.Model):
     # Relations
     organization = relationship("Organization", back_populates="job_postings")
     creator = relationship("User")
-    interview_schedules = relationship("InterviewSchedule", back_populates="job_posting")
+    interview_schedules = relationship("InterviewSchedule", secondary="job_applications",
+                                     viewonly=True)
     applications = relationship("JobApplication", back_populates="job_posting", cascade="all, delete-orphan")
     
     def __repr__(self):
@@ -82,7 +83,7 @@ class JobApplication(db.Model):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     job_posting_id = Column(String(36), ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False)
-    
+    interview_schedule_id = Column(String(36), ForeignKey("interview_schedules.id"), nullable=True)
     # Informations du candidat
     candidate_name = Column(String(255), nullable=False)
     candidate_email = Column(String(255), nullable=False)
@@ -101,4 +102,4 @@ class JobApplication(db.Model):
     
     # Relations
     job_posting = relationship("JobPosting", back_populates="applications")
-    interview_schedules = relationship("InterviewSchedule")
+    interview_schedule = relationship("InterviewSchedule", back_populates="job_application")
