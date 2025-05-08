@@ -80,7 +80,7 @@ class AIAssistant(db.Model):
     back_populates='ai_assistant',
     lazy='dynamic'  # Allows querying like assistant.interviews.filter(...)
     )   
-    organization = relationship("Organization", back_populates="ai_assistants_org")
+    organization = relationship("Organization", back_populates="ai_assistants")
     team_associations = db.relationship(
         'TeamAIAssistant',
         back_populates='ai_assistant',
