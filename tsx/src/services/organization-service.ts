@@ -1,5 +1,5 @@
 import { LogoData, TokenResponse } from '@/types';
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 // Extension de AxiosRequestConfig pour ajouter la propriété _retry
 interface RetryableRequestConfig extends AxiosRequestConfig {
   _retry?: boolean;
@@ -11,11 +11,12 @@ const api: AxiosInstance = axios.create({
 });
 
 // Ajouter un intercepteur pour les requêtes
+// Intercepteur (version améliorée)
 api.interceptors.request.use(
-    // @ts-ignore
-  (config: AxiosRequestConfig): AxiosRequestConfig => {
+  (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('accessToken');
-    if (token && config.headers) {
+    if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -101,28 +102,24 @@ export class OrganizationService {
         }
       }
 
-      static async createOrganization(data:any): Promise<any> {
+      static async createOrganization(data: any): Promise<any> {
         try {
-            // Construire l'URL avec les paramètres
-            let url = '/organizations';
-            // Ajouter un paramètre timestamp pour éviter la mise en cache
-            const params = new URLSearchParams();
-            params.append('_t', Date.now().toString());
-            url += `?${params.toString()}`;  // Ajouter les paramètres à l'URL (si nécessaire)
-            let token = localStorage.getItem('accessToken');
 
-            const response = await api.post<any>(url, data, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
+            const response = await api.post('/organizations', data, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                params: {
+                    _t: Date.now() // Anti-cache
+                }
             });
+    
             return response.data;
-          } catch (error) {
-            console.error("Erreur lors de la creation de l'organisation:", error);
-            throw error;
-          }
-      }
+        } catch (error) {
+            console.error("Erreur lors de la création de l'organisation:", error);
+            throw error; // Ou mieux: throw new Error("Message d'erreur clair");
+        }
+    }
 
 }
 

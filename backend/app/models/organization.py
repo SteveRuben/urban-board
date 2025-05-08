@@ -58,13 +58,7 @@ class Organization(db.Model):
     members = None
     ai_assistants = None
     job_postings = None  # Add this line
-    # Add this relationship
-    ai_assistants_org = db.relationship(
-        'AIAssistant',
-        back_populates='organization',
-        foreign_keys='AIAssistant.organization_id',
-        cascade='all, delete-orphan'
-    )
+    
     
     def __repr__(self):
         return f"<Organization {self.name}>"
@@ -153,7 +147,9 @@ def setup_organization_relationships():
     
     Organization.ai_assistants = relationship(
         "AIAssistant",
-        back_populates="organization"
+        back_populates="organization",
+        foreign_keys="AIAssistant.organization_id",
+        cascade="all, delete-orphan"
     )
     
     # Add this relationship configuration
