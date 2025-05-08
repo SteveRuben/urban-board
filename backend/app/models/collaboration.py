@@ -72,6 +72,11 @@ class Team(db.Model):
     # Relations
     members = db.relationship('TeamMember', back_populates='team', cascade='all, delete-orphan')
     creator = db.relationship('User', backref='created_teams')
+    team_ai_assistant_associations = db.relationship(
+        'TeamAIAssistant',
+        back_populates='team',
+        foreign_keys='TeamAIAssistant.team_id'
+    )
     
     def __repr__(self):
         return f"<Team {self.name}>"

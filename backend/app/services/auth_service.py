@@ -35,7 +35,7 @@ class AuthService:
         
         # Hacher le mot de passe
         hashed_password = generate_password_hash(password)
-        
+        import app.models.organization
         # Créer un nouvel utilisateur
         user = User(
             id=str(uuid.uuid4()),

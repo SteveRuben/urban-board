@@ -1,9 +1,11 @@
 # backend/models/interview.py
 from datetime import datetime
 from app import db
+from ..models.organization import GUID
 
 class Interview(db.Model):
     __tablename__ = 'interviews'
+    __table_args__ = {'extend_existing': True}  # Add this line
     
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
@@ -29,7 +31,7 @@ class Interview(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    ai_assistant_id = db.Column(GUID(), db.ForeignKey('ai_assistants.id'), nullable=True)
     # Relations (définies dans les autres modèles via backref)
     # questions - défini dans Question
     # responses - défini dans Response
@@ -40,19 +42,23 @@ class Interview(db.Model):
     # ai_contents - défini dans AIGeneratedContent
     # Relations définies explicitement (bien qu'elles soient aussi définies par backref dans les autres modèles)
     # Cela peut être utile pour avoir plus de contrôle sur les relations
-    questions = db.relationship('InterviewQuestion', backref='interviews', cascade="all, delete-orphan")
-    responses = db.relationship('InterviewResponse', backref='interviews', cascade="all, delete-orphan")
-    facial_analyses = db.relationship('FacialAnalysis', backref='interviews', cascade="all, delete-orphan")
-    biometric_data = db.relationship('BiometricData'  , backref='interviews', cascade="all, delete-orphan")
+    # Relations avec back_populates
+    interview_questions = db.relationship('InterviewQuestion', back_populates='interview_ref', cascade="all, delete-orphan")
+    interview_responses = db.relationship('InterviewResponse', back_populates='interview_ref', cascade="all, delete-orphan")
+    facial_analyses = db.relationship('FacialAnalysis', back_populates='interview', cascade="all, delete-orphan")
+    biometric_data = db.relationship('BiometricData', back_populates='interview', cascade="all, delete-orphan")
+    ai_assistant = db.relationship(
+    'AIAssistant',
+    back_populates='interviews',
+    uselist=False  # This indicates a many-to-one relationship
+    )
+    # Relations one-to-one
+    interview_summary = db.relationship('InterviewSummary', back_populates='interview_ref', uselist=False, cascade="all, delete-orphan")
+    biometric_summary = db.relationship('BiometricSummary', back_populates='interview', uselist=False, cascade="all, delete-orphan")
     
-    # Relations one-to-one (une interview a un seul résumé et un seul résumé biométrique)
-    # uselist=False indique une relation one-to-one
-    summary = db.relationship('InterviewSummary', back_populates=db.backref('interviews', uselist=False), 
-                           uselist=False, cascade="all, delete-orphan")
-    biometric_summary = db.relationship('BiometricSummary', backref=db.backref('interviews', uselist=False), 
-                                     uselist=False, cascade="all, delete-orphan")
-    
-    creator = db.relationship('User', backref='created_interviews', foreign_keys=[created_by])
+    # Relation avec User
+    creator = db.relationship('User', back_populates='created_interviews', foreign_keys=[created_by])
+
     
     def to_dict(self):
         return {

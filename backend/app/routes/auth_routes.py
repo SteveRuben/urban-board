@@ -13,7 +13,7 @@ from ..models.user import User  # Import du modèle User
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 @auth_bp.route('/register', methods=['POST'])
-@auth_limit
+# @auth_limit
 def register():
     """
     Inscription d'un nouvel utilisateur

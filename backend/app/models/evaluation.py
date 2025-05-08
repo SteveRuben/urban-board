@@ -34,7 +34,7 @@ class Evaluation(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-class InterviewSummary(db.Model):
+""" class InterviewSummary(db.Model):
     __tablename__ = 'interview_summaries'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -65,4 +65,4 @@ class InterviewSummary(db.Model):
             'created_by': self.created_by,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        } """

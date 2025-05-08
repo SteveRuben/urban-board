@@ -97,7 +97,6 @@ def rate_limit(limit, period, key_prefix='rate_limit'):
                 
                 # Exécuter la fonction protégée
                 response = f(*args, **kwargs)
-                
                 # Si la réponse est un tuple (réponse, code, en-têtes)
                 if isinstance(response, tuple) and len(response) >= 3:
                     resp, code, resp_headers = response
@@ -111,7 +110,6 @@ def rate_limit(limit, period, key_prefix='rate_limit'):
                 else:
                     return response
             except Exception as e:
-                print(f"{e.__class__.__name__}: {e}")
                 current_app.logger.error(f"Erreur lors de l'application du rate limit: {str(e)}")
                 # En cas d'erreur avec Redis, laisser passer la requête
                 return f(*args, **kwargs)

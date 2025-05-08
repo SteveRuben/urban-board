@@ -20,7 +20,7 @@ class InterviewQuestion(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relations
-    # interview = db.relationship('Interview', backref='questions')
+    interview_ref = db.relationship('Interview', back_populates='interview_questions')
     # responses - défini dans Response
     # biometric_data - défini dans BiometricData
     
