@@ -1341,6 +1341,6 @@ def generate_interview_questions_from_resume(resume_text, job_role, num_question
                    "difficulty": "moyenne",
                    "expected_answer_elements": ["Analyse de la situation", "Approche méthodique", "Résultats"],
                    "generated_by": "default",
-                   "error": f"Erreur lors de la génération des questions: {str(e)}"
+                   "error": f"Erreur lors de la génération des questions : {str(e)}"
                }
            ]
