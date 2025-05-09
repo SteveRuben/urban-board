@@ -1,20 +1,17 @@
 import json
 import uuid
-import openai
 from typing import Dict, Any, List, Optional
-from app.config import OPENAI_API_KEY, MODEL_NAME
+from ..services.llm_service import get_llm_response  
 
 class ExerciseGenerator:
-    """Classe pour générer des exercices de code à l'aide de l'API OpenAI."""
+    """Classe pour générer des exercices de code à l'aide de LLM."""
     
     def __init__(self):
-        # Configuration de l'API OpenAI
-        # openai.api_key = OPENAI_API_KEY
         pass
     
     def generate_exercise_for_skills(self, skills: List[str], difficulty: str, purpose: str) -> Dict[str, Any]:
         """
-        Génère un exercice adapté aux compétences spécifiées via l'API OpenAI.
+        Génère un exercice adapté aux compétences spécifiées via LLM.
         
         Args:
             skills: Liste des compétences cibles
@@ -37,26 +34,56 @@ class ExerciseGenerator:
             # Construire le prompt pour la génération
             generation_prompt = self._build_generation_prompt(skills, main_technology, skill_level, purpose)
             
-            # Utiliser l'API OpenAI pour générer l'exercice
-            exercise_spec = self._generate_with_openai(generation_prompt, main_technology)
-            
-            # Enrichir l'exercice avec des métadonnées
-            exercise_spec["unique_id"] = f"ex-gen-{uuid.uuid4().hex[:8]}"
-            exercise_spec["id"] = exercise_spec["unique_id"]  # Ajouter id pour compatibilité
-            exercise_spec["difficulty"] = difficulty
-            exercise_spec["purpose"] = purpose
-            exercise_spec["is_generated"] = True
-            exercise_spec["generation_prompt"] = generation_prompt
-            exercise_spec["skills"] = skills
-            exercise_spec["technologies"] = [main_technology] if main_technology else []
-            exercise_spec["generation_method"] = "openai"
-            
-            return exercise_spec
-            
+            # Utiliser le LLM pour générer l'exercice
+            try:
+                llm_response = get_llm_response(generation_prompt)
+                
+                try:
+                    # Tenter de parser la réponse JSON
+                    exercise_spec = json.loads(llm_response)
+                    
+                    # Enrichir l'exercice avec des métadonnées
+                    exercise_spec["unique_id"] = f"ex-gen-{uuid.uuid4().hex[:8]}"
+                    exercise_spec["id"] = exercise_spec["unique_id"]  # Ajouter id pour compatibilité
+                    exercise_spec["difficulty"] = difficulty
+                    exercise_spec["purpose"] = purpose
+                    exercise_spec["is_generated"] = True
+                    exercise_spec["generation_prompt"] = generation_prompt
+                    exercise_spec["skills"] = skills
+                    exercise_spec["technologies"] = [main_technology] if main_technology else []
+                    exercise_spec["generation_method"] = "llm"
+                    
+                    return exercise_spec
+                    
+                except json.JSONDecodeError:
+                    # Si la réponse n'est pas au format JSON valide, utiliser la méthode de secours
+                    print(f"Erreur de décodage JSON dans la réponse LLM, utilisation de la méthode de secours")
+                    fallback_exercise = self._generate_simple_exercise_no_llm(skills, difficulty, purpose, main_technology)
+                    fallback_exercise['metadata'] = {
+                        'generation_method': 'fallback',
+                        'error': 'JSON invalide dans la réponse LLM'
+                    }
+                    return fallback_exercise
+                    
+            except Exception as llm_error:
+                # En cas d'erreur avec le LLM, utiliser la méthode de secours
+                print(f"Erreur LLM dans generate_exercise_for_skills: {str(llm_error)}, utilisation de la méthode de secours")
+                fallback_exercise = self._generate_simple_exercise_no_llm(skills, difficulty, purpose, main_technology)
+                fallback_exercise['metadata'] = {
+                    'generation_method': 'fallback',
+                    'error': f'Erreur LLM: {str(llm_error)}'
+                }
+                return fallback_exercise
+                
         except Exception as e:
-            # En cas d'erreur, utiliser la méthode de secours
-            print(f"Erreur lors de la génération d'exercice avec OpenAI: {str(e)}")
-            return self._generate_simple_exercise_no_llm(skills, difficulty, purpose, main_technology)
+            # En cas d'erreur générale, utiliser la méthode de secours
+            print(f"Erreur générale dans generate_exercise_for_skills: {str(e)}, utilisation de la méthode de secours")
+            fallback_exercise = self._generate_simple_exercise_no_llm(skills, difficulty, purpose, main_technology)
+            fallback_exercise['metadata'] = {
+                'generation_method': 'fallback',
+                'error': f'Erreur générale: {str(e)}'
+            }
+            return fallback_exercise
     
     def _identify_main_technology(self, skills: List[str]) -> Optional[str]:
         """Identifie la technologie principale parmi les compétences."""
@@ -103,7 +130,7 @@ class ExerciseGenerator:
         return "Python"  # Langue par défaut
     
     def _build_generation_prompt(self, skills: List[str], technology: Optional[str], skill_level: str, purpose: str) -> str:
-        """Construit le prompt pour générer un exercice avec GPT."""
+        """Construit le prompt pour générer un exercice avec le LLM."""
         skills_str = ", ".join(skills)
         technology_str = technology if technology else "programmation générale"
         
@@ -150,55 +177,6 @@ FORMAT DE RÉPONSE (JSON):
         
         return prompt
     
-    def _generate_with_openai(self, prompt: str, technology: Optional[str]) -> Dict[str, Any]:
-        """Génère un exercice en utilisant l'API OpenAI."""
-        try:
-            from openai import OpenAI
-
-            # Initialiser le client OpenAI
-            client = OpenAI(api_key=OPENAI_API_KEY)
-
-            # Appel à l'API OpenAI
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": "Tu es un expert en programmation qui crée des exercices d'entraînement."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000,
-                top_p=1.0,
-                frequency_penalty=0.0,
-                presence_penalty=0.0
-            )
-
-            # Extraire le contenu de la réponse
-            content = response.choices[0].message.content
-
-            # Extraire le JSON de la réponse
-            try:
-                # Trouver les délimiteurs JSON dans la réponse
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-
-                if json_start >= 0 and json_end > json_start:
-                    json_str = content[json_start:json_end]
-                    # Analyser le JSON
-                    return json.loads(json_str)
-                else:
-                    raise ValueError("Aucun JSON trouvé dans la réponse")
-
-            except Exception as e:
-                print(f"Erreur lors de l'extraction du JSON: {str(e)}")
-                print(f"Réponse brute: {content}")
-                # En cas d'erreur, utiliser la méthode de secours
-                raise ValueError(f"Erreur lors de l'extraction du JSON: {str(e)}")
-
-        except Exception as e:
-            print(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
-            # En cas d'erreur, utiliser la méthode de secours
-            raise ValueError(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
-
     # Nouvelle méthode simplifiée pour générer des exercices très simples sans LLM
     def _generate_simple_exercise_no_llm(self, skills: List[str], difficulty: str, purpose: str, technology: Optional[str]) -> Dict[str, Any]:
         """
