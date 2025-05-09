@@ -101,7 +101,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ userRole = 'recruiter', s
     },
     {
       name: 'Analyse de CV',
-      href: '/resumes',
+      href: '/resumes/analyze',
       icon: DocumentTextIcon,
       access: hasAccess('full_candidate_analysis') || true // Temporairement accessible à tous pour le développement
     },
