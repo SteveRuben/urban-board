@@ -1,4 +1,3 @@
-// frontend/types/resume.ts
 export interface Education {
   degree: string;
   institution: string;
