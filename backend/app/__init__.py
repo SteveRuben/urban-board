@@ -66,9 +66,18 @@ def create_app(config_name='dev'):
     configure_logging(app)
     
     # Activer CORS pour permettre les requêtes depuis le frontend
-    CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}}, supports_credentials=True)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": app.config['CORS_ORIGINS'],
+            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With","x-request-id"],
+            "supports_credentials": True,
+            "max_age": 86400  # 24 hours
+        }
+    })
+
     socketio.init_app(app, 
-                      cors_allowed_origins=app.config['CORS_ORIGINS'], 
+                      cors_allowed_origins=app.config['CORS_ORIGINS'],
                       async_mode='eventlet',
                       logger=True,
                       engineio_logger=True)
