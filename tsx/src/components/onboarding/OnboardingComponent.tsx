@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import axios from 'axios';
 import StepIndicator from './StepIndicator';
 import OrganizationInfoStep from './steps/OrganizationInfoStep';
 import DomainStep from './steps/DomainStep';

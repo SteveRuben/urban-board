@@ -3,6 +3,8 @@ from datetime import datetime
 import os
 import uuid
 from flask import Blueprint, current_app, request, jsonify, g, abort
+
+from ..services.user_service import UserService
 from ..services.audit_service import AuditService
 from ..models.user import User
 from ..models.organization import Organization, OrganizationDomain, OrganizationMember
@@ -40,9 +42,10 @@ def require_owner(organization_id, user_id):
     
     return member
 
-@organizations_bp.route('/', methods=['POST'])
+
+@organizations_bp.route('', methods=['POST'])
 @token_required
-def create_organization():
+def create_organization():    
     """Crée une nouvelle organisation"""
     user_id = g.current_user.user_id
     data = request.get_json()
@@ -54,15 +57,17 @@ def create_organization():
     try:
         organization = organization_service.create_organization(
             name=data['name'],
-            user_id=user_id,
-            plan=data.get('plan', 'free')
+            user_id=user_id
+            #plan=data.get('plan', 'free')
         )
+        
+        UserService.update_onboarding_status(user_id=user_id)
         
         return jsonify({
             "id": organization.id,
             "name": organization.name,
-            "slug": organization.slug,
-            "plan": organization.plan
+            "slug": organization.slug
+            #"plan": organization.plan
         }), 201
     except Exception as e:
         abort(400, description=str(e))
