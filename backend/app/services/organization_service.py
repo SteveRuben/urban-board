@@ -30,7 +30,7 @@ class OrganizationService:
             name=name,
             slug=slug,
         )
-        db.add(organization)
+        db.session.add(organization)
         
         # Ajouter l'utilisateur comme propriétaire
         member = OrganizationMember(
@@ -39,24 +39,24 @@ class OrganizationService:
             user_id=user_id,
             role="owner"
         )
-        db.add(member)
+        db.session.add(member)
         
         # Mettre à jour l'organisation active de l'utilisateur
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.session.query(User).filter(User.id == user_id).first()
         if user:
             user.current_organization_id = organization.id
         
-        db.commit()
+        db.session.commit()
         return organization
     
     def get_organization_by_id(self, organization_id: str) -> Optional[Organization]:
-        return db.query(Organization).filter(Organization.id == organization_id).first()
+        return db.session.query(Organization).filter(Organization.id == organization_id).first()
     
     def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
-        return db.query(Organization).filter(Organization.slug == slug).first()
+        return db.session.query(Organization).filter(Organization.slug == slug).first()
     
     def get_organizations_for_user(self, user_id: str) -> List[Organization]:
-        members = db.query(OrganizationMember).filter(
+        members = db.session.query(OrganizationMember).filter(
             OrganizationMember.user_id == user_id
         ).all()
         return [member.organization for member in members]
@@ -64,7 +64,7 @@ class OrganizationService:
     def add_domain(self, organization_id: str, domain: str, is_primary: bool = False) -> OrganizationDomain:
         """Ajoute un domaine à une organisation"""
         # Vérifier si le domaine existe déjà
-        existing = db.query(OrganizationDomain).filter(
+        existing = db.session.query(OrganizationDomain).filter(
             OrganizationDomain.domain == domain
         ).first()
         
@@ -73,7 +73,7 @@ class OrganizationService:
         
         # Si c'est le domaine principal, mettre à jour les autres domaines
         if is_primary:
-            db.query(OrganizationDomain).filter(
+            db.session.query(OrganizationDomain).filter(
                 OrganizationDomain.organization_id == organization_id,
                 OrganizationDomain.is_primary == True
             ).update({"is_primary": False})
@@ -88,13 +88,13 @@ class OrganizationService:
             verification_token=verification_token
         )
         
-        db.add(domain_entry)
-        db.commit()
+        db.session.add(domain_entry)
+        db.session.commit()
         return domain_entry
     
     def verify_domain(self, domain_id: str, token: str) -> bool:
         """Vérifie un domaine avec le token de vérification"""
-        domain_entry = db.query(OrganizationDomain).filter(
+        domain_entry = db.session.query(OrganizationDomain).filter(
             OrganizationDomain.id == domain_id
         ).first()
         
@@ -103,14 +103,14 @@ class OrganizationService:
         
         if domain_entry.verification_token == token:
             domain_entry.is_verified = True
-            db.commit()
+            db.session.commit()
             return True
             
         return False
     
     def is_member(self, organization_id: str, user_id: str) -> bool:
         """Vérifie si un utilisateur est membre d'une organisation"""
-        member = db.query(OrganizationMember).filter(
+        member = db.session.query(OrganizationMember).filter(
             OrganizationMember.organization_id == organization_id,
             OrganizationMember.user_id == user_id
         ).first()
@@ -119,7 +119,7 @@ class OrganizationService:
 
     def get_organization_by_domain(self, domain: str) -> Optional[Organization]:
         """Obtient l'organisation correspondant à un domaine"""
-        domain_entry = db.query(OrganizationDomain).filter(
+        domain_entry = db.session.query(OrganizationDomain).filter(
             OrganizationDomain.domain == domain,
             OrganizationDomain.is_verified == True
         ).first()
@@ -129,7 +129,7 @@ class OrganizationService:
     def add_member(self, organization_id: str, user_id: str, role: str = "member") -> OrganizationMember:
         """Ajoute un membre à l'organisation"""
         # Vérifier que l'utilisateur n'est pas déjà membre
-        existing = db.query(OrganizationMember).filter(
+        existing = db.session.query(OrganizationMember).filter(
             OrganizationMember.organization_id == organization_id,
             OrganizationMember.user_id == user_id
         ).first()
@@ -138,7 +138,7 @@ class OrganizationService:
             # Mettre à jour le rôle si nécessaire
             if existing.role != role:
                 existing.role = role
-                db.commit()
+                db.session.commit()
             return existing
         
         # Ajouter le nouveau membre
@@ -149,13 +149,13 @@ class OrganizationService:
             role=role
         )
         
-        db.add(member)
-        db.commit()
+        db.session.add(member)
+        db.session.commit()
         return member
     
     def remove_member(self, organization_id: str, user_id: str) -> bool:
         """Supprime un membre de l'organisation"""
-        member = self.db.query(OrganizationMember).filter(
+        member = db.session.query(OrganizationMember).filter(
             OrganizationMember.organization_id == organization_id,
             OrganizationMember.user_id == user_id
         ).first()
@@ -165,7 +165,7 @@ class OrganizationService:
         
         # Vérifier qu'il ne s'agit pas du dernier propriétaire
         if member.role == "owner":
-            owner_count = self.db.query(OrganizationMember).filter(
+            owner_count = db.session.query(OrganizationMember).filter(
                 OrganizationMember.organization_id == organization_id,
                 OrganizationMember.role == "owner"
             ).count()
@@ -173,13 +173,13 @@ class OrganizationService:
             if owner_count <= 1:
                 raise ValueError("Impossible de supprimer le dernier propriétaire de l'organisation")
         
-        db.delete(member)
-        db.commit()
+        db.session.delete(member)
+        db.session.commit()
         return True
     
     def update_member_role(self, organization_id: str, user_id: str, new_role: str) -> bool:
         """Met à jour le rôle d'un membre"""
-        member = self.db.query(OrganizationMember).filter(
+        member = db.session.query(OrganizationMember).filter(
             OrganizationMember.organization_id == organization_id,
             OrganizationMember.user_id == user_id
         ).first()
@@ -189,7 +189,7 @@ class OrganizationService:
         
         # Vérifier qu'il ne s'agit pas du dernier propriétaire
         if member.role == "owner" and new_role != "owner":
-            owner_count = db.query(OrganizationMember).filter(
+            owner_count = db.session.query(OrganizationMember).filter(
                 OrganizationMember.organization_id == organization_id,
                 OrganizationMember.role == "owner"
             ).count()
@@ -198,7 +198,7 @@ class OrganizationService:
                 raise ValueError("Impossible de rétrograder le dernier propriétaire de l'organisation")
         
         member.role = new_role
-        db.commit()
+        db.session.commit()
         return True
     
     def update_organization(self, organization_id: str, name: str = None, logo_url: str = None, 
@@ -220,5 +220,5 @@ class OrganizationService:
         if is_active is not None:
             organization.is_active = is_active
             
-        db.commit()
+        db.session.commit()
         return organization
