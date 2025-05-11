@@ -9,6 +9,7 @@ import SummaryStep from './steps/SummaryStep';
 import OrganizationService from '@/services/organization-service';
 
 
+
 // Types
 interface OrganizationData {
   name: string;
@@ -98,7 +99,9 @@ const OnboardingComponent: React.FC<OnboardingComponentProps> = ({ userId, email
       await OrganizationService.createOrganization({
         ...organizationData,
         user_id: userId
-      });      
+      });
+
+
       // Redirection vers le dashboard après succès
       router.push('/dashboard');
     } catch (err: any) {
