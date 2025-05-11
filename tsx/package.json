@@ -11,9 +11,12 @@
   "dependencies": {
     "@headlessui/react": "^2.2.2",
     "@heroicons/react": "^2.2.0",
+    "@monaco-editor/react": "^4.7.0",
     "axios": "^1.8.4",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.10.5",
     "gray-matter": "^4.0.3",
+    "gsap": "^3.13.0",
     "lucide-react": "^0.503.0",
     "marked": "^15.0.10",
     "next": "15.3.1",
