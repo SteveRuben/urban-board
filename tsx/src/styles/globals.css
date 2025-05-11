@@ -104,22 +104,9 @@ body {
 }
 
 /* Afficher le curseur pointer pour les éléments interactifs */
-a,
-button,
+.codingame a,
+.codingame button,
 [role="button"],
 .cursor-pointer {
   cursor: pointer;
-}
-
-.magnifier {
-  position: fixed;
-  pointer-events: none;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  width: 100px;
-  height: 100px;
-  background-repeat: no-repeat;
-  background-size: 200%;
-  z-index: 9999;
-  transform: translate(-50%, -50%);
 }
