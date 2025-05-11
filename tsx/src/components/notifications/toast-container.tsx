@@ -8,7 +8,7 @@ import Notification,{ Toast } from '@/types/notification';
 const ToastContainer: React.FC = () => {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [isBrowser, setIsBrowser] = useState<boolean>(false);
-    const { notifications, markAsRead } = useNotifications();
+    const { notifications= [], markAsRead } = useNotifications();
     
     // Vérifier si nous sommes côté client
     useEffect(() => {
@@ -19,7 +19,7 @@ const ToastContainer: React.FC = () => {
     useEffect(() => {
       // Vérifier s'il y a de nouvelles notifications non lues
       const unreadNotifications = notifications.filter(
-        notif => !notif.read && !toasts.some(toast => toast.id === notif.id)
+        notif => !notif?.read && !toasts.some(toast => toast.id === notif.id)
       );
       
       if (unreadNotifications.length > 0) {
