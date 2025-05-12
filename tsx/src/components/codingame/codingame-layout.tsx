@@ -1,4 +1,3 @@
-import AnimatedTitle from "@/components/codingame/animated-title";
 import CustomCursor from "@/components/codingame/custom-cursor";
 import Navbar from "@/components/codingame/navbar";
 import BackgroundParticles from "@/components/codingame/particles-bg";
@@ -14,7 +13,6 @@ const CodingameLayout = ({ children }: LayoutProps) => {
       <BackgroundParticles />
 
       <main className="flex flex-col items-center justify-center h-screen px-4 text-center">
-        <AnimatedTitle />
         <Navbar />
         <section className="text-center py-5 px-4">{children}</section>
       </main>

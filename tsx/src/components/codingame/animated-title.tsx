@@ -18,7 +18,7 @@ const AnimatedTitle = () => {
   return (
     <h1
       ref={titleRef}
-      className="text-5xl font-extrabold text-primary text-center mb-6"
+      className="text-5xl font-extrabold text-white text-center mb-6"
     >
       Préparez vos entretiens avec IA
     </h1>

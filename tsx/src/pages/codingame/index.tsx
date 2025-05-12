@@ -1,11 +1,13 @@
 "use client";
 
+import AnimatedTitle from "@/components/codingame/animated-title";
 import CodingameLayout from "@/components/codingame/codingame-layout";
 import { motion } from "framer-motion";
 
 export default function Codingame() {
   return (
     <CodingameLayout>
+      <AnimatedTitle />
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -6,11 +6,18 @@ import Image from "next/image";
 import Link from "next/link";
 
 const Navbar = () => {
+  const navLinks = [
+    { label: "Challenges", baseUrl: "/challenges" },
+    { label: "Steps", baseUrl: "/steps" },
+    { label: "Test cases", baseUrl: "/testcases" },
+    { label: "Participates", baseUrl: "/participates" },
+  ];
+
   return (
     <header className="fixed top-5 left-0 w-full z-50">
       <nav className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-3 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center space-x-2">
           <Image
             src="/logo.svg"
             alt="Logo"
@@ -19,47 +26,28 @@ const Navbar = () => {
             className="w-6 h-6 bg-white rounded-full"
           />
           <span className="text-white font-semibold text-lg">RecruteIA</span>
-        </div>
+        </Link>
 
         {/* Links */}
         <ul className="hidden md:flex items-center space-x-4 text-sm font-medium bg-[#0B0B0F]/50  text-white p-3 rounded-full">
           <li>
-            <Link href="/challenges">
+            <Link href="/codingame">
               <span className="bg-[#0E0E13] text-cyan-400 px-3 py-1.5 rounded-full hover:bg-cyan-950 transition-all">
                 Codingame
               </span>
             </Link>
           </li>
+          {navLinks.map((navLink, index) => (
+            <li key={index}>
+              <Link href={`/codingame/${navLink.baseUrl}`}>
+                <span className="hover:text-cyan-400 transition-colors">
+                  {navLink.label}
+                </span>
+              </Link>
+            </li>
+          ))}
           <li>
-            <Link href="/desktop">
-              <span className="hover:text-cyan-400 transition-colors">
-                Challenges
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/review">
-              <span className="hover:text-cyan-400 transition-colors">
-                Steps
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/tools">
-              <span className="hover:text-cyan-400 transition-colors">
-                Test cases
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/pricing">
-              <span className="hover:text-cyan-400 transition-colors">
-                Participates
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/strategy">
+            <Link href="/codingame">
               <span className="bg-white/10 px-3 py-1.5 rounded-md text-sm hover:bg-white/20 transition-all">
                 Express yourself
               </span>
