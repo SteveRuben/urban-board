@@ -95,8 +95,8 @@ def create_app(config_name='dev'):
         register_blueprints(app)
         
         # Créer les tables si elles n'existent pas
-        db.drop_all() 
-        db.create_all()
+        # db.drop_all() 
+        # db.create_all()
     
     # Initialiser les services
     initialize_services(app)

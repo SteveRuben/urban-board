@@ -36,7 +36,7 @@ notification_service = NotificationService(
 
 
 
-@notification_bp.route('/', methods=['GET'])
+@notification_bp.route('', methods=['GET'])
 @token_required
 def get_notifications():
     """
@@ -62,7 +62,7 @@ def get_notifications():
         type_filter = request.args.get('type')
         
         notifications = notification_service.get_user_notifications(
-            user_id=g.user_id,
+            user_id=g.current_user.user_id,
             limit=limit or 50,
             filter_type=type_filter,
             filter_read=False if unread_only else None

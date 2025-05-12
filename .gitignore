@@ -38,3 +38,5 @@ frontend/.next/**/*
 ***.pyc
 /backend/migrations_bk/***
 /docs/tmp/***
+backend/.env
+/debug.log

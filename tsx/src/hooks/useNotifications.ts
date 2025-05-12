@@ -36,12 +36,12 @@ export const useNotifications = (): UseNotificationsReturn => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const { user,  } = useAuth();
+  const { user, } = useAuth();
   const token = localStorage.getItem('accessToken');
-  
+
   // Initialisation de la connexion WebSocket
   useEffect(() => {
-    
+
     if (!token) return;
 
     // Création de la connexion Socket.IO
@@ -64,7 +64,7 @@ export const useNotifications = (): UseNotificationsReturn => {
     socketInstance.on('new_notification', (notification: Notification) => {
       setNotifications(prev => [notification, ...prev]);
       setUnreadCount(count => count + 1);
-      
+
       // Afficher une notification système si supporté par le navigateur
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         new Notification(notification.title, {
@@ -89,13 +89,12 @@ export const useNotifications = (): UseNotificationsReturn => {
     if (!token) return;
 
     try {
-      const response = await fetch('/api/notifications', {
-         credentials: 'include',
+      const response = await fetch(`/api/notifications?t=${Date.now()}`, {
         headers: {
           'Authorization': 'Bearer ' + token,
         }
       });
-      
+
       if (response.ok) {
         const data: NotificationResponse = await response.json();
         setNotifications(data.notifications);
@@ -109,12 +108,12 @@ export const useNotifications = (): UseNotificationsReturn => {
   // Marquer les notifications comme lues
   const markAsRead = useCallback(async (notificationId: string | null = null): Promise<void> => {
     if (!token) return;
-    
+
     try {
-      const endpoint = notificationId 
-        ? `${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${notificationId}/read` 
+      const endpoint = notificationId
+        ? `${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${notificationId}/read`
         : `${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`;
-        
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -122,10 +121,10 @@ export const useNotifications = (): UseNotificationsReturn => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         if (notificationId) {
-          setNotifications(prev => prev.map(n => 
+          setNotifications(prev => prev.map(n =>
             n.id === notificationId ? { ...n, read: true } : n
           ));
           setUnreadCount(count => Math.max(0, count - 1));
@@ -142,7 +141,7 @@ export const useNotifications = (): UseNotificationsReturn => {
   // Supprimer une notification
   const deleteNotification = useCallback(async (notificationId: string): Promise<void> => {
     if (!token) return;
-    
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE',
@@ -150,7 +149,7 @@ export const useNotifications = (): UseNotificationsReturn => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
         // Mise à jour du compteur si la notification n'était pas lue
