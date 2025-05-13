@@ -47,7 +47,7 @@ function AppWithLayout({ Component, pageProps }: AppPropsWithLayout): React.Reac
     // Rediriger vers l'onboarding si l'utilisateur est connecté mais n'a pas d'organisation
     if (user && !user.onboarding_completed && !onboardingPaths.includes(router.pathname)) {
       router.push('/onboarding');
-    }
+    } 
   }, [user, router.pathname]);
 
 

@@ -12,7 +12,7 @@ const OnboardingPage: React.FC = () => {
     // Rediriger vers le dashboard si l'utilisateur a déjà complété l'onboarding
     if (!loading && user?.onboarding_completed) {
       router.push('/dashboard');
-    }
+    } 
   }, [user, loading, router]);
 
   // Afficher un écran de chargement pendant la vérification de l'authentification

@@ -6,7 +6,7 @@ class Evaluation(db.Model):
     __tablename__ = 'evaluations'
     
     id = db.Column(db.Integer, primary_key=True)
-    response_id = db.Column(db.Integer, db.ForeignKey('responses.id'), nullable=False, unique=True)
+    response_id = db.Column(db.Integer, db.ForeignKey('interview_responses.id'), nullable=False, unique=True)
     exactitude = db.Column(db.Float, nullable=True)  # Score sur 5
     clarte = db.Column(db.Float, nullable=True)  # Score sur 5
     profondeur = db.Column(db.Float, nullable=True)  # Score sur 5
@@ -34,7 +34,7 @@ class Evaluation(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-class InterviewSummary(db.Model):
+""" class InterviewSummary(db.Model):
     __tablename__ = 'interview_summaries'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -65,4 +65,4 @@ class InterviewSummary(db.Model):
             'created_by': self.created_by,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        } """

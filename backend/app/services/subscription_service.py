@@ -1,8 +1,8 @@
 # backend/services/subscription_service.py
-from models.user import User
-from models.organization import Organization, OrganizationMember
-from models.subscription import Subscription
-from models.plan import Plan, PlanFeature
+from ..models.user import User
+from ..models.organization import Organization, OrganizationMember
+from ..models.subscription import Subscription
+from ..models.plan import Plan, PlanFeature
 from datetime import datetime, timedelta
 from app import db
 

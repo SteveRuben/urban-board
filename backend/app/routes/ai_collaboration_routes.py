@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..services.ai_collaboration_service import AICollaborationService
-from ..models.collaboration import AIAssistant, TeamAIAssistant, AIGeneratedContent
+from ..models.ai_assistant import AIAssistant, TeamAIAssistant, AIGeneratedContent
 from ..middleware.auth_middleware import token_required
 from app import db
 

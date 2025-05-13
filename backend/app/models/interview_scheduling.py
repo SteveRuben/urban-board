@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from . import job_posting
 from app import db
 
 class InterviewSchedule(db.Model):
@@ -61,6 +62,7 @@ class InterviewSchedule(db.Model):
     # Ajouter ce champ à models/interview_scheduling.py dans la classe InterviewSchedule
     job_posting_id = db.Column(db.String(36), db.ForeignKey("job_postings.id"), nullable=True)
     job_posting = relationship("JobPosting", back_populates="interview_schedules")
+    job_application = relationship("JobApplication", back_populates="interview_schedule", uselist=False)
     
     def __repr__(self):
         return f"<InterviewSchedule {self.candidate_name} - {self.scheduled_at}>"

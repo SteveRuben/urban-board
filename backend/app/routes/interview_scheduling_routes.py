@@ -1,13 +1,13 @@
 # backend/routes/interview_scheduling_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from services.interview_scheduling_service import InterviewSchedulingService
-from services.organization_service import OrganizationService
-from services.audit_service import AuditService
+from ..services.interview_scheduling_service import InterviewSchedulingService
+from ..services.organization_service import OrganizationService
+from ..services.audit_service import AuditService
 from datetime import datetime
-from . import scheduling_bp
 from app import db
 
+scheduling_bp = Blueprint('scheduling', __name__, url_prefix='/api/scheduling')
 
 
 scheduling_service = InterviewSchedulingService()

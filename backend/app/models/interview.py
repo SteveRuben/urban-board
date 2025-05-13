@@ -1,9 +1,11 @@
 # backend/models/interview.py
 from datetime import datetime
 from app import db
+from ..models.organization import GUID
 
 class Interview(db.Model):
     __tablename__ = 'interviews'
+    __table_args__ = {'extend_existing': True}  # Add this line
     
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
@@ -29,7 +31,7 @@ class Interview(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    ai_assistant_id = db.Column(GUID(), db.ForeignKey('ai_assistants.id'), nullable=True)
     # Relations (définies dans les autres modèles via backref)
     # questions - défini dans Question
     # responses - défini dans Response
@@ -37,8 +39,26 @@ class Interview(db.Model):
     # biometric_summary - défini dans BiometricSummary
     # summary - défini dans InterviewSummary
     # biometric_data - défini dans BiometricData
+    # ai_contents - défini dans AIGeneratedContent
+    # Relations définies explicitement (bien qu'elles soient aussi définies par backref dans les autres modèles)
+    # Cela peut être utile pour avoir plus de contrôle sur les relations
+    # Relations avec back_populates
+    interview_questions = db.relationship('InterviewQuestion', back_populates='interview_ref', cascade="all, delete-orphan")
+    interview_responses = db.relationship('InterviewResponse', back_populates='interview_ref', cascade="all, delete-orphan")
+    facial_analyses = db.relationship('FacialAnalysis', back_populates='interview', cascade="all, delete-orphan")
+    biometric_data = db.relationship('BiometricData', back_populates='interview', cascade="all, delete-orphan")
+    ai_assistant = db.relationship(
+    'AIAssistant',
+    back_populates='interviews',
+    uselist=False  # This indicates a many-to-one relationship
+    )
+    # Relations one-to-one
+    interview_summary = db.relationship('InterviewSummary', back_populates='interview_ref', uselist=False, cascade="all, delete-orphan")
+    biometric_summary = db.relationship('BiometricSummary', back_populates='interview', uselist=False, cascade="all, delete-orphan")
     
-    creator = db.relationship('User', backref='created_interviews', foreign_keys=[created_by])
+    # Relation avec User
+    creator = db.relationship('User', back_populates='created_interviews', foreign_keys=[created_by])
+
     
     def to_dict(self):
         return {
@@ -55,6 +75,8 @@ class Interview(db.Model):
             'scheduled_for': self.scheduled_for.isoformat() if self.scheduled_for else None,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'meet_link': self.meet_link,
+            'calendar_event_id': self.calendar_event_id,
             'created_by': self.created_by,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -69,5 +91,18 @@ class Interview(db.Model):
         base_dict['responses'] = [r.to_dict() for r in self.responses] if hasattr(self, 'responses') else []
         base_dict['summary'] = self.summary.to_dict() if hasattr(self, 'summary') and self.summary else None
         base_dict['biometric_summary'] = self.biometric_summary.to_dict() if hasattr(self, 'biometric_summary') and self.biometric_summary else None
+        
+        # Ajouter les données biométriques (version simplifiée pour éviter trop de données)
+        if hasattr(self, 'facial_analyses') and self.facial_analyses:
+            base_dict['has_facial_analyses'] = True
+            base_dict['facial_analyses_count'] = len(self.facial_analyses)
+        else:
+            base_dict['has_facial_analyses'] = False
+            
+        if hasattr(self, 'biometric_data') and self.biometric_data:
+            base_dict['has_biometric_data'] = True
+            base_dict['biometric_data_count'] = len(self.biometric_data)
+        else:
+            base_dict['has_biometric_data'] = False
         
         return base_dict

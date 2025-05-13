@@ -1,11 +1,11 @@
 # backend/services/interview_scheduling_service.py
 from datetime import datetime, timedelta
 import uuid
-from models.interview_scheduling import InterviewSchedule
-from services.notification_service import NotificationService
-from services.email_service import EmailService
-from services.audit_service import AuditService
-from services.subscription_service import SubscriptionService
+from ..models.interview_scheduling import InterviewSchedule
+from ..services.notification_service import NotificationService
+from ..services.email_service import EmailService
+from ..services.audit_service import AuditService
+from ..services.subscription_service import SubscriptionService
 from app import db
 
 class InterviewSchedulingService:

@@ -1,24 +1,31 @@
 # backend/app/models/ai_assistant.py
 from datetime import datetime
 import uuid
+from sqlalchemy import CHAR, TypeDecorator
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import relationship
 
 from app import db
+from ..models.organization import GUID
+
+
 
 class AIAssistant(db.Model):
     """Modèle pour les assistants IA configurables"""
     __tablename__ = 'ai_assistants'
 
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=False)
-    organization_id = db.Column(db.String(36), db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    id = db.Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(GUID(), db.ForeignKey('users.id'), nullable=False)
+    organization_id = db.Column(GUID(), db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     
     # Informations de base
     name = db.Column(db.String(100), nullable=False)
+    assistant_type = db.Column(db.String(50), nullable=False)  # 'general', 'recruiter', 'evaluator', etc.
     description = db.Column(db.Text, nullable=True)
     avatar = db.Column(db.String(255), nullable=True, default='/images/ai-assistant-default.png')
     model = db.Column(db.String(50), nullable=False, default='claude-3-7-sonnet')
+    capabilities = db.Column(db.JSON, nullable=True)  # Fonctionnalités disponibles pour cette IA
+    
     
     # Classification
     industry = db.Column(db.String(50), nullable=True)
@@ -55,7 +62,7 @@ class AIAssistant(db.Model):
     
     # Métadonnées
     is_template = db.Column(db.Boolean, default=False)
-    template_id = db.Column(UUID(as_uuid=True), nullable=True)  # Si cloné à partir d'un modèle
+    template_id = db.Column(GUID(), nullable=True)  # Si cloné à partir d'un modèle
     
     # Statistiques d'utilisation
     usage_count = db.Column(db.Integer, default=0)
@@ -68,8 +75,17 @@ class AIAssistant(db.Model):
     # Relations
     user = relationship('User', back_populates='ai_assistants')
     documents = relationship('AIAssistantDocument', back_populates='assistant', cascade='all, delete-orphan')
-    interviews = relationship('Interview', back_populates='ai_assistant')
-    organization = relationship("Organization", back_populates="ai_assistants_org")
+    interviews = relationship(
+    'Interview', 
+    back_populates='ai_assistant',
+    lazy='dynamic'  # Allows querying like assistant.interviews.filter(...)
+    )   
+    organization = relationship("Organization", back_populates="ai_assistants")
+    team_associations = db.relationship(
+        'TeamAIAssistant',
+        back_populates='ai_assistant',
+        foreign_keys='TeamAIAssistant.ai_assistant_id'
+    )
     
     def __repr__(self):
         return f'<AIAssistant {self.name}>'
@@ -102,8 +118,8 @@ class AIAssistantDocument(db.Model):
     """Modèle pour les documents associés aux assistants IA"""
     __tablename__ = 'ai_assistant_documents'
 
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    assistant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('ai_assistants.id'), nullable=False)
+    id = db.Column(GUID(), primary_key=True, default=uuid.uuid4)
+    assistant_id = db.Column(GUID(), db.ForeignKey('ai_assistants.id'), nullable=False)
     
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
@@ -140,4 +156,56 @@ class AIAssistantDocument(db.Model):
             'vectorIndexStatus': self.vector_index_status,
             'createdAt': self.created_at.isoformat(),
             'updatedAt': self.updated_at.isoformat()
+        }
+
+
+class TeamAIAssistant(db.Model):
+    """Association entre une équipe et un assistant IA"""
+    __tablename__ = 'team_ai_assistants'
+     
+    team_id = db.Column(GUID(), db.ForeignKey('teams.id'), primary_key=True)
+    ai_assistant_id = db.Column(GUID(), db.ForeignKey('ai_assistants.id'), primary_key=True)
+    role = db.Column(db.String(20), nullable=False, default='assistant') # 'assistant', 'evaluator', 'analyzer'
+    added_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relationships - use back_populates instead of backref
+    team = db.relationship('Team', back_populates='team_ai_assistant_associations')
+    ai_assistant = db.relationship('AIAssistant', back_populates='team_associations')
+    adder = db.relationship('User', back_populates='team_ai_assistant_additions')
+    
+    def __repr__(self):
+        return f"<TeamAIAssistant {self.ai_assistant_id} in {self.team_id}>"
+
+
+class AIGeneratedContent(db.Model):
+    """Contenu généré par une IA dans le cadre d'une équipe"""
+    __tablename__ = 'ai_generated_contents'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.String(36), db.ForeignKey('teams.id'), nullable=False)
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
+    ai_assistant_id = db.Column(db.String(36), db.ForeignKey('ai_assistants.id'), nullable=False)
+    content_type = db.Column(db.String(50), nullable=False)  # 'comment', 'analysis', 'summary', 'question', 'evaluation'
+    content = db.Column(db.Text, nullable=False)
+    data = db.Column(db.JSON, nullable=True)  # Informations supplémentaires sur la génération
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relations
+    team = db.relationship('Team', backref='ai_contents')
+    interview = db.relationship('Interview', backref='ai_contents')
+    ai_assistant = db.relationship('AIAssistant', backref='generated_contents')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'team_id': self.team_id,
+            'interview_id': self.interview_id,
+            'ai_assistant_id': self.ai_assistant_id,
+            'ai_assistant_name': self.ai_assistant.name,
+            'content_type': self.content_type,
+            'content': self.content,
+            'data': self.data,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

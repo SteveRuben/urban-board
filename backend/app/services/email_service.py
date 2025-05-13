@@ -6,19 +6,19 @@ from email.mime.application import MIMEApplication
 from datetime import datetime
 import os
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from app import app
+from flask import current_app
 
 class EmailService:
     """Service pour gérer l'envoi d'emails dans l'application"""
     
     def __init__(self):
         # Configuration des paramètres d'email
-        self.smtp_server = app.config.get('SMTP_SERVER', 'smtp.gmail.com')
-        self.smtp_port = app.config.get('SMTP_PORT', 587)
-        self.smtp_username = app.config.get('SMTP_USERNAME', '')
-        self.smtp_password = app.config.get('SMTP_PASSWORD', '')
-        self.sender_email = app.config.get('SENDER_EMAIL', 'noreply@recruteai.com')
-        self.sender_name = app.config.get('SENDER_NAME', 'RecruteIA')
+        self.smtp_server = current_app.config.get('SMTP_SERVER', 'smtp.gmail.com')
+        self.smtp_port = current_app.config.get('SMTP_PORT', 587)
+        self.smtp_username = current_app.config.get('SMTP_USERNAME', '')
+        self.smtp_password = current_app.config.get('SMTP_PASSWORD', '')
+        self.sender_email = current_app.config.get('SENDER_EMAIL', 'noreply@recruteai.com')
+        self.sender_name = current_app.config.get('SENDER_NAME', 'RecruteIA')
         
         # Configuration de Jinja2 pour les templates d'email
         template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'emails')

@@ -33,7 +33,11 @@ class User(db.Model):
     permissions = db.Column(db.JSON, default=lambda: [])
     
     # Relations pour les organisations
-    organizations = db.relationship("OrganizationMember", back_populates="user")
+    organizations = None
+    created_summaries = None
+    ai_assistants = None
+    team_ai_assistant_additions = None
+    created_interviews = None #created_interviews = db.relationship('Interview', back_populates='creator', foreign_keys='Interview.created_by')
     current_organization_id = db.Column(db.String(36), nullable=True)
     
     """
@@ -208,3 +212,45 @@ class User(db.Model):
             organization_id=self.current_organization_id
         ).first()
         return org_member.organization if org_member else None
+
+
+# Set up relationships after all models are defined
+def setup_user_relationships():
+    # Import locally to avoid circular imports
+    from .organization import OrganizationMember
+    from .interview import Interview
+    
+    User.organizations = db.relationship(
+        "OrganizationMember", 
+        back_populates="user",
+        lazy='dynamic'
+    )
+    User.created_interviews = db.relationship(
+        "Interview", 
+        back_populates="creator",
+        foreign_keys="Interview.created_by"
+    )
+    
+    User.created_summaries = db.relationship(
+        'InterviewSummary',
+        back_populates='creator',
+        foreign_keys='InterviewSummary.created_by',
+        lazy='dynamic'  # # Allows querying like user.created_summaries.filter(...)
+    )
+    # Add this relationship
+    User.ai_assistants = db.relationship(
+        'AIAssistant',
+        back_populates='user',
+        foreign_keys='AIAssistant.user_id',
+        lazy='dynamic'  # or 'select' if you prefer
+    )
+    
+    # Add this if you're using TeamAIAssistant model    
+    User.team_ai_assistant_additions = db.relationship(
+        'TeamAIAssistant',
+        back_populates='adder',
+        foreign_keys='TeamAIAssistant.added_by'
+    )
+
+# Call the setup function at the bottom
+setup_user_relationships()

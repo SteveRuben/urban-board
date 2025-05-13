@@ -2,8 +2,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from ..services.ai_interview_service import ai_service
 from ..models.interview import Interview
-from ..models.question import Question
-from ..models.response import Response
+from ..models.interview_question import InterviewQuestion
+from ..models.interview_response import InterviewResponse
 from ..models.evaluation import Evaluation
 from ..models.biometric_data import BiometricData
 from ..middleware.auth_middleware import token_required as auth_required
@@ -274,6 +274,3 @@ def analyze_response_clarity():
         current_app.logger.error(f"Erreur lors de l'analyse de la clarté: {str(e)}")
         return jsonify({"error": "Erreur lors de l'analyse de la clarté de la réponse"}), 500
     
-def init_app(app):
-    """Initialise les routes avec l'application Flask"""
-    app.register_blueprint(ai_bp)

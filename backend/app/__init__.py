@@ -5,9 +5,11 @@ import stripe
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request
 from flask_cors import CORS
+
+from app.utils.error_handlers import register_error_handlers
 from .config import config_by_name
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, inspect
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
@@ -27,6 +29,8 @@ metadata = MetaData(naming_convention=convention)
 db = SQLAlchemy(metadata=metadata)
 jwt = JWTManager()
 migrate = Migrate()
+
+
 
 def create_app(config_name='dev'):
     """
@@ -62,18 +66,36 @@ def create_app(config_name='dev'):
     configure_logging(app)
     
     # Activer CORS pour permettre les requêtes depuis le frontend
-    CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}}, supports_credentials=True)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": app.config['CORS_ORIGINS'],
+            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With","x-request-id"],
+            "supports_credentials": True,
+            "max_age": 86400  # 24 hours
+        }
+    })
+
     socketio.init_app(app, 
-                      cors_allowed_origins=app.config['CORS_ORIGINS'], 
+                      cors_allowed_origins=app.config['CORS_ORIGINS'],
                       async_mode='eventlet',
                       logger=True,
                       engineio_logger=True)
     
     with app.app_context():
+        # import les modèles
+        from .models import user, organization
+        from .models import Interview, InterviewSummary
+        
+        # Then setup relationships
+        from .models.model_setup import setup_all_relationships
+        setup_all_relationships()
+        
         # Enregistrer les blueprints
         register_blueprints(app)
         
         # Créer les tables si elles n'existent pas
+        # db.drop_all() 
         # db.create_all()
     
     # Initialiser les services
@@ -83,9 +105,9 @@ def create_app(config_name='dev'):
     register_hooks(app)
     
     from .services.ai_interview_service import init_app as init_ai_service
-    from .routes.ai_routes import init_app as init_ai_routes
+    #from .routes.ai_routes import init_app as init_ai_routes
     init_ai_service(app)
-    init_ai_routes(app)
+    # init_ai_routes(app)
 
     # Route de vérification de santé
     @app.route('/health')
@@ -108,17 +130,17 @@ def create_app(config_name='dev'):
         return {"routes": routes}
 
     # Afficher toutes les routes disponibles
-    print("\n🧭 Liste des routes disponibles :")
-    for rule in app.url_map.iter_rules():
-        methods = ','.join(sorted(rule.methods))
-        print(f"{rule.endpoint:30s} {methods:20s} {rule}")
+    # print("\n🧭 Liste des routes disponibles :")
+    # for rule in app.url_map.iter_rules():
+    #     methods = ','.join(sorted(rule.methods))
+    #     print(f"{rule.endpoint:30s} {methods:20s} {rule}")
     
     return app
 
 def register_blueprints(app):
     """
     Enregistre les blueprints de l'application.
-    
+
     Args:
         app (Flask): Application Flask
     """
@@ -128,9 +150,15 @@ def register_blueprints(app):
     from .routes.subscription_routes import subscription_bp
     from .routes.admin_routes import admin_bp
     from .routes.integration_routes import integration_bp
-    from .routes.challenge_routes import challenge_bp
     from .routes.organization_routes import organizations_bp
-    
+    from .routes.collaboration_routes import collab_bp
+    from .routes.ai_routes import ai_bp
+    from .routes.ai_assistant_routes import ai_assistant_bp
+    from .routes.biometric_routes import biometric_bp
+    from .routes.ai_collaboration_routes import ai_collab_bp
+    from .routes.interview_scheduling_routes import scheduling_bp
+    from .routes.challenge.challenge_route import challenge_bp
+
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
     app.register_blueprint(user_bp, url_prefix='/api/users')
@@ -139,9 +167,21 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
-    app.register_blueprint(challenge_bp)
-    app.register_blueprint(organizations_bp)
+    app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
     
+    app.register_blueprint(organizations_bp, url_prefix='/api/organizations')
+    app.register_blueprint(collab_bp, url_prefix='/api/collaboration')
+    app.register_blueprint(scheduling_bp, url_prefix='/api/scheduling')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(ai_assistant_bp, url_prefix='/api/ai-assistants')
+    app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
+    app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
+    
+    
+
+    # Gestion des erreurs
+    register_error_handlers(app)
+
 def register_hooks(app):
     """
     Enregistre les hooks de l'application.
@@ -168,7 +208,7 @@ def register_hooks(app):
 # Ajouter cette fonction pour émettre des notifications
 def emit_notification(user_id, notification):
     socketio.emit(f'notification:{user_id}', notification)
-    
+
 def configure_logging(app):
     """
     Configure la journalisation de l'application.

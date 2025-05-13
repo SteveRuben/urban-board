@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import axios from 'axios';
 import StepIndicator from './StepIndicator';
 import OrganizationInfoStep from './steps/OrganizationInfoStep';
 import DomainStep from './steps/DomainStep';
 import SummaryStep from './steps/SummaryStep';
 import OrganizationService from '@/services/organization-service';
+
 
 
 // Types
@@ -99,7 +99,9 @@ const OnboardingComponent: React.FC<OnboardingComponentProps> = ({ userId, email
       await OrganizationService.createOrganization({
         ...organizationData,
         user_id: userId
-      });      
+      });
+
+
       // Redirection vers le dashboard après succès
       router.push('/dashboard');
     } catch (err: any) {

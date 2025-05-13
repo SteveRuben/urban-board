@@ -1,9 +1,10 @@
 # backend/services/ai_collaboration_service.py
 
 from flask import current_app
-from ..models.collaboration import AIAssistant, TeamAIAssistant, AIGeneratedContent, Team, TeamMember, CollaborationActivity
+from ..models.collaboration import Team, TeamMember, CollaborationActivity
 from ..models.user import User
 from ..models.interview import Interview
+from ..models.ai_assistant import AIAssistant, TeamAIAssistant, AIGeneratedContent
 from app import db
 from datetime import datetime
 import uuid
