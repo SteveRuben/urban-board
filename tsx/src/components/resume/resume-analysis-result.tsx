@@ -608,23 +608,7 @@ export default function ResumeAnalysisResult({ analysis, jobTitle }: ResumeAnaly
           </div>
         )}
 
-        {/* Actions */}
-        {/* <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="flex flex-wrap gap-3 justify-center">
-            <button className="action-button">
-              <Download className="w-4 h-4 mr-2" />
-              Télécharger PDF
-            </button>
-            <button className="action-button">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimer
-            </button>
-            <button className="action-button">
-              <Share2 className="w-4 h-4 mr-2" />
-              Partager
-            </button>
-          </div>
-        </div> */}
+        
       </div>
     </div>
   )
