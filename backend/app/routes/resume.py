@@ -1,7 +1,11 @@
-from flask import request, jsonify
+from flask import request, jsonify, send_from_directory, current_app
 from . import resume_bp
 from ..services.resume_analyzer import analyze_resume, match_resume_to_job_description
-
+import os
+import uuid
+import traceback
+import logging
+from werkzeug.utils import secure_filename
 
 @resume_bp.route('/analyze', methods=['POST'])
 def analyze():
@@ -191,3 +195,122 @@ def generate_training_exercises():
     except Exception as e:
         return jsonify({"error": f"Erreur lors de la génération des exercices: {str(e)}"}), 500
 
+@resume_bp.route('/improve', methods=['POST'])
+def improve_cv_api():
+    """
+    Améliore un CV pour correspondre à une offre d'emploi ou un standard spécifique
+    et permet le téléchargement du CV amélioré
+    """
+    try:
+        # Vérifier si un fichier CV a été téléchargé
+        if 'resume' not in request.files:
+            return jsonify({"error": "Aucun fichier CV téléchargé"}), 400
+        
+        resume_file = request.files['resume']
+        
+        if resume_file.filename == '':
+            return jsonify({"error": "Aucun fichier CV sélectionné"}), 400
+        
+        # Récupérer le type d'amélioration souhaité
+        improvement_target = request.form.get('improvement_target', 'general')
+        
+        # Récupérer le format de sortie souhaité
+        output_format = request.form.get('output_format', 'pdf')
+        
+        # Vérifier si un fichier de description de poste a été téléchargé
+        job_description = None
+        if 'job_description' in request.files:
+            job_description_file = request.files['job_description']
+            
+            if job_description_file.filename != '':
+                # Extraire le texte du fichier de description de poste
+                try:
+                    job_description_file.seek(0)  # Réinitialiser le curseur au début du fichier
+                    # Vérifier l'extension du fichier
+                    if job_description_file.filename.endswith('.txt'):
+                        job_description = job_description_file.read().decode('utf-8')
+                    else:
+                        from ..services.resume_analyzer import extract_text_from_file
+                        job_description = extract_text_from_file(job_description_file)
+                except Exception as e:
+                    current_app.logger.error(f"Erreur lors de la lecture du fichier de description de poste: {str(e)}")
+                    return jsonify({"error": f"Erreur lors de la lecture du fichier de description de poste: {str(e)}"}), 400
+        
+        # Améliorer le CV avec gestion d'erreurs robuste
+        from ..services.resume_analyzer import improve_cv
+        try:
+            result = improve_cv(resume_file, improvement_target, job_description, output_format)
+        except Exception as e:
+            current_app.logger.error(f"Erreur lors de l'amélioration du CV: {str(e)}")
+            current_app.logger.error(traceback.format_exc())
+            return jsonify({"error": f"Erreur lors de l'amélioration du CV: {str(e)}"}), 500
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        # Créer un identifiant unique pour le fichier
+        file_id = str(uuid.uuid4())
+        
+        # Assurez-vous d'utiliser le chemin absolu
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        if not os.path.isabs(upload_folder):
+            upload_folder = os.path.abspath(upload_folder)
+            
+        output_dir = os.path.join(upload_folder, 'improved_cvs')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Obtenir le nom du fichier et s'assurer qu'il est sécurisé
+        original_filename = result['analysis']['output_document']['filename']
+        secure_name = secure_filename(original_filename)
+        
+        # Créer un nom de fichier unique
+        unique_filename = f"{file_id}_{secure_name}"
+        file_path = os.path.join(output_dir, unique_filename)
+        
+        # Journaliser pour debug
+        current_app.logger.info(f"Sauvegarde du fichier à: {file_path}")
+        
+        # Écrire le contenu du fichier
+        with open(file_path, 'wb') as f:
+            f.write(result['document'][0].getvalue())
+        
+        # Vérifier que le fichier existe
+        if not os.path.exists(file_path):
+            current_app.logger.error(f"Échec de création du fichier: {file_path}")
+            return jsonify({"error": "Impossible de créer le fichier amélioré"}), 500
+            
+        # Créer l'URL de téléchargement
+        # Utilisez juste le file_id et filename sans le chemin complet
+        download_url = f"/api/resumes/download-improved-cv/{file_id}/{secure_name}"
+        
+        return jsonify({
+            "analysis": result['analysis'],
+            "download_url": download_url
+        })
+    except Exception as e:
+        current_app.logger.error(f"Erreur générale dans improve_cv_api: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": f"Une erreur s'est produite lors du traitement de votre demande: {str(e)}"}), 500
+
+@resume_bp.route('/download-improved-cv/<file_id>/<filename>', methods=['GET'])
+def download_improved_cv(file_id, filename):
+    """
+    Télécharge un CV amélioré précédemment généré
+    """
+    try:
+        # Vérifier le nom de fichier pour des raisons de sécurité
+        filename = secure_filename(filename)
+        
+        # Construire le chemin vers le fichier
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        output_dir = os.path.join(upload_folder, 'improved_cvs')
+        
+        # Vérifier si le fichier existe
+        file_path = os.path.join(output_dir, f"{file_id}_{filename}")
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Fichier non trouvé"}), 404
+        
+        return send_from_directory(output_dir, f"{file_id}_{filename}", as_attachment=True)
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors du téléchargement du CV: {str(e)}")
+        return jsonify({"error": f"Erreur lors du téléchargement du CV: {str(e)}"}), 500

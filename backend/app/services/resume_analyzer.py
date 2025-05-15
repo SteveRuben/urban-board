@@ -70,6 +70,105 @@ Fournis ta réponse au format JSON avec la structure suivante:
 }}
 """
 
+CV_IMPROVEMENT_PROMPT = """
+Tu es un expert en recrutement et en optimisation de CV. Analyse ce CV et fais des recommandations 
+d'amélioration pour {improvement_target}.
+
+Voici le contenu textuel du CV à analyser:
+{resume_text}
+{additional_context}
+
+Fournis une analyse approfondie et des suggestions d'amélioration concrètes pour ce CV.
+Ta réponse doit suivre le format JSON suivant:
+{{
+  "analysis": {{
+    "strengths": ["point fort 1", "point fort 2", ...],
+    "weaknesses": ["point faible 1", "point faible 2", ...],
+    "missing_elements": ["élément manquant 1", "élément manquant 2", ...],
+    "format_issues": ["problème de format 1", "problème de format 2", ...]
+  }},
+  "recommendations": {{
+    "content_improvements": [
+      {{
+        "section": "section du CV (ex: Expérience professionnelle, Formation, etc.)",
+        "current_content": "contenu actuel (résumé)",
+        "suggested_improvement": "suggestion d'amélioration détaillée",
+        "rationale": "justification de cette suggestion"
+      }},
+      ...
+    ],
+    "structure_improvements": [
+      {{
+        "recommendation": "recommandation spécifique",
+        "importance": "élevée/moyenne/faible",
+        "details": "détails de la recommandation"
+      }},
+      ...
+    ],
+    "keyword_optimization": ["mot-clé 1", "mot-clé 2", ...],
+    "ats_compatibility_tips": ["conseil 1", "conseil 2", ...] 
+  }},
+  "improved_summary": "Un résumé professionnel amélioré pour le début du CV"
+}}
+"""
+
+CV_TEMPLATES = {
+    "american": {
+        "sections": [
+            "PROFESSIONAL SUMMARY",
+            "SKILLS",
+            "EXPERIENCE",
+            "EDUCATION",
+            "CERTIFICATIONS"
+        ],
+        "format_guidelines": {
+            "length": "1-2 pages maximum",
+            "font": "Arial or Times New Roman, 10-12pt",
+            "bullet_points": "Start with action verbs, focus on achievements",
+            "sections_order": "Summary → Skills → Experience → Education",
+            "contact_info": "Name, phone, email, LinkedIn (optional: location)",
+            "design": "Clean and minimal, limited use of color"
+        }
+    },
+    "canadian": {
+        "sections": [
+            "PROFESSIONAL SUMMARY",
+            "SKILLS",
+            "EXPERIENCE",
+            "EDUCATION",
+            "VOLUNTEER EXPERIENCE",
+            "LANGUAGES"
+        ],
+        "format_guidelines": {
+            "length": "1-2 pages maximum",
+            "font": "Arial or Calibri, 11-12pt",
+            "bullet_points": "Focus on achievements and transferable skills",
+            "sections_order": "Summary → Skills → Experience → Education → Languages",
+            "contact_info": "Name, phone, email, LinkedIn, location (city, province)",
+            "design": "Clean, professional, minimal formatting"
+        }
+    },
+    "linkedin": {
+        "sections": [
+            "ABOUT",
+            "EXPERIENCE",
+            "EDUCATION",
+            "SKILLS",
+            "RECOMMENDATIONS",
+            "ACCOMPLISHMENTS"
+        ],
+        "format_guidelines": {
+            "length": "Concise sections, scannable format",
+            "headline": "Job title + value proposition (limited to 120 characters)",
+            "about": "First-person narrative, 3-5 paragraphs maximum",
+            "experience": "Focus on achievements with metrics, use 3-5 bullet points per role",
+            "skills": "List technical and soft skills (maximum 50)",
+            "profile_photo": "Professional headshot recommended",
+            "keywords": "Industry-specific keywords throughout profile"
+        }
+    }
+}
+
 def allowed_file(filename):
     """
     Vérifie si le fichier a une extension autorisée
@@ -171,10 +270,6 @@ def extract_contact_info(text):
             break
     
     return contact_info
-
-       
-        
-        
 
 def extract_candidate_skills_no_llm(resume_text):
     """
@@ -575,13 +670,13 @@ def extract_job_requirements_no_llm(job_text):
                          "Ruby", "Go", "React", "Angular", "Vue", "Node.js", "Django", 
                          "Flask", "Spring", "Express", "Laravel", "Ruby on Rails", 
                          "PostgreSQL", "MySQL", "MongoDB", "SQL Server", "Oracle", 
-                         "Flutter", "Dart", "Swift", "Kotlin"]
+                         "Flutter", "Dart", "Swift", "Kotlin", ".NET","HTML/CSS"]
     
     common_skills = ["API REST", "GraphQL", "Git", "Docker", "Kubernetes", "CI/CD", 
                     "AWS", "Azure", "GCP", "DevOps", "Agile", "Scrum", "TDD", 
                     "Machine Learning", "Deep Learning", "Data Science", "Big Data", 
                     "Cloud Computing", "Microservices", "Mobile Development",
-                    "UML", "RUP", "Tests unitaires", "UI/UX"]
+                    "UML", "RUP", "Tests unitaires", "UX/UI"]
     
     # Initialiser les collections pour les exigences
     tech_stacks = []
@@ -1344,3 +1439,860 @@ def generate_interview_questions_from_resume(resume_text, job_role, num_question
                    "error": f"Erreur lors de la génération des questions : {str(e)}"
                }
            ]
+
+
+def get_additional_context_for_improvement(improvement_target, job_description=None):
+    """
+    Génère le contexte additionnel à inclure dans le prompt d'amélioration basé sur la cible
+    
+    Args:
+        improvement_target (str): La cible d'amélioration ("job_offer", "american", "canadian", "linkedin")
+        job_description (str, optional): Description du poste si improvement_target est "job_offer"
+        
+    Returns:
+        str: Contexte additionnel pour le prompt
+    """
+    if improvement_target == "job_offer" and job_description:
+        return f"""
+        Voici l'offre d'emploi pour laquelle le CV doit être optimisé:
+        ```
+        {job_description}
+        ```
+        
+        Analyse la correspondance entre le CV et cette offre d'emploi.
+        Identifie les compétences et expériences qui manquent ou devraient être mises en avant.
+        Suggère des modifications pour augmenter les chances du candidat d'être retenu par les systèmes ATS 
+        (Applicant Tracking System) et les recruteurs.
+        """
+    
+    elif improvement_target == "american":
+        return """
+        Ce CV doit être adapté au style américain. Les CV américains:
+        - Mettent l'accent sur les résultats quantifiables et les accomplissements
+        - Utilisent des verbes d'action forts
+        - Sont concis (1-2 pages maximum)
+        - Sont orientés vers les compétences et l'expérience pertinentes pour le poste visé
+        - N'incluent généralement pas de photo, d'âge, de statut marital ou d'informations personnelles
+        - Commencent souvent par un résumé professionnel ou un objectif de carrière ciblé
+        - Utilisent le format antichronologique pour l'expérience professionnelle et la formation
+        """
+    
+    elif improvement_target == "canadian":
+        return """
+        Ce CV doit être adapté au style canadien. Les CV canadiens:
+        - Sont similaires aux CV américains, mais peuvent inclure plus d'informations personnelles
+        - Mettent l'accent sur les compétences transférables
+        - Incluent souvent une section sur les langues parlées (surtout pour les postes au Québec)
+        - Peuvent mentionner le statut d'immigration si pertinent
+        - Sont généralement limités à 2 pages maximum
+        - Préfèrent un ton formel et professionnel
+        - Peuvent inclure des expériences de bénévolat
+        """
+    
+    elif improvement_target == "linkedin":
+        return """
+        Ce CV doit être adapté au format LinkedIn. Un profil LinkedIn efficace:
+        - Utilise un titre/headline accrocheur qui combine poste actuel et proposition de valeur
+        - Commence par une section "À propos" rédigée à la première personne, conversationnelle mais professionnelle
+        - Quantifie les réalisations dans chaque expérience professionnelle
+        - Utilise des mots-clés pertinents pour le secteur et recherchés par les recruteurs
+        - Inclut des compétences que les connexions peuvent valider
+        - Limite chaque section à l'essentiel pour être facilement scannable
+        - Peut inclure des médias, articles, projets pour illustrer les réalisations
+        """
+    
+    else:
+        return """
+        Analyse ce CV et suggère des améliorations générales pour le rendre plus efficace et percutant.
+        Concentre-toi sur la structure, le contenu, les formulations et la présentation.
+        """
+
+def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
+    """
+    Version de secours pour améliorer un CV sans utiliser de LLM.
+    
+    Args:
+        resume_text (str): Le texte du CV
+        improvement_target (str): La cible d'amélioration ("job_offer", "american", "canadian", "linkedin")
+        job_description (str, optional): Description du poste si improvement_target est "job_offer"
+        
+    Returns:
+        dict: Analyse et suggestions d'amélioration
+    """
+    # Initialiser les collections pour l'analyse
+    strengths = []
+    weaknesses = []
+    missing_elements = []
+    format_issues = []
+    content_improvements = []
+    structure_improvements = []
+    keyword_optimization = []
+    ats_compatibility_tips = []
+    
+    # Analyse de base du CV
+    lines = resume_text.split('\n')
+    text_length = len(resume_text)
+    word_count = len(resume_text.split())
+    
+    # Détection des sections standard dans le CV
+    has_summary = any(re.search(r'(résumé|sommaire|profil|summary|about|à propos)', line, re.IGNORECASE) for line in lines[:15])
+    has_skills = any(re.search(r'(compétences|skills|expertise|technologies)', line, re.IGNORECASE) for line in lines)
+    has_experience = any(re.search(r'(expérience|experience|parcours|carrière)', line, re.IGNORECASE) for line in lines)
+    has_education = any(re.search(r'(formation|education|études|diplôme)', line, re.IGNORECASE) for line in lines)
+    has_languages = any(re.search(r'(langues|languages|language skills)', line, re.IGNORECASE) for line in lines)
+    has_certifications = any(re.search(r'(certifications|certificats|diplômes|qualifications)', line, re.IGNORECASE) for line in lines)
+    
+    # Recherche de verbes d'action
+    action_verbs = ["développé", "dirigé", "géré", "créé", "implémenté", "conçu", "coordonné", 
+                    "analyzed", "managed", "developed", "implemented", "coordinated", "created",
+                    "achieved", "improved", "increased", "decreased", "reduced"]
+    
+    action_verbs_count = sum(1 for verb in action_verbs if re.search(r'\b' + verb + r'\b', resume_text, re.IGNORECASE))
+    
+    # Recherche de quantifications
+    quantification_pattern = r'\b\d+%|\d+ [a-zA-Z]+|\$\d+|\d+ \$'
+    quantification_matches = re.findall(quantification_pattern, resume_text)
+    has_quantifications = len(quantification_matches) > 0
+        
+    # Évaluation basique de la structure du CV
+    if text_length < 1500:
+        format_issues.append("Le CV est trop court et manque probablement de détails importants")
+    elif text_length > 8000:
+        format_issues.append("Le CV est trop long et devrait être condensé pour plus d'impact")
+    
+    # Points forts identifiés
+    if has_summary:
+        strengths.append("Inclut un résumé professionnel/sommaire en début de CV")
+    else:
+        missing_elements.append("Résumé professionnel ou sommaire de compétences")
+    
+    if has_skills:
+        strengths.append("Présente une section dédiée aux compétences")
+    else:
+        missing_elements.append("Section de compétences techniques et/ou interpersonnelles")
+    
+    if has_experience:
+        strengths.append("Détaille l'expérience professionnelle")
+    else:
+        missing_elements.append("Expérience professionnelle détaillée")
+    
+    if has_education:
+        strengths.append("Inclut les informations sur la formation/éducation")
+    else:
+        missing_elements.append("Section sur la formation académique")
+    
+    experience_patterns = [
+        r'(\d+)[+\-]?\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
+        r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?',
+        r'(?:minimum|au moins)\s+(\d+)\s*an(?:s|née(?:s)?)?'
+    ]
+    
+    
+    
+    # Points faibles identifiés
+    if action_verbs_count < 5:
+        weaknesses.append("Utilisation insuffisante de verbes d'action percutants")
+        content_improvements.append({
+            "section": "Expérience professionnelle",
+            "current_content": "Descriptions de postes sans verbes d'action",
+            "suggested_improvement": "Commencer chaque point par un verbe d'action fort et percutant",
+            "rationale": "Les verbes d'action rendent le CV plus dynamique et mettent en valeur vos contributions"
+        })
+        keyword_optimization.extend(["développé", "dirigé", "géré", "implémenté", "optimisé"])
+    
+    if not has_quantifications:
+        weaknesses.append("Manque de résultats quantifiés et mesurables")
+        content_improvements.append({
+            "section": "Expérience professionnelle",
+            "current_content": "Descriptions de responsabilités sans mesures concrètes",
+            "suggested_improvement": "Ajouter des métriques et des pourcentages pour quantifier vos réalisations",
+            "rationale": "Les chiffres attirent l'attention et démontrent votre impact de façon concrète"
+        })
+    experience_years = []
+    try:
+        # Pattern 1: X ans d'expérience
+        pattern1 = r'(\d+)\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))'
+        for match in re.finditer(pattern1, resume_text.lower()):
+            try:
+                years = int(match.group(1))
+                experience_years.append(years)
+            except (IndexError, ValueError):
+                pass
+        
+        # Pattern 2: expérience de X ans
+        pattern2 = r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?'
+        for match in re.finditer(pattern2, resume_text.lower()):
+            try:
+                years = int(match.group(1))
+                experience_years.append(years)
+            except (IndexError, ValueError):
+                pass
+        
+        # Pattern 3: minimum X ans
+        pattern3 = r'(?:minimum|au moins)\s+(\d+)\s*an(?:s|née(?:s)?)?'
+        for match in re.finditer(pattern3, resume_text.lower()):
+            try:
+                years = int(match.group(1))
+                experience_years.append(years)
+            except (IndexError, ValueError):
+                pass
+    except Exception as e:
+        print(f"Erreur lors de l'extraction des années d'expérience: {str(e)}")
+    # Recommandations spécifiques selon la cible d'amélioration
+    if improvement_target == "job_offer" and job_description:
+        # Extraire les compétences requises du job_description
+        job_data = extract_job_requirements_no_llm(job_description)
+        required_skills = job_data.get("technical_skills", []) + job_data.get("tech_stacks", [])
+        required_soft_skills = job_data.get("soft_skills", [])
+        
+        # Extraire les compétences du candidat
+        resume_data = extract_candidate_skills_no_llm(resume_text)
+        candidate_skills = resume_data.get("technical_skills", [])
+        candidate_soft_skills = resume_data.get("soft_skills", [])
+        
+        # Identifier les compétences manquantes
+        missing_technical_skills = [skill for skill in required_skills if skill.lower() not in [s.lower() for s in candidate_skills]]
+        missing_soft_skills = [skill for skill in required_soft_skills if skill.lower() not in [s.lower() for s in candidate_soft_skills]]
+        
+        if missing_technical_skills:
+            weaknesses.append("Certaines compétences techniques requises ne sont pas mentionnées")
+            keyword_optimization.extend(missing_technical_skills)
+        
+        if missing_soft_skills:
+            weaknesses.append("Certaines compétences non-techniques requises ne sont pas mises en valeur")
+            keyword_optimization.extend(missing_soft_skills)
+        
+        # Conseils pour l'optimisation ATS
+        ats_compatibility_tips = [
+            "Inclure les mots-clés exacts de l'offre d'emploi dans votre CV",
+            "Utiliser à la fois la version complète et l'acronyme des technologies (ex: 'JavaScript (JS)')",
+            "Adapter le titre/poste recherché pour qu'il corresponde exactement au titre dans l'offre",
+            "Éviter les tableaux, en-têtes/pieds de page et formats complexes qui peuvent poser problème aux ATS",
+            "Utiliser un format de fichier standard comme .docx ou .pdf (texte sélectionnable)"
+        ]
+        
+        structure_improvements.append({
+            "recommendation": "Réorganiser le CV pour mettre en avant les compétences et expériences les plus pertinentes pour ce poste",
+            "importance": "élevée",
+            "details": "Placer les compétences et expériences correspondant le mieux à l'offre en début de section"
+        })
+    
+    elif improvement_target in ["american", "canadian", "linkedin"]:
+        template = CV_TEMPLATES.get(improvement_target, {})
+        expected_sections = template.get("sections", [])
+        format_guidelines = template.get("format_guidelines", {})
+        
+        # Vérifier les sections attendues pour ce format
+        for section in expected_sections:
+            section_pattern = "|".join([word.lower() for word in re.split(r'[_\s]', section)])
+            if not any(re.search(section_pattern, line, re.IGNORECASE) for line in lines):
+                missing_elements.append(f"Section '{section}'")
+        
+        # Conseils spécifiques au format
+        if improvement_target == "american":
+            if not has_quantifications:
+                structure_improvements.append({
+                    "recommendation": "Ajouter des résultats quantifiables à chaque expérience professionnelle",
+                    "importance": "élevée",
+                    "details": "Les CV américains mettent l'accent sur les résultats mesurables"
+                })
+            
+            if any(re.search(r'(âge|age|date de naissance|marié|marrié|photo)', resume_text, re.IGNORECASE)):
+                format_issues.append("Les informations personnelles comme l'âge, le statut marital ou les photos ne sont pas recommandées dans les CV américains")
+            
+        elif improvement_target == "canadian":
+            if not has_languages:
+                missing_elements.append("Section sur les langues parlées (important au Canada, surtout au Québec)")
+            
+            structure_improvements.append({
+                "recommendation": "Ajouter une section sur les langues maîtrisées",
+                "importance": "moyenne",
+                "details": "Préciser le niveau de maîtrise pour chaque langue (ex: Français - natif, Anglais - courant)"
+            })
+            
+        elif improvement_target == "linkedin":
+            structure_improvements.append({
+                "recommendation": "Rédiger la section 'À propos' à la première personne",
+                "importance": "élevée",
+                "details": "Sur LinkedIn, un ton plus conversationnel et personnel est apprécié"
+            })
+            
+            if not has_summary or not any(line.strip() and len(line.split()) > 20 for line in lines[:15]):
+                content_improvements.append({
+                    "section": "À propos / Summary",
+                    "current_content": "Résumé trop court ou inexistant",
+                    "suggested_improvement": "Rédiger un résumé percutant de 3-5 phrases à la première personne",
+                    "rationale": "La section 'À propos' est cruciale sur LinkedIn pour capter l'attention des recruteurs"
+                })
+    
+    # Créer un résumé professionnel amélioré générique
+    career_level = "professionnel expérimenté"
+    if len(resume_text) < 3000:
+        career_level = "jeune professionnel"
+    
+    # Extraire les compétences principales 
+    skills_data = extract_candidate_skills_no_llm(resume_text)
+    main_skills = skills_data.get("technical_skills", [])[:5]
+    soft_skills = skills_data.get("soft_skills", [])[:3]
+    
+    # Générer quelques réalisations génériques basées sur les compétences
+    achievements = []
+    for skill in main_skills[:2]:
+        achievements.append(f"expertise en {skill}")
+    
+    # Construire le résumé amélioré
+    skills_part = f"spécialisé en {', '.join(main_skills)}" if main_skills else "aux compétences diversifiées"
+    soft_part = f" et possédant d'excellentes aptitudes en {', '.join(soft_skills)}" if soft_skills else ""
+    achievements_part = f", avec une {' et une '.join(achievements)}" if achievements else ""
+    
+    improved_summary = f"{career_level} {skills_part}{soft_part}{achievements_part}. Orienté résultats et solutions, capable de relever des défis complexes et d'atteindre les objectifs fixés."
+    
+    # Assembler le résultat
+    return {
+        "analysis": {
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "missing_elements": missing_elements,
+            "format_issues": format_issues
+        },
+        "recommendations": {
+            "content_improvements": content_improvements,
+            "structure_improvements": structure_improvements,
+            "keyword_optimization": keyword_optimization,
+            "ats_compatibility_tips": ats_compatibility_tips
+        },
+        "improved_summary": improved_summary,
+        "_generated_by": "fallback_method"  # Marqueur pour indiquer la méthode de secours
+    }
+
+def format_cv_content_no_llm(resume_text, improvement_target, job_description=None, cv_analysis=None):
+    """
+    Reformate le contenu d'un CV sans utiliser de LLM
+    
+    Args:
+        resume_text (str): Le texte du CV
+        improvement_target (str): La cible d'amélioration
+        job_description (str, optional): Description du poste
+        cv_analysis (dict, optional): Analyse précédente du CV
+        
+    Returns:
+        str: Contenu du CV reformaté
+    """
+    # Utiliser l'analyse si fournie, sinon en générer une nouvelle
+    if not cv_analysis:
+        cv_analysis = improve_cv_no_llm(resume_text, improvement_target, job_description)
+    
+    # Extraire les informations clés du CV original
+    lines = resume_text.split('\n')
+    
+    # Extraire les informations de contact
+    contact_info = extract_contact_info(resume_text)
+    
+    # Extraire les compétences et expériences
+    skills_data = extract_candidate_skills_no_llm(resume_text)
+    
+    # Sélectionner le modèle approprié
+    template = CV_TEMPLATES.get(improvement_target, CV_TEMPLATES.get("american"))
+    
+    # Créer la structure du nouveau CV
+    formatted_cv = []
+    
+    # En-tête avec informations de contact
+    name_line = next((line for line in lines[:5] if len(line.strip()) > 0 and len(line.strip()) < 50), "")
+    if name_line:
+        formatted_cv.append(name_line.strip().upper())
+        formatted_cv.append("")
+    
+    contact_line = []
+    if contact_info.get('email'):
+        contact_line.append(contact_info['email'])
+    if contact_info.get('phone'):
+        contact_line.append(contact_info['phone'])
+    if contact_info.get('linkedin'):
+        contact_line.append(contact_info['linkedin'])
+    
+    if contact_line:
+        formatted_cv.append(" | ".join(contact_line))
+        formatted_cv.append("")
+    
+    # Résumé professionnel
+    improved_summary = cv_analysis.get('improved_summary', '')
+    if improved_summary:
+        formatted_cv.append(template['sections'][0])  # Premier section (PROFESSIONAL SUMMARY/ABOUT)
+        formatted_cv.append("------------------------------")
+        formatted_cv.append(improved_summary)
+        formatted_cv.append("")
+    
+    # Compétences
+    if 'SKILLS' in template['sections'] or 'COMPÉTENCES' in template['sections']:
+        section_title = 'SKILLS' if improvement_target in ['american', 'linkedin'] else 'COMPÉTENCES'
+        formatted_cv.append(section_title)
+        formatted_cv.append("------------------------------")
+        
+        # Ajouter les compétences techniques
+        technical_skills = skills_data.get('technical_skills', [])
+        if technical_skills:
+            if improvement_target == 'linkedin':
+                # Format LinkedIn: liste de compétences
+                formatted_cv.append("Technical: " + ", ".join(technical_skills))
+            else:
+                # Format standard: sections
+                formatted_cv.append("Technical Skills:")
+                skills_chunks = [technical_skills[i:i+5] for i in range(0, len(technical_skills), 5)]
+                for chunk in skills_chunks:
+                    formatted_cv.append("• " + ", ".join(chunk))
+        
+        # Ajouter les soft skills
+        soft_skills = skills_data.get('soft_skills', [])
+        if soft_skills:
+            if improvement_target == 'linkedin':
+                formatted_cv.append("Soft Skills: " + ", ".join(soft_skills))
+            else:
+                formatted_cv.append("Soft Skills:")
+                formatted_cv.append("• " + ", ".join(soft_skills))
+        
+        formatted_cv.append("")
+    
+    # Expérience professionnelle
+    if 'EXPERIENCE' in template['sections'] or 'EXPÉRIENCE PROFESSIONNELLE' in template['sections']:
+        section_title = 'EXPERIENCE' if improvement_target in ['american', 'linkedin'] else 'EXPÉRIENCE PROFESSIONNELLE'
+        formatted_cv.append(section_title)
+        formatted_cv.append("------------------------------")
+        
+        # Ajouter les expériences
+        experiences = skills_data.get('relevant_experience', [])
+        if experiences:
+            for exp in experiences:
+                position = exp.get('position', '')
+                company = exp.get('company', '')
+                duration = exp.get('duration', '')
+                
+                # Titre du poste et entreprise
+                if position and company:
+                    if improvement_target == 'linkedin':
+                        formatted_cv.append(f"{position}")
+                        formatted_cv.append(f"{company} | {duration}")
+                    else:
+                        formatted_cv.append(f"{position}, {company} ({duration})")
+                
+                # Points clés de l'expérience
+                highlights = exp.get('highlights', [])
+                for highlight in highlights:
+                    # Améliorer les points avec des verbes d'action
+                    first_word = highlight.strip().split(' ')[0].lower()
+                    action_verbs = ["développé", "dirigé", "géré", "créé", "implémenté", "conçu", "coordonné"]
+                    
+                    if first_word not in [verb.lower() for verb in action_verbs]:
+                        # Ajouter un verbe d'action si aucun n'est présent
+                        import random
+                        verb = random.choice(action_verbs)
+                        highlight = f"{verb} {highlight[0].lower()}{highlight[1:]}"
+                    
+                    formatted_cv.append(f"• {highlight}")
+                
+                formatted_cv.append("")
+        else:
+            # Expérience générique si aucune n'est détectée
+            formatted_cv.append("[Insérez vos expériences ici en suivant ce format:]")
+            formatted_cv.append("Titre du poste, Entreprise (Durée)")
+            formatted_cv.append("• Réalisation importante avec résultats quantifiables")
+            formatted_cv.append("• Deuxième accomplissement majeur")
+            formatted_cv.append("")
+    
+    # Formation
+    if 'EDUCATION' in template['sections'] or 'FORMATION' in template['sections']:
+        section_title = 'EDUCATION' if improvement_target in ['american', 'linkedin'] else 'FORMATION'
+        formatted_cv.append(section_title)
+        formatted_cv.append("------------------------------")
+        
+        # Ajouter la formation
+        education = skills_data.get('education', [])
+        if education:
+            for edu in education:
+                degree = edu.get('degree', '')
+                institution = edu.get('institution', '')
+                year = edu.get('year', '')
+                
+                if degree and institution:
+                    formatted_cv.append(f"{degree}, {institution} ({year})")
+                    formatted_cv.append("")
+        else:
+            # Formation générique si aucune n'est détectée
+            formatted_cv.append("[Insérez votre formation ici en suivant ce format:]")
+            formatted_cv.append("Diplôme, Institution (Année)")
+            formatted_cv.append("")
+    
+    # Sections spécifiques selon le format
+    if improvement_target == 'canadian' and 'LANGUAGES' in template['sections']:
+        formatted_cv.append("LANGUAGES")
+        formatted_cv.append("------------------------------")
+        formatted_cv.append("[Insérez vos langues et niveaux ici]")
+        formatted_cv.append("")
+    
+    if 'CERTIFICATIONS' in template['sections']:
+        formatted_cv.append("CERTIFICATIONS")
+        formatted_cv.append("------------------------------")
+        formatted_cv.append("[Insérez vos certifications ici]")
+        formatted_cv.append("")
+    
+    # Conseils d'optimisation ATS
+    if improvement_target == 'job_offer':
+        formatted_cv.append("")
+        formatted_cv.append("NOTES SUR L'OPTIMISATION ATS (à retirer avant utilisation)")
+        formatted_cv.append("------------------------------")
+        for tip in cv_analysis.get('recommendations', {}).get('ats_compatibility_tips', []):
+            formatted_cv.append(f"• {tip}")
+    
+    return "\n".join(formatted_cv)
+
+def generate_improved_cv_document(resume_text, formatted_content, output_format="docx"):
+    """
+    Génère un document CV amélioré dans le format spécifié
+    
+    Args:
+        resume_text (str): Le texte original du CV (pour référence)
+        formatted_content (str): Le contenu reformaté du CV
+        output_format (str): Format de sortie ("docx", "pdf", "txt")
+        
+    Returns:
+        tuple: (bytes_io, filename) le document généré et son nom
+    """
+    filename = f"CV_Amélioré_{datetime.now().strftime('%Y%m%d')}"
+    
+    if output_format == "txt":
+        # Fichier texte simple
+        bytes_io = io.BytesIO()
+        bytes_io.write(formatted_content.encode('utf-8'))
+        bytes_io.seek(0)
+        return bytes_io, f"{filename}.txt"
+    
+    elif output_format == "docx":
+        # Générer un document DOCX
+        try:
+            import docx
+            from docx.shared import Pt, RGBColor
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            
+            doc = docx.Document()
+            
+            # Style de document
+            styles = doc.styles
+            
+            # Parcourir le contenu formaté et l'ajouter au document
+            for line in formatted_content.split('\n'):
+                if line.strip() and all(c.isupper() for c in line.strip() if c.isalpha()):
+                    # Titre de section
+                    p = doc.add_paragraph()
+                    run = p.add_run(line.strip())
+                    run.bold = True
+                    run.font.size = Pt(14)
+                elif line.strip() and line.startswith('-----'):
+                    # Ligne de séparation
+                    p = doc.add_paragraph()
+                elif line.strip() and line.startswith('•'):
+                    # Élément de liste
+                    p = doc.add_paragraph()
+                    p.add_run(line.strip())
+                    p.paragraph_format.left_indent = Pt(12)
+                elif line.strip():
+                    # Texte normal
+                    p = doc.add_paragraph()
+                    p.add_run(line.strip())
+                else:
+                    # Ligne vide
+                    doc.add_paragraph()
+            
+            # Sauvegarder le document
+            bytes_io = io.BytesIO()
+            doc.save(bytes_io)
+            bytes_io.seek(0)
+            return bytes_io, f"{filename}.docx"
+            
+        except ImportError:
+            # Fallback en cas d'absence de python-docx
+            bytes_io = io.BytesIO()
+            bytes_io.write(formatted_content.encode('utf-8'))
+            bytes_io.seek(0)
+            return bytes_io, f"{filename}.txt"
+    
+    elif output_format == "pdf":
+        # Générer un PDF
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.enums import TA_LEFT, TA_CENTER
+            
+            bytes_io = io.BytesIO()
+            doc = SimpleDocTemplate(bytes_io, pagesize=letter)
+            styles = getSampleStyleSheet()
+            
+            heading_style = styles['Heading2']
+            normal_style = styles['Normal']
+            
+            # Liste des éléments à ajouter au document
+            elements = []
+            
+            # Parcourir le contenu formaté et l'ajouter au document
+            for line in formatted_content.split('\n'):
+                if line.strip() and all(c.isupper() for c in line.strip() if c.isalpha()):
+                    # Titre de section
+                    elements.append(Paragraph(line.strip(), heading_style))
+                elif line.strip() and line.startswith('-----'):
+                    # Ligne de séparation
+                    elements.append(Spacer(1, 2))
+                elif line.strip() and line.startswith('•'):
+                    # Élément de liste - utiliser le style Normal avec indentation
+                    para = Paragraph(line.strip(), normal_style)
+                    para.leftIndent = 20
+                    elements.append(para)
+                elif line.strip():
+                    # Texte normal
+                    elements.append(Paragraph(line.strip(), normal_style))
+                else:
+                    # Ligne vide
+                    elements.append(Spacer(1, 12))
+            
+            # Générer le PDF
+            doc.build(elements)
+            bytes_io.seek(0)
+            return bytes_io, f"{filename}.pdf"
+            
+        except ImportError:
+            # Fallback en cas d'absence de reportlab
+            bytes_io = io.BytesIO()
+            bytes_io.write(formatted_content.encode('utf-8'))
+            bytes_io.seek(0)
+            return bytes_io, f"{filename}.txt"
+    
+    else:
+        # Format par défaut - txt
+        bytes_io = io.BytesIO()
+        bytes_io.write(formatted_content.encode('utf-8'))
+        bytes_io.seek(0)
+        return bytes_io, f"{filename}.txt"
+
+def improve_cv(file, improvement_target, job_description=None, output_format="docx"):
+    """
+    Analyse un CV et génère une version améliorée selon la cible spécifiée
+    
+    Args:
+        file: Le fichier CV téléchargé
+        improvement_target (str): La cible d'amélioration ("job_offer", "american", "canadian", "linkedin")
+        job_description (str, optional): Description du poste si improvement_target est "job_offer"
+        output_format (str): Format du document de sortie ("docx", "pdf", "txt")
+        
+    Returns:
+        dict: Résultat contenant l'analyse, les recommandations et le lien vers le document amélioré
+    """
+    try:
+        # Vérifier si le fichier est valide
+        if not file or not allowed_file(file.filename):
+            return {
+                "error": "Format de fichier non pris en charge. Veuillez télécharger un fichier PDF, DOCX ou TXT."
+            }
+        
+        # Extraire le texte du CV
+        resume_text = extract_text_from_file(file)
+        
+        # Prétraiter le texte
+        processed_text = preprocess_resume_text(resume_text)
+        
+        # Vérifier la cible d'amélioration
+        valid_targets = ["job_offer", "american", "canadian", "linkedin", "general"]
+        if improvement_target not in valid_targets:
+            improvement_target = "general"
+        
+        # Obtenir le contexte supplémentaire pour le prompt
+        additional_context = get_additional_context_for_improvement(
+            improvement_target, 
+            job_description
+        )
+        
+        # Tenter d'analyser le CV avec le LLM
+        try:
+            prompt = CV_IMPROVEMENT_PROMPT.format(
+                improvement_target=improvement_target,
+                resume_text=processed_text[:7000],  # Limiter la taille pour éviter de dépasser le contexte du LLM
+                additional_context=additional_context
+            )
+            
+            llm_response = get_llm_response(prompt)
+            
+            try:
+                # Tenter de parser la réponse JSON
+                analysis = json.loads(llm_response)
+                
+                # Ajouter des métadonnées
+                analysis['metadata'] = {
+                    'filename': secure_filename(file.filename),
+                    'analysis_timestamp': datetime.now().isoformat(),
+                    'improvement_target': improvement_target,
+                    'analysis_method': 'llm'
+                }
+                
+                # Utiliser le LLM pour reformater le contenu du CV
+                format_prompt = f"""
+                En te basant sur l'analyse suivante d'un CV:
+                ```
+                {json.dumps(analysis, ensure_ascii=False)}
+                ```
+                
+                Et sur le contenu original du CV:
+                ```
+                {processed_text[:5000]}
+                ```
+                
+                Reformate complètement ce CV pour le standard {improvement_target}.
+                {"Optimise-le pour l'offre d'emploi suivante: " + job_description if improvement_target == "job_offer" and job_description else ""}
+                
+                Inclus toutes les sections pertinentes et restructure le contenu pour maximiser l'impact selon les recommandations.
+                Retourne uniquement le contenu formaté du CV, sans explications ni commentaires supplémentaires.
+                """
+                
+                try:
+                    formatted_content = get_llm_response(format_prompt)
+                    
+                    # Générer le document CV amélioré
+                    document_io, filename = generate_improved_cv_document(
+                        processed_text, 
+                        formatted_content, 
+                        output_format
+                    )
+                    
+                    # Ajouter le contenu formaté à l'analyse
+                    analysis['formatted_content'] = formatted_content
+                    analysis['output_document'] = {
+                        'filename': filename,
+                        'format': output_format
+                    }
+                    
+                    # Retourner le résultat
+                    return {
+                        'analysis': analysis,
+                        'document': (document_io, filename)
+                    }
+                    
+                except Exception as format_error:
+                    # En cas d'erreur avec le formatage LLM, utiliser la méthode de secours
+                    print(f"Erreur de formatage LLM: {str(format_error)}, utilisation de la méthode de secours")
+                    formatted_content = format_cv_content_no_llm(
+                        processed_text, 
+                        improvement_target, 
+                        job_description, 
+                        analysis
+                    )
+                    
+                    # Générer le document CV amélioré
+                    document_io, filename = generate_improved_cv_document(
+                        processed_text, 
+                        formatted_content, 
+                        output_format
+                    )
+                    
+                    # Ajouter le contenu formaté à l'analyse
+                    analysis['formatted_content'] = formatted_content
+                    analysis['output_document'] = {
+                        'filename': filename,
+                        'format': output_format
+                    }
+                    analysis['metadata']['formatting_method'] = 'fallback'
+                    
+                    # Retourner le résultat
+                    return {
+                        'analysis': analysis,
+                        'document': (document_io, filename)
+                    }
+                
+            except json.JSONDecodeError:
+                # Si la réponse n'est pas au format JSON valide, utiliser la méthode de secours
+                print(f"Erreur de décodage JSON dans la réponse LLM, utilisation de la méthode de secours")
+                fallback_analysis = improve_cv_no_llm(processed_text, improvement_target, job_description)
+                
+                # Ajouter des métadonnées
+                fallback_analysis['metadata'] = {
+                    'filename': secure_filename(file.filename),
+                    'analysis_timestamp': datetime.now().isoformat(),
+                    'improvement_target': improvement_target,
+                    'analysis_method': 'fallback',
+                    'error': 'JSON invalide dans la réponse LLM'
+                }
+                
+                # Formater le contenu
+                formatted_content = format_cv_content_no_llm(
+                    processed_text, 
+                    improvement_target, 
+                    job_description, 
+                    fallback_analysis
+                )
+                
+                # Générer le document CV amélioré
+                document_io, filename = generate_improved_cv_document(
+                    processed_text, 
+                    formatted_content, 
+                    output_format
+                )
+                
+                # Ajouter le contenu formaté à l'analyse
+                fallback_analysis['formatted_content'] = formatted_content
+                fallback_analysis['output_document'] = {
+                    'filename': filename,
+                    'format': output_format
+                }
+                
+                # Retourner le résultat
+                return {
+                    'analysis': fallback_analysis,
+                    'document': (document_io, filename)
+                }
+                
+        except Exception as llm_error:
+            # En cas d'erreur avec le LLM, utiliser la méthode de secours
+            print(f"Erreur LLM: {str(llm_error)}, utilisation de la méthode de secours")
+            fallback_analysis = improve_cv_no_llm(processed_text, improvement_target, job_description)
+            
+            # Ajouter des métadonnées
+            fallback_analysis['metadata'] = {
+                'filename': secure_filename(file.filename),
+                'analysis_timestamp': datetime.now().isoformat(),
+                'improvement_target': improvement_target,
+                'analysis_method': 'fallback',
+                'error': f'Erreur LLM: {str(llm_error)}'
+            }
+            
+            # Formater le contenu
+            formatted_content = format_cv_content_no_llm(
+                processed_text, 
+                improvement_target, 
+                job_description, 
+                fallback_analysis
+            )
+            
+            # Générer le document CV amélioré
+            document_io, filename = generate_improved_cv_document(
+                processed_text, 
+                formatted_content, 
+                output_format
+            )
+            
+            # Ajouter le contenu formaté à l'analyse
+            fallback_analysis['formatted_content'] = formatted_content
+            fallback_analysis['output_document'] = {
+                'filename': filename,
+                'format': output_format
+            }
+            
+            # Retourner le résultat
+            return {
+                'analysis': fallback_analysis,
+                'document': (document_io, filename)
+            }
+            
+    except Exception as e:
+        # Capturer toute autre erreur
+        return {
+            "error": f"Erreur lors de l'amélioration du CV: {str(e)}",
+            "analysis_method": "failed"
+        }
+    
+    
