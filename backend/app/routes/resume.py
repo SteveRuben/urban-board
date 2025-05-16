@@ -216,9 +216,13 @@ def improve_cv_api():
         
         # Récupérer le format de sortie souhaité
         output_format = request.form.get('output_format', 'pdf')
+        if output_format not in ['pdf', 'docx', 'txt']:
+            output_format = 'pdf'  # Valeur par défaut si format invalide
         
-        # Vérifier si un fichier de description de poste a été téléchargé
+        # Vérifier les sources de description de poste (fichier ou texte)
         job_description = None
+        
+        # Priorité au fichier de description de poste
         if 'job_description' in request.files:
             job_description_file = request.files['job_description']
             
@@ -226,7 +230,6 @@ def improve_cv_api():
                 # Extraire le texte du fichier de description de poste
                 try:
                     job_description_file.seek(0)  # Réinitialiser le curseur au début du fichier
-                    # Vérifier l'extension du fichier
                     if job_description_file.filename.endswith('.txt'):
                         job_description = job_description_file.read().decode('utf-8')
                     else:
@@ -235,6 +238,43 @@ def improve_cv_api():
                 except Exception as e:
                     current_app.logger.error(f"Erreur lors de la lecture du fichier de description de poste: {str(e)}")
                     return jsonify({"error": f"Erreur lors de la lecture du fichier de description de poste: {str(e)}"}), 400
+        
+        # Vérifier si une description de poste a été fournie sous forme de texte
+        elif 'job_description_text' in request.form and request.form.get('job_description_text').strip():
+            job_description = request.form.get('job_description_text').strip()
+        
+        # Pré-extraction des années d'expérience pour journalisation (optionnel)
+        experience_years = 0
+        try:
+            # Extraction préliminaire pour le logging
+            from ..services.resume_analyzer import extract_text_from_file, preprocess_resume_text
+            import re
+            
+            resume_file.seek(0)
+            resume_text = extract_text_from_file(resume_file)
+            processed_text = preprocess_resume_text(resume_text)
+            
+            # Patterns pour les années d'expérience en français et anglais
+            experience_patterns = [
+                r'(\d+)[+\-]?\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
+                r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?',
+                r'(\d+)[+\-]?\s*(?:year(?:s)?\s+(?:of\s+)?experience)',
+                r'experience\s+(?:of|:)?\s*(\d+)[+\-]?\s*year(?:s)?'
+            ]
+            
+            for pattern in experience_patterns:
+                matches = re.findall(pattern, processed_text.lower())
+                if matches:
+                    try:
+                        experience_years = max(experience_years, int(matches[0]))
+                    except (ValueError, TypeError, IndexError):
+                        continue
+            
+            resume_file.seek(0)  # Réinitialiser le curseur pour l'appel principal
+            current_app.logger.info(f"Années d'expérience détectées dans le CV: {experience_years}")
+        except Exception as exp_error:
+            current_app.logger.warning(f"Erreur lors de la pré-extraction des années d'expérience: {str(exp_error)}")
+            # Non bloquant, on continue
         
         # Améliorer le CV avec gestion d'erreurs robuste
         from ..services.resume_analyzer import improve_cv
@@ -280,17 +320,26 @@ def improve_cv_api():
             return jsonify({"error": "Impossible de créer le fichier amélioré"}), 500
             
         # Créer l'URL de téléchargement
-        # Utilisez juste le file_id et filename sans le chemin complet
         download_url = f"/api/resumes/download-improved-cv/{file_id}/{secure_name}"
         
-        return jsonify({
+        # Construire la réponse avec les années d'expérience
+        experience_years = result.get('experience_years', 0)
+        response_data = {
             "analysis": result['analysis'],
-            "download_url": download_url
-        })
+            "download_url": download_url,
+            "experience_years": experience_years
+        }
+        
+        # Ajouter un message explicatif si des années d'expérience ont été trouvées
+        if experience_years > 0:
+            response_data["experience_message"] = f"Le CV indique {experience_years} ans d'expérience professionnelle."
+        
+        return jsonify(response_data)
     except Exception as e:
         current_app.logger.error(f"Erreur générale dans improve_cv_api: {str(e)}")
         current_app.logger.error(traceback.format_exc())
         return jsonify({"error": f"Une erreur s'est produite lors du traitement de votre demande: {str(e)}"}), 500
+
 
 @resume_bp.route('/download-improved-cv/<file_id>/<filename>', methods=['GET'])
 def download_improved_cv(file_id, filename):
@@ -308,9 +357,21 @@ def download_improved_cv(file_id, filename):
         # Vérifier si le fichier existe
         file_path = os.path.join(output_dir, f"{file_id}_{filename}")
         if not os.path.exists(file_path):
+            current_app.logger.error(f"Fichier non trouvé: {file_path}")
             return jsonify({"error": "Fichier non trouvé"}), 404
         
-        return send_from_directory(output_dir, f"{file_id}_{filename}", as_attachment=True)
+        # Déterminer le type MIME basé sur l'extension
+        mime_type = None
+        if filename.endswith('.pdf'):
+            mime_type = 'application/pdf'
+        elif filename.endswith('.docx'):
+            mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        elif filename.endswith('.txt'):
+            mime_type = 'text/plain'
+        
+        return send_from_directory(output_dir, f"{file_id}_{filename}", 
+                                  as_attachment=True, 
+                                  mimetype=mime_type)
     except Exception as e:
         current_app.logger.error(f"Erreur lors du téléchargement du CV: {str(e)}")
         return jsonify({"error": f"Erreur lors du téléchargement du CV: {str(e)}"}), 500

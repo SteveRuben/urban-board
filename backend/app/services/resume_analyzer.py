@@ -271,6 +271,304 @@ def extract_contact_info(text):
     
     return contact_info
 
+def extract_experience_years(resume_text):
+    """
+    Extrait les années d'expérience professionnelle d'un CV avec une meilleure précision
+    
+    Args:
+        resume_text (str): Le texte du CV
+        
+    Returns:
+        float: Années d'expérience (avec décimales pour les mois)
+    """
+    import re
+    from datetime import datetime
+    import calendar
+    
+    experience_years = []
+    total_experience = 0
+    
+    # 1. Recherche d'une mention explicite des années d'expérience
+    experience_patterns = [
+        # Français
+        r'(\d+)[+\-]?\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
+        r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?',
+        r'(?:minimum|au moins)\s+(\d+)\s*an(?:s|née(?:s)?)?',
+        r'depuis\s+(\d{4})',
+        # Anglais
+        r'(\d+)[+\-]?\s*(?:year(?:s)?\s+(?:of\s+)?experience)',
+        r'experience\s+(?:of|:)?\s*(\d+)[+\-]?\s*year(?:s)?',
+        r'(?:minimum|at least)\s+(\d+)\s*year(?:s)?',
+        r'since\s+(\d{4})'
+    ]
+    
+    for pattern in experience_patterns:
+        matches = re.finditer(pattern, resume_text.lower())
+        for match in matches:
+            try:
+                if pattern == r'depuis\s+(\d{4})' or pattern == r'since\s+(\d{4})':
+                    # Calculer les années depuis l'année mentionnée
+                    year = int(match.group(1))
+                    current_year = datetime.now().year
+                    experience_years.append(current_year - year)
+                else:
+                    # Extraction directe du nombre d'années
+                    years = int(match.group(1))
+                    experience_years.append(years)
+            except (IndexError, ValueError) as e:
+                print(f"Erreur lors de l'extraction des années d'expérience: {str(e)}")
+                continue
+    
+    # 2. Identifier les emplois et leurs durées 
+    job_entries = []
+    
+    # A. Détection des dates avec format mois-année à mois-année
+    month_year_pattern = r'((?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4})\s*(?:[-–]\s*|\s+(?:à|au|to|until|jusqu\'(?:à|au))\s+)((?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4}|(?:aujourd\'hui|present|actuel|maintenant|current|now|today|présent))'
+    
+    month_year_matches = re.finditer(month_year_pattern, resume_text.lower())
+    for match in month_year_matches:
+        job_entries.append((match.group(1), match.group(2)))
+    
+    # B. Détection des dates avec jours précis (pour les stages courts)
+    day_month_year_pattern = r'(\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4})\s*(?:[-–]\s*|\s+(?:à|au|to|until|jusqu\'(?:à|au))\s+)(\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+\d{4})'
+    
+    day_month_year_matches = re.finditer(day_month_year_pattern, resume_text.lower())
+    for match in day_month_year_matches:
+        job_entries.append((match.group(1), match.group(2)))
+    
+    # C. Format "Mois-Mois YYYY" (ex: "Août-septembre 2023")
+    month_to_month_pattern = r'((?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?)[- ](?:à|au|to|until|jusqu\'(?:à|au))?\s*((?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?)\s+(\d{4})'
+    
+    month_to_month_matches = re.finditer(month_to_month_pattern, resume_text.lower())
+    for match in month_to_month_matches:
+        # Convertir les mois en nombres pour calculer la durée
+        months_fr = {'janvier': 1, 'février': 2, 'mars': 3, 'avril': 4, 'mai': 5, 'juin': 6, 
+                    'juillet': 7, 'août': 8, 'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12,
+                    'jan': 1, 'fév': 2, 'mar': 3, 'avr': 4, 'mai': 5, 'juin': 6, 
+                    'juil': 7, 'août': 8, 'sept': 9, 'oct': 10, 'nov': 11, 'déc': 12}
+        
+        months_en = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6, 
+                    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+                    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 
+                    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
+        
+        all_months = {**months_fr, **months_en}
+        
+        start_month = match.group(1).lower()
+        end_month = match.group(2).lower()
+        year = int(match.group(3))
+        
+        # Obtenir le numéro du mois
+        start_month_num = None
+        for m in all_months:
+            if m in start_month:
+                start_month_num = all_months[m]
+                break
+        
+        end_month_num = None
+        for m in all_months:
+            if m in end_month:
+                end_month_num = all_months[m]
+                break
+        
+        if start_month_num and end_month_num:
+            start_date = f"{start_month_num}/01/{year}"
+            end_date = f"{end_month_num}/28/{year}"
+            job_entries.append((start_date, end_date))
+    
+    # D. Années (YYYY-YYYY) - mais uniquement pour les expériences professionnelles
+    year_to_year_pattern = r'(\d{4})\s*[àa\-]\s*(20\d{2}|aujourd\'hui|present|actuel|maintenant|current|now|today|présent)'
+    
+    year_matches = re.finditer(year_to_year_pattern, resume_text.lower())
+    for match in year_matches:
+        # Ignorer les correspondances qui semblent être des périodes d'éducation
+        context_before = resume_text[max(0, match.start() - 50):match.start()].lower()
+        if any(edu_term in context_before for edu_term in ['formation', 'education', 'études', 'diplôme', 'baccalauréat', 'licence', 'master', 'dut']):
+            continue
+            
+        job_entries.append((match.group(1), match.group(2)))
+    
+    # 3. Calculer la durée en mois pour chaque entrée, puis convertir en années
+    from datetime import datetime
+    
+    for start, end in job_entries:
+        try:
+            # Vérifier si l'entrée contient des mots indiquant un stage
+            is_internship = False
+            job_context = ""
+            
+            # Extraire le contexte autour de cette entrée pour déterminer s'il s'agit d'un stage
+            try:
+                start_pos = resume_text.lower().find(str(start).lower())
+                end_pos = resume_text.lower().find(str(end).lower())
+                if start_pos >= 0 and end_pos >= 0:
+                    job_context = resume_text[max(0, start_pos - 100):min(len(resume_text), end_pos + 100)]
+            except:
+                # Si on ne peut pas trouver le contexte, on continue avec une valeur par défaut
+                pass
+            
+            if re.search(r'stage|stagiaire|intern|internship', job_context.lower()):
+                is_internship = True
+                
+            # A. Format année-année
+            if re.match(r'\d{4}$', str(start)) and (re.match(r'\d{4}$', str(end)) or end.lower() in ['aujourd\'hui', 'present', 'actuel', 'maintenant', 'current', 'now', 'today', 'présent']):
+                start_year = int(start)
+                if re.match(r'\d{4}$', str(end)):
+                    end_year = int(end)
+                else:
+                    end_year = datetime.now().year
+                
+                # Vérifier la cohérence des années
+                if 1950 <= start_year <= datetime.now().year and start_year <= end_year:
+                    # Convertir en mois (approximation)
+                    months = (end_year - start_year) * 12
+                    
+                    # Si c'est un stage, limiter la durée maximum à 6 mois sauf indication contraire
+                    if is_internship and months > 6:
+                        months = 6
+                        
+                    experience_years.append(months / 12)
+            
+            # B. Formats de date plus précis
+            else:
+                try:
+                    # Essayer différents formats de date
+                    date_formats = [
+                        '%m/%d/%Y',  # MM/DD/YYYY
+                        '%d/%m/%Y',  # DD/MM/YYYY
+                        '%B %Y',     # Month YYYY
+                        '%b %Y',     # Mon YYYY
+                        '%d %B %Y',  # DD Month YYYY
+                        '%d %b %Y'   # DD Mon YYYY
+                    ]
+                    
+                    start_date = None
+                    end_date = None
+                    
+                    # Traiter le début
+                    for fmt in date_formats:
+                        try:
+                            start_date = datetime.strptime(str(start), fmt)
+                            break
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    # Traiter la fin
+                    if isinstance(end, str) and end.lower() in ['aujourd\'hui', 'present', 'actuel', 'maintenant', 'current', 'now', 'today', 'présent']:
+                        end_date = datetime.now()
+                    else:
+                        for fmt in date_formats:
+                            try:
+                                end_date = datetime.strptime(str(end), fmt)
+                                break
+                            except (ValueError, TypeError):
+                                continue
+                    
+                    if start_date and end_date:
+                        # Calculer la différence en mois
+                        months = ((end_date.year - start_date.year) * 12) + (end_date.month - start_date.month)
+                        
+                        # Ajouter les jours proportionnellement
+                        if end_date.day > start_date.day:
+                            months += (end_date.day - start_date.day) / 30
+                        
+                        # Si c'est un stage, vérifier la durée typique
+                        if is_internship and months > 6:
+                            months = 6
+                            
+                        experience_years.append(months / 12)
+                except Exception as e:
+                    print(f"Erreur lors du calcul de la durée: {str(e)}")
+        except Exception as e:
+            print(f"Erreur lors du traitement de l'entrée {start}-{end}: {str(e)}")
+    
+    # 4. Calculer l'expérience totale
+    total_experience = sum(experience_years) if experience_years else 0
+    
+    # 5. Vérifier s'il s'agit d'un profil junior/étudiant
+    is_junior = re.search(r'stage|stagiaire|intern|internship|junior|entry[- ]level|débutant|étudiant', resume_text.lower()) is not None
+    
+    # 6. Détection de l'âge pour vérification de cohérence
+    age = None
+    
+    # Recherche directe de l'âge
+    age_pattern = r'(?:âge|age)\s*:?\s*(\d{1,2})|(\d{1,2})\s*(?:ans|years)'
+    age_match = re.search(age_pattern, resume_text.lower())
+    if age_match:
+        age_group = age_match.group(1) or age_match.group(2)
+        if age_group:
+            age = int(age_group)
+    
+    # Recherche par date de naissance
+    birth_year = None
+    
+    # Format JJ/MM/AAAA
+    birth_date_pattern = r'(?:né\(e\)|né|naissance|birth|born)(?:\s+(?:le|on|:))?\s*:?\s*(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4}|\d{2})'
+    birth_match = re.search(birth_date_pattern, resume_text.lower())
+    if birth_match:
+        try:
+            year = int(birth_match.group(3))
+            if year < 100:  # Année sur 2 chiffres
+                year = 1900 + year if year > 50 else 2000 + year
+            birth_year = year
+            age = datetime.now().year - birth_year
+        except (ValueError, IndexError):
+            pass
+    
+    # Format "Date de naissance : 02 Mars 2005"
+    birth_date_text_pattern = r'(?:date\s+de\s+naissance|birth\s+date).*?(\d{1,2})[\s]*(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)[\s]*(\d{4})'
+    birth_text_match = re.search(birth_date_text_pattern, resume_text.lower())
+    if birth_text_match:
+        try:
+            birth_year = int(birth_text_match.group(2))
+            age = datetime.now().year - birth_year
+        except (ValueError, IndexError):
+            pass
+    
+    # 7. Vérifier la cohérence avec l'âge
+    if age:
+        # Estimation de l'expérience maximale possible (âge - 18)
+        max_possible_experience = max(0, age - 18)
+        
+        # Si l'expérience détectée dépasse l'expérience maximale possible, ajuster
+        if total_experience > max_possible_experience:
+            total_experience = max_possible_experience
+    
+    # 8. Vérifier la cohérence avec la date de diplôme la plus récente
+    graduation_year = None
+    recent_graduation = re.search(r'(?:diplôme|graduate|graduation|obtention).*?(20\d{2})', resume_text.lower())
+    if recent_graduation:
+        try:
+            graduation_year = int(recent_graduation.group(1))
+            years_since_graduation = datetime.now().year - graduation_year
+            
+            if years_since_graduation < 3 and total_experience > years_since_graduation:
+                total_experience = years_since_graduation
+        except:
+            pass
+    
+    # 9. Arrondir à une décimale pour plus de précision
+    final_experience = round(total_experience, 1)
+    
+    # 10. Ajustement spécial pour les CV avec uniquement des stages
+    if is_junior and re.search(r'stagiaire', resume_text.lower()) and not re.search(r'développeur|ingénieur|consultant|analyste|manager|directeur', resume_text.lower()):
+        if final_experience > 1.0:
+            stage_months = 0
+            for exp in experience_years:
+                # Pour chaque expérience, si c'est probablement un stage, limiter à 6 mois max
+                if exp <= 0.5:  # 6 mois ou moins
+                    stage_months += exp * 12
+                else:
+                    # Si plus de 6 mois, vérifier le contexte
+                    if is_junior:
+                        stage_months += min(exp, 0.5) * 12
+                    else:
+                        stage_months += exp * 12
+            
+            final_experience = round(stage_months / 12, 1)
+    
+    return final_experience
+
 def extract_candidate_skills_no_llm(resume_text):
     """
     Extrait les compétences d'un CV sans utiliser de LLM.
@@ -342,7 +640,11 @@ def extract_candidate_skills_no_llm(resume_text):
     
     # Détection plus avancée de l'éducation
     education_data = []
-    education_keywords = ["Licence", "Master", "Doctorat", "DUT", "BTS", "Ingénieur", "Université", "École", "Formation", "Diplôme"]
+    education_keywords = [
+        "Licence", "Master", "Doctorat", "DUT", "BTS", "Ingénieur", "Université", "École", "Formation", "Diplôme",
+        "Bachelor", "Master's", "PhD", "Degree", "BSc", "MSc", "MBA", "University", "College", "Education", "Certificate"
+
+    ]
     year_pattern = r'20\d{2}|19\d{2}'  # Années entre 1900 et 2099
     
     for i, line in enumerate(lines):
@@ -393,7 +695,11 @@ def extract_candidate_skills_no_llm(resume_text):
     experience_patterns = [
         r'(\d+)\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
         r'expérience\s+(?:de|:)?\s*(\d+)\s*an(?:s|née(?:s)?)?',
-        r'(?:depuis|pendant)\s+(\d+)\s*an(?:s|née(?:s)?)?'
+        r'(?:depuis|pendant)\s+(\d+)\s*an(?:s|née(?:s)?)?',
+        
+        r'(\d+)\s*(?:year(?:s)?\s+(?:of\s+)?experience)',
+        r'experience\s+(?:of|:)?\s*(\d+)\s*year(?:s)?',
+        r'(?:for|over)\s+(\d+)\s*year(?:s)?'
     ]
     
     for pattern in experience_patterns:
@@ -408,7 +714,10 @@ def extract_candidate_skills_no_llm(resume_text):
     # Recherche de postes et entreprises
     company_patterns = [
         r'(?:chez|à|pour|au sein de)\s+([A-Z][A-Za-z0-9\s&\.\-]+)',
-        r'([A-Z][A-Za-z0-9\s&\.\-]+)(?:\s*,|\s+SA|\s+SAS|\s+SARL|\s+Inc\.)'
+        r'([A-Z][A-Za-z0-9\s&\.\-]+)(?:\s*,|\s+SA|\s+SAS|\s+SARL|\s+Inc\.)',
+        
+        r'(?:at|for|with)\s+([A-Z][A-Za-z0-9\s&\.\-]+)',
+        r'([A-Z][A-Za-z0-9\s&\.\-]+)(?:\s*,|\s+Inc|\s+Ltd|\s+LLC|\s+Corp|\s+Limited)'
     ]
     
     role_patterns = [
@@ -425,7 +734,22 @@ def extract_candidate_skills_no_llm(resume_text):
         r'([Dd]ev[Oo]ps)',
         r'([Ff]ull\s*[Ss]tack)',
         r'([Ff]ront\s*[Ee]nd)',
-        r'([Bb]ack\s*[Ee]nd)'
+        r'([Bb]ack\s*[Ee]nd)',
+        
+        r'([Ss]oftware\s+[Ee]ngineer\w*)',
+        r'([Pp]roduct\s+[Mm]anager\w*)',
+        r'([Pp]roject\s+[Mm]anager\w*)',
+        r'([Ss]enior\s+[A-Za-z\s]+(?:Developer|Engineer|Architect|Consultant))',
+        r'([Jj]unior\s+[A-Za-z\s]+(?:Developer|Engineer|Analyst))',
+        r'([Ll]ead\s+[A-Za-z\s]+(?:Developer|Engineer|Architect))',
+        r'([Tt]echnical\s+[A-Za-z\s]+)',
+        r'([Pp]rogrammer\w*)',
+        r'([Ss]ystems?\s+[Aa]dministrator\w*)',
+        r'([Nn]etwork\s+[Ee]ngineer\w*)',
+        r'([Ss]ecurity\s+[A-Za-z\s]+)',
+        r'([Qq]uality\s+[Aa]ssurance\w*)',
+        r'([Tt]ester\w*)',
+        r'([Uu][Xx]/[Uu][Ii]\s+[Dd]esigner\w*)'
     ]
     
     # Extraire les rôles
@@ -703,24 +1027,24 @@ def extract_job_requirements_no_llm(job_text):
     # Identifier les sections dans le texte
     for line in lines:
         line_lower = line.lower().strip()
-        
-        # Détecter les en-têtes de section
-        if any(header in line_lower for header in ["requis", "exigé", "demandé", "required", "requirements"]):
+
+        # Détecter les en-têtes de section (français et anglais)
+        if any(header in line_lower for header in ["requis", "exigé", "demandé", "required", "requirements", "necessity"]):
             current_section = "requirements"
             continue
-        elif any(header in line_lower for header in ["qualifications", "profil", "profile"]):
+        elif any(header in line_lower for header in ["qualifications", "profil", "profile", "candidate"]):
             current_section = "qualifications"
             continue
-        elif any(header in line_lower for header in ["compétences", "skills", "abilities"]):
+        elif any(header in line_lower for header in ["compétences", "skills", "abilities", "competencies", "what you'll need"]):
             current_section = "skills"
             continue
         elif any(header in line_lower for header in ["expérience", "experience"]):
             current_section = "experience"
             continue
-        elif any(header in line_lower for header in ["formation", "études", "education", "diplôme"]):
+        elif any(header in line_lower for header in ["formation", "études", "education", "diplôme", "degree", "academic"]):
             current_section = "education"
             continue
-        elif any(header in line_lower for header in ["entreprise", "société", "about us", "qui sommes-nous"]):
+        elif any(header in line_lower for header in ["entreprise", "société", "about us", "qui sommes-nous", "company", "organization"]):
             current_section = "about"
             continue
         
@@ -1196,6 +1520,9 @@ def analyze_resume(file, job_role=None):
        # Extraire le texte du CV
        resume_text = extract_text_from_file(file)
        
+       language = detect_language(resume_text)
+
+       
        # Prétraiter le texte
        processed_text = preprocess_resume_text(resume_text)
        
@@ -1203,7 +1530,9 @@ def analyze_resume(file, job_role=None):
        contact_info = extract_contact_info(processed_text)
        
        # Si aucun poste n'est spécifié, utiliser un poste générique
-       job_role = job_role or "un poste dans votre entreprise"
+       if job_role is None:
+           job_role = "un poste dans votre entreprise" if language == 'fr' else "a position in your company"
+       
        
        # Tenter d'analyser le CV avec le LLM
        try:
@@ -1440,18 +1769,25 @@ def generate_interview_questions_from_resume(resume_text, job_role, num_question
                }
            ]
 
-
-def get_additional_context_for_improvement(improvement_target, job_description=None):
+def get_additional_context_for_improvement(improvement_target, job_description=None, experience_years=None):
     """
     Génère le contexte additionnel à inclure dans le prompt d'amélioration basé sur la cible
     
     Args:
         improvement_target (str): La cible d'amélioration ("job_offer", "american", "canadian", "linkedin")
         job_description (str, optional): Description du poste si improvement_target est "job_offer"
+        experience_years (int, optional): Années d'expérience détectées
         
     Returns:
         str: Contexte additionnel pour le prompt
     """
+    experience_context = ""
+    if experience_years is not None and experience_years > 0:
+        experience_context = f"""
+        Le CV indique {experience_years} ans d'expérience professionnelle. 
+        Assure-toi que cette information soit clairement mise en valeur dans le résumé et dans l'en-tête du CV.
+        """
+    
     if improvement_target == "job_offer" and job_description:
         return f"""
         Voici l'offre d'emploi pour laquelle le CV doit être optimisé:
@@ -1461,12 +1797,13 @@ def get_additional_context_for_improvement(improvement_target, job_description=N
         
         Analyse la correspondance entre le CV et cette offre d'emploi.
         Identifie les compétences et expériences qui manquent ou devraient être mises en avant.
+        {experience_context}
         Suggère des modifications pour augmenter les chances du candidat d'être retenu par les systèmes ATS 
         (Applicant Tracking System) et les recruteurs.
         """
     
     elif improvement_target == "american":
-        return """
+        return f"""
         Ce CV doit être adapté au style américain. Les CV américains:
         - Mettent l'accent sur les résultats quantifiables et les accomplissements
         - Utilisent des verbes d'action forts
@@ -1475,10 +1812,11 @@ def get_additional_context_for_improvement(improvement_target, job_description=N
         - N'incluent généralement pas de photo, d'âge, de statut marital ou d'informations personnelles
         - Commencent souvent par un résumé professionnel ou un objectif de carrière ciblé
         - Utilisent le format antichronologique pour l'expérience professionnelle et la formation
+        {experience_context}
         """
     
     elif improvement_target == "canadian":
-        return """
+        return f"""
         Ce CV doit être adapté au style canadien. Les CV canadiens:
         - Sont similaires aux CV américains, mais peuvent inclure plus d'informations personnelles
         - Mettent l'accent sur les compétences transférables
@@ -1487,10 +1825,11 @@ def get_additional_context_for_improvement(improvement_target, job_description=N
         - Sont généralement limités à 2 pages maximum
         - Préfèrent un ton formel et professionnel
         - Peuvent inclure des expériences de bénévolat
+        {experience_context}
         """
     
     elif improvement_target == "linkedin":
-        return """
+        return f"""
         Ce CV doit être adapté au format LinkedIn. Un profil LinkedIn efficace:
         - Utilise un titre/headline accrocheur qui combine poste actuel et proposition de valeur
         - Commence par une section "À propos" rédigée à la première personne, conversationnelle mais professionnelle
@@ -1499,12 +1838,14 @@ def get_additional_context_for_improvement(improvement_target, job_description=N
         - Inclut des compétences que les connexions peuvent valider
         - Limite chaque section à l'essentiel pour être facilement scannable
         - Peut inclure des médias, articles, projets pour illustrer les réalisations
+        {experience_context}
         """
     
     else:
-        return """
+        return f"""
         Analyse ce CV et suggère des améliorations générales pour le rendre plus efficace et percutant.
         Concentre-toi sur la structure, le contenu, les formulations et la présentation.
+        {experience_context}
         """
 
 def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
@@ -1535,10 +1876,10 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
     word_count = len(resume_text.split())
     
     # Détection des sections standard dans le CV
-    has_summary = any(re.search(r'(résumé|sommaire|profil|summary|about|à propos)', line, re.IGNORECASE) for line in lines[:15])
-    has_skills = any(re.search(r'(compétences|skills|expertise|technologies)', line, re.IGNORECASE) for line in lines)
-    has_experience = any(re.search(r'(expérience|experience|parcours|carrière)', line, re.IGNORECASE) for line in lines)
-    has_education = any(re.search(r'(formation|education|études|diplôme)', line, re.IGNORECASE) for line in lines)
+    has_summary = any(re.search(r'(résumé|sommaire|profil|summary|about|à propos|profile|professional summary)', line, re.IGNORECASE) for line in lines[:15])
+    has_skills = any(re.search(r'(compétences|skills|expertise|technologies|core competencies)', line, re.IGNORECASE) for line in lines)
+    has_experience = any(re.search(r'(expérience|experience|parcours|carrière|work history|employment)', line, re.IGNORECASE) for line in lines)
+    has_education = any(re.search(r'(formation|education|études|diplôme|academic|degree)', line, re.IGNORECASE) for line in lines)
     has_languages = any(re.search(r'(langues|languages|language skills)', line, re.IGNORECASE) for line in lines)
     has_certifications = any(re.search(r'(certifications|certificats|diplômes|qualifications)', line, re.IGNORECASE) for line in lines)
     
@@ -1581,13 +1922,7 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
     else:
         missing_elements.append("Section sur la formation académique")
     
-    experience_patterns = [
-        r'(\d+)[+\-]?\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
-        r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?',
-        r'(?:minimum|au moins)\s+(\d+)\s*an(?:s|née(?:s)?)?'
-    ]
-    
-    
+   
     
     # Points faibles identifiés
     if action_verbs_count < 5:
@@ -1608,42 +1943,38 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
             "suggested_improvement": "Ajouter des métriques et des pourcentages pour quantifier vos réalisations",
             "rationale": "Les chiffres attirent l'attention et démontrent votre impact de façon concrète"
         })
-    experience_years = []
-    try:
-        # Pattern 1: X ans d'expérience
-        pattern1 = r'(\d+)\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))'
-        for match in re.finditer(pattern1, resume_text.lower()):
-            try:
-                years = int(match.group(1))
-                experience_years.append(years)
-            except (IndexError, ValueError):
-                pass
-        
-        # Pattern 2: expérience de X ans
-        pattern2 = r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?'
-        for match in re.finditer(pattern2, resume_text.lower()):
-            try:
-                years = int(match.group(1))
-                experience_years.append(years)
-            except (IndexError, ValueError):
-                pass
-        
-        # Pattern 3: minimum X ans
-        pattern3 = r'(?:minimum|au moins)\s+(\d+)\s*an(?:s|née(?:s)?)?'
-        for match in re.finditer(pattern3, resume_text.lower()):
-            try:
-                years = int(match.group(1))
-                experience_years.append(years)
-            except (IndexError, ValueError):
-                pass
-    except Exception as e:
-        print(f"Erreur lors de l'extraction des années d'expérience: {str(e)}")
+    
+    final_experience_years = extract_experience_years(resume_text)
+    
+    # Vérifier si l'expérience est clairement mentionnée dans le CV
+    if final_experience_years > 0:
+        # Vérifier si les années d'expérience sont clairement indiquées dans le résumé
+        exp_in_summary = re.search(r'\b' + str(final_experience_years) + r'\s*(?:an(?:s|née(?:s)?)|year(?:s)?)', resume_text[:500], re.IGNORECASE)
+        if not exp_in_summary:
+            weaknesses.append(f"L'expérience totale de {final_experience_years} ans n'est pas clairement mise en avant en début de CV")
+            content_improvements.append({
+                "section": "Résumé professionnel",
+                "current_content": "Résumé sans mention claire de l'expérience totale",
+                "suggested_improvement": f"Mentionner explicitement '{final_experience_years} ans d'expérience en [domaine]' dans le résumé",
+                "rationale": "L'expérience professionnelle est un atout clé qui doit être immédiatement visible"
+            })
+    else:
+        if has_experience:
+            weaknesses.append("Années d'expérience non clairement indiquées")
+            content_improvements.append({
+                "section": "Résumé professionnel",
+                "current_content": "Absence de mention d'années d'expérience",
+                "suggested_improvement": "Inclure une phrase indiquant clairement votre expérience totale dans votre domaine",
+                "rationale": "Les recruteurs recherchent rapidement cette information clé"
+            })
+    
     # Recommandations spécifiques selon la cible d'amélioration
     if improvement_target == "job_offer" and job_description:
-        # Extraire les compétences requises du job_description
+        # [Code existant pour job_offer]
         job_data = extract_job_requirements_no_llm(job_description)
         required_skills = job_data.get("technical_skills", []) + job_data.get("tech_stacks", [])
         required_soft_skills = job_data.get("soft_skills", [])
+        job_exp_level = job_data.get("experience_level", "")
         
         # Extraire les compétences du candidat
         resume_data = extract_candidate_skills_no_llm(resume_text)
@@ -1662,13 +1993,41 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
             weaknesses.append("Certaines compétences non-techniques requises ne sont pas mises en valeur")
             keyword_optimization.extend(missing_soft_skills)
         
-        # Conseils pour l'optimisation ATS
+        # Vérifier l'adéquation de l'expérience
+        job_years_required = 0
+        if "0-2 ans" in job_exp_level:
+            job_years_required = 1
+        elif "3-5 ans" in job_exp_level:
+            job_years_required = 3
+        elif "5+ ans" in job_exp_level:
+            job_years_required = 5
+        
+        if job_years_required > 0:
+            if final_experience_years < job_years_required:
+                weaknesses.append(f"L'expérience de {final_experience_years} ans est inférieure aux {job_years_required} ans requis pour le poste")
+                content_improvements.append({
+                    "section": "Expérience professionnelle",
+                    "current_content": f"Expérience totale de {final_experience_years} ans",
+                    "suggested_improvement": "Mettre en valeur tous les projets et réalisations pertinents pour compenser le manque d'années d'expérience",
+                    "rationale": "Démontrer que vous pouvez apporter de la valeur malgré une expérience formelle plus courte"
+                })
+            else:
+                strengths.append(f"L'expérience de {final_experience_years} ans correspond ou dépasse les {job_years_required} ans requis pour le poste")
+                content_improvements.append({
+                    "section": "Résumé professionnel",
+                    "current_content": "Mention générique de l'expérience",
+                    "suggested_improvement": f"Souligner vos {final_experience_years} ans d'expérience, dépassant les {job_years_required} ans requis",
+                    "rationale": "Mettre en avant un avantage compétitif clé par rapport aux exigences du poste"
+                })
+        
+        # Conseils pour l'optimisation ATS avec expérience
         ats_compatibility_tips = [
             "Inclure les mots-clés exacts de l'offre d'emploi dans votre CV",
             "Utiliser à la fois la version complète et l'acronyme des technologies (ex: 'JavaScript (JS)')",
             "Adapter le titre/poste recherché pour qu'il corresponde exactement au titre dans l'offre",
             "Éviter les tableaux, en-têtes/pieds de page et formats complexes qui peuvent poser problème aux ATS",
-            "Utiliser un format de fichier standard comme .docx ou .pdf (texte sélectionnable)"
+            "Utiliser un format de fichier standard comme .docx ou .pdf (texte sélectionnable)",
+            f"Mentionner clairement vos {final_experience_years} ans d'expérience directement dans le résumé et l'en-tête"
         ]
         
         structure_improvements.append({
@@ -1696,10 +2055,14 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
                     "importance": "élevée",
                     "details": "Les CV américains mettent l'accent sur les résultats mesurables"
                 })
-            
-            if any(re.search(r'(âge|age|date de naissance|marié|marrié|photo)', resume_text, re.IGNORECASE)):
-                format_issues.append("Les informations personnelles comme l'âge, le statut marital ou les photos ne sont pas recommandées dans les CV américains")
-            
+            personal_info_patterns = [
+                r'âge|age',
+                r'date de naissance',
+                r'marié|marrié',
+                r'photo'
+            ]
+            if any(re.search(pattern, resume_text, re.IGNORECASE) for pattern in personal_info_patterns):
+                format_issues.append("Les informations personnelles comme l'âge, le statut marital ou les photos ne sont pas recommandées dans les CV américains")    
         elif improvement_target == "canadian":
             if not has_languages:
                 missing_elements.append("Section sur les langues parlées (important au Canada, surtout au Québec)")
@@ -1725,10 +2088,21 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
                     "rationale": "La section 'À propos' est cruciale sur LinkedIn pour capter l'attention des recruteurs"
                 })
     
-    # Créer un résumé professionnel amélioré générique
+    
+    # Créer un résumé professionnel amélioré générique avec années d'expérience
     career_level = "professionnel expérimenté"
-    if len(resume_text) < 3000:
-        career_level = "jeune professionnel"
+    experience_description = ""
+    
+    if final_experience_years > 0:
+        experience_description = f"avec {final_experience_years} ans d'expérience"
+        if final_experience_years < 3:
+            career_level = f"jeune professionnel {experience_description}"
+        elif final_experience_years < 7:
+            career_level = f"professionnel {experience_description}"
+        else:
+            career_level = f"professionnel expérimenté {experience_description}"
+    else:
+        career_level = "professionnel"
     
     # Extraire les compétences principales 
     skills_data = extract_candidate_skills_no_llm(resume_text)
@@ -1759,10 +2133,11 @@ def improve_cv_no_llm(resume_text, improvement_target, job_description=None):
             "content_improvements": content_improvements,
             "structure_improvements": structure_improvements,
             "keyword_optimization": keyword_optimization,
-            "ats_compatibility_tips": ats_compatibility_tips
+            "ats_compatibility_tips": ats_compatibility_tips if ats_compatibility_tips and len(ats_compatibility_tips) > 0 else []
         },
+        "experience_years": final_experience_years,
         "improved_summary": improved_summary,
-        "_generated_by": "fallback_method"  # Marqueur pour indiquer la méthode de secours
+        "_generated_by": "fallback_method"  # Marqueur pour indiquer que c'est la méthode de secours
     }
 
 def format_cv_content_no_llm(resume_text, improvement_target, job_description=None, cv_analysis=None):
@@ -1828,7 +2203,7 @@ def format_cv_content_no_llm(resume_text, improvement_target, job_description=No
         section_title = 'SKILLS' if improvement_target in ['american', 'linkedin'] else 'COMPÉTENCES'
         formatted_cv.append(section_title)
         formatted_cv.append("------------------------------")
-        
+
         # Ajouter les compétences techniques
         technical_skills = skills_data.get('technical_skills', [])
         if technical_skills:
@@ -1837,18 +2212,18 @@ def format_cv_content_no_llm(resume_text, improvement_target, job_description=No
                 formatted_cv.append("Technical: " + ", ".join(technical_skills))
             else:
                 # Format standard: sections
-                formatted_cv.append("Technical Skills:")
+                formatted_cv.append("Technical Skills:" if improvement_target in ['american', 'linkedin'] else "Compétences techniques:")
                 skills_chunks = [technical_skills[i:i+5] for i in range(0, len(technical_skills), 5)]
                 for chunk in skills_chunks:
                     formatted_cv.append("• " + ", ".join(chunk))
-        
+
         # Ajouter les soft skills
         soft_skills = skills_data.get('soft_skills', [])
         if soft_skills:
             if improvement_target == 'linkedin':
                 formatted_cv.append("Soft Skills: " + ", ".join(soft_skills))
             else:
-                formatted_cv.append("Soft Skills:")
+                formatted_cv.append("Soft Skills:" if improvement_target in ['american', 'linkedin'] else "Compétences personnelles:")
                 formatted_cv.append("• " + ", ".join(soft_skills))
         
         formatted_cv.append("")
@@ -1945,7 +2320,7 @@ def format_cv_content_no_llm(resume_text, improvement_target, job_description=No
     
     return "\n".join(formatted_cv)
 
-def generate_improved_cv_document(resume_text, formatted_content, output_format="docx"):
+def generate_improved_cv_document(resume_text, formatted_content, output_format="docx", experience_years=0):
     """
     Génère un document CV amélioré dans le format spécifié
     
@@ -1953,11 +2328,14 @@ def generate_improved_cv_document(resume_text, formatted_content, output_format=
         resume_text (str): Le texte original du CV (pour référence)
         formatted_content (str): Le contenu reformaté du CV
         output_format (str): Format de sortie ("docx", "pdf", "txt")
+        experience_years (int): Années d'expérience pour le nom du fichier
         
     Returns:
         tuple: (bytes_io, filename) le document généré et son nom
     """
-    filename = f"CV_Amélioré_{datetime.now().strftime('%Y%m%d')}"
+    # Créer un nom de fichier avec les années d'expérience
+    exp_suffix = f"_{experience_years}ans" if experience_years > 0 else ""
+    filename = f"CV_Amélioré{exp_suffix}_{datetime.now().strftime('%Y%m%d')}"
     
     if output_format == "txt":
         # Fichier texte simple
@@ -1995,9 +2373,31 @@ def generate_improved_cv_document(resume_text, formatted_content, output_format=
                     p.add_run(line.strip())
                     p.paragraph_format.left_indent = Pt(12)
                 elif line.strip():
-                    # Texte normal
-                    p = doc.add_paragraph()
-                    p.add_run(line.strip())
+                    # Vérifier si c'est une ligne contenant l'expérience
+                    experience_pattern = r'(\d+)\s*(?:an(?:s|née(?:s)?)|year(?:s)?)\s*(?:d\'?expérience|of\s+experience)'
+                    exp_match = re.search(experience_pattern, line)
+                    
+                    if exp_match:
+                        # Mettre en évidence les années d'expérience
+                        p = doc.add_paragraph()
+                        before_exp = line[:exp_match.start()]
+                        experience_text = exp_match.group(0)
+                        after_exp = line[exp_match.end():]
+                        
+                        if before_exp:
+                            p.add_run(before_exp)
+                        
+                        # Mettre l'expérience en gras et en couleur
+                        exp_run = p.add_run(experience_text)
+                        exp_run.bold = True
+                        exp_run.font.color.rgb = RGBColor(0, 128, 0)  # Vert pour l'expérience
+                        
+                        if after_exp:
+                            p.add_run(after_exp)
+                    else:
+                        # Texte normal
+                        p = doc.add_paragraph()
+                        p.add_run(line.strip())
                 else:
                     # Ligne vide
                     doc.add_paragraph()
@@ -2014,7 +2414,6 @@ def generate_improved_cv_document(resume_text, formatted_content, output_format=
             bytes_io.write(formatted_content.encode('utf-8'))
             bytes_io.seek(0)
             return bytes_io, f"{filename}.txt"
-    
     elif output_format == "pdf":
         # Générer un PDF
         try:
@@ -2098,22 +2497,43 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
         # Prétraiter le texte
         processed_text = preprocess_resume_text(resume_text)
         
+        # Extraire les années d'expérience pour le contexte
+        experience_years = 0
+        experience_patterns = [
+            # Français
+            r'(\d+)[+\-]?\s*(?:an(?:s|née(?:s)?)?\s+d\'?(?:expérience))',
+            r'expérience\s+(?:de|:)?\s*(\d+)[+\-]?\s*an(?:s|née(?:s)?)?',
+            # Anglais
+            r'(\d+)[+\-]?\s*(?:year(?:s)?\s+(?:of\s+)?experience)',
+            r'experience\s+(?:of|:)?\s*(\d+)[+\-]?\s*year(?:s)?'
+        ]
+        
+        for pattern in experience_patterns:
+            matches = re.findall(pattern, processed_text.lower())
+            if matches:
+                try:
+                    experience_years = max(experience_years, int(matches[0]))
+                    break
+                except (ValueError, TypeError, IndexError):
+                    continue
+        
         # Vérifier la cible d'amélioration
         valid_targets = ["job_offer", "american", "canadian", "linkedin", "general"]
         if improvement_target not in valid_targets:
             improvement_target = "general"
         
-        # Obtenir le contexte supplémentaire pour le prompt
+        # Obtenir le contexte supplémentaire pour le prompt avec les années d'expérience
         additional_context = get_additional_context_for_improvement(
             improvement_target, 
-            job_description
+            job_description,
+            experience_years
         )
         
         # Tenter d'analyser le CV avec le LLM
         try:
             prompt = CV_IMPROVEMENT_PROMPT.format(
                 improvement_target=improvement_target,
-                resume_text=processed_text[:7000],  # Limiter la taille pour éviter de dépasser le contexte du LLM
+                resume_text=processed_text[:7000],  # Limiter la taille pour éviter de dépasser le contexte
                 additional_context=additional_context
             )
             
@@ -2123,13 +2543,17 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                 # Tenter de parser la réponse JSON
                 analysis = json.loads(llm_response)
                 
-                # Ajouter des métadonnées
+                # Ajouter des métadonnées et les années d'expérience
                 analysis['metadata'] = {
                     'filename': secure_filename(file.filename),
                     'analysis_timestamp': datetime.now().isoformat(),
                     'improvement_target': improvement_target,
                     'analysis_method': 'llm'
                 }
+                
+                # Ajouter les années d'expérience si non incluses
+                if 'experience_years' not in analysis:
+                    analysis['experience_years'] = experience_years
                 
                 # Utiliser le LLM pour reformater le contenu du CV
                 format_prompt = f"""
@@ -2146,7 +2570,11 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                 Reformate complètement ce CV pour le standard {improvement_target}.
                 {"Optimise-le pour l'offre d'emploi suivante: " + job_description if improvement_target == "job_offer" and job_description else ""}
                 
+                Le candidat a {experience_years} ans d'expérience professionnelle. Assure-toi que cette information est clairement mise en valeur dans le résumé et si pertinent, dans l'en-tête du CV.
+                
                 Inclus toutes les sections pertinentes et restructure le contenu pour maximiser l'impact selon les recommandations.
+                Ajoute des réalisations quantifiées et des résultats mesurables pour chaque expérience.
+                
                 Retourne uniquement le contenu formaté du CV, sans explications ni commentaires supplémentaires.
                 """
                 
@@ -2157,7 +2585,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                     document_io, filename = generate_improved_cv_document(
                         processed_text, 
                         formatted_content, 
-                        output_format
+                        output_format,
+                        analysis.get('experience_years', experience_years)
                     )
                     
                     # Ajouter le contenu formaté à l'analyse
@@ -2167,10 +2596,11 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                         'format': output_format
                     }
                     
-                    # Retourner le résultat
+                    # Retourner le résultat avec les années d'expérience mises en évidence
                     return {
                         'analysis': analysis,
-                        'document': (document_io, filename)
+                        'document': (document_io, filename),
+                        'experience_years': analysis.get('experience_years', experience_years)
                     }
                     
                 except Exception as format_error:
@@ -2187,7 +2617,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                     document_io, filename = generate_improved_cv_document(
                         processed_text, 
                         formatted_content, 
-                        output_format
+                        output_format,
+                        analysis.get('experience_years', experience_years)
                     )
                     
                     # Ajouter le contenu formaté à l'analyse
@@ -2201,7 +2632,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                     # Retourner le résultat
                     return {
                         'analysis': analysis,
-                        'document': (document_io, filename)
+                        'document': (document_io, filename),
+                        'experience_years': analysis.get('experience_years', experience_years)
                     }
                 
             except json.JSONDecodeError:
@@ -2230,7 +2662,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                 document_io, filename = generate_improved_cv_document(
                     processed_text, 
                     formatted_content, 
-                    output_format
+                    output_format,
+                    fallback_analysis.get('experience_years', experience_years)
                 )
                 
                 # Ajouter le contenu formaté à l'analyse
@@ -2243,7 +2676,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
                 # Retourner le résultat
                 return {
                     'analysis': fallback_analysis,
-                    'document': (document_io, filename)
+                    'document': (document_io, filename),
+                    'experience_years': fallback_analysis.get('experience_years', experience_years)
                 }
                 
         except Exception as llm_error:
@@ -2272,7 +2706,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
             document_io, filename = generate_improved_cv_document(
                 processed_text, 
                 formatted_content, 
-                output_format
+                output_format,
+                fallback_analysis.get('experience_years', experience_years)
             )
             
             # Ajouter le contenu formaté à l'analyse
@@ -2285,7 +2720,8 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
             # Retourner le résultat
             return {
                 'analysis': fallback_analysis,
-                'document': (document_io, filename)
+                'document': (document_io, filename),
+                'experience_years': fallback_analysis.get('experience_years', experience_years)
             }
             
     except Exception as e:
@@ -2295,4 +2731,49 @@ def improve_cv(file, improvement_target, job_description=None, output_format="do
             "analysis_method": "failed"
         }
     
+def detect_language(text):
+    """
+    Détecte la langue principale du texte (français ou anglais)
     
+    Args:
+        text (str): Texte à analyser
+        
+    Returns:
+        str: 'fr' pour français, 'en' pour anglais, 'unknown' si indéterminé
+    """
+    # Mots fréquents en français
+    fr_words = set(['de', 'la', 'et', 'le', 'du', 'en', 'un', 'une', 'des', 'pour', 'avec', 'par', 'sur', 'dans', 'au', 'à'])
+    
+    # Mots fréquents en anglais
+    en_words = set(['the', 'of', 'and', 'to', 'in', 'a', 'for', 'with', 'on', 'at', 'by', 'from', 'as', 'an', 'is', 'are'])
+    
+    # Préparer le texte
+    words = re.findall(r'\b\w+\b', text.lower())
+    
+    # Compter les occurrences
+    fr_count = sum(1 for word in words if word in fr_words)
+    en_count = sum(1 for word in words if word in en_words)
+    
+    # Sections courantes en français
+    fr_sections = sum(1 for line in text.lower().split('\n') if any(s in line for s in ['expérience', 'compétences', 'formation', 'éducation', 'langues']))
+    
+    # Sections courantes en anglais
+    en_sections = sum(1 for line in text.lower().split('\n') if any(s in line for s in ['experience', 'skills', 'education', 'languages', 'certifications']))
+    
+    # Déterminer la langue
+    fr_score = fr_count + (fr_sections * 3)  # Donner un poids plus important aux sections
+    en_score = en_count + (en_sections * 3)
+    
+    if fr_score > en_score * 1.2:  # Si le français est clairement dominant
+        return 'fr'
+    elif en_score > fr_score * 1.2:  # Si l'anglais est clairement dominant
+        return 'en'
+    else:
+        # Si pas de différence claire, vérifier des phrases plus spécifiques
+        if 'years of experience' in text.lower() or 'work experience' in text.lower():
+            return 'en'
+        elif "années d'expérience" in text.lower() or "expérience professionnelle" in text.lower():
+            return 'fr'
+        else:
+            return 'unknown' 
+        
