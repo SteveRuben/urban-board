@@ -44,11 +44,12 @@ export interface LoginHistory {
 
 
 export interface Integration {
-    id: string;
-    name: string;
-    connected: boolean;
-    connectionDate: string | null;
-    icon: string;
+  id: string;
+  name: string;
+  description: string;
+  connected: boolean;
+  connectionDate: string | null;
+  icon: string;
 }
 
 export interface ConfirmAction {

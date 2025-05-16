@@ -13,7 +13,8 @@ import ConfirmActionModal from '@/components/common/ConfirmActionModal';
 import TwoFactorAuthModal from '@/components/profile/TwoFactorAuthModal';
 import { useAuth } from '@/provider/auth';
 import { useNotification } from '@/provider/toast';
-import { PersonalInfo } from '@/types';
+import { ConfirmAction, Integration, NotificationPreferences, PasswordForm, 
+  PersonalInfo, SecurityInfo, TwoFactorSetupData, TwoFactorSetupState } from '@/types';
 
 
 
@@ -53,7 +54,7 @@ const ProfilePage: React.FC = () => {
   const [twoFactorSetupState, setTwoFactorSetupState] = useState<TwoFactorSetupState>('idle');
   const [twoFactorSetupData, setTwoFactorSetupData] = useState<TwoFactorSetupData | null>(null);
   const [twoFactorVerificationCode, setTwoFactorVerificationCode] = useState<string>('');
-  
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
   // États pour les préférences de notification
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
     email: {
@@ -77,8 +78,30 @@ const ProfilePage: React.FC = () => {
   });
 
   // États pour les intégrations
-  const [integrations, setIntegrations] = useState<Integration[]>([
-    { 
+
+ useEffect(() => {
+  const loadIntegrations = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch('/api/integrations', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      
+      setIntegrations(data);
+    } catch (error) {
+      console.error('Erreur chargement intégrations:', error);
+    }
+  };
+
+
+  loadIntegrations();
+  
+}, []);
+
+/*     { 
       id: 'calendar',
       name: 'Google Calendar',
       connected: false,
@@ -106,7 +129,7 @@ const ProfilePage: React.FC = () => {
       connectionDate: null,
       icon: '/icons/slack.svg'
     }
-  ]);
+  ]); */
   
   // État pour les modaux de confirmation
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
