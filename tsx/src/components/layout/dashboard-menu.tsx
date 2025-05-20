@@ -91,7 +91,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ userRole = 'recruiter', s
       submenu:[
         {
           name: 'Emplois',
-          href: '/jobs'
+          href: '/job-postings'
         },
         {
           name: 'Candidats',

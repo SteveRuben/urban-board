@@ -4,8 +4,8 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime, timedelta
 from app import db
-from models.job_posting import JobPosting
-from services.ai_service import AIService
+from ..models.job_posting import JobPosting
+from ..services.ai_service import AIService
 
 class JobPostingService:
     """Service pour gérer les postes à pourvoir"""
@@ -173,3 +173,175 @@ class JobPostingService:
             'employment_type': job_type,
             'external_id': external_id
         }
+    
+    def update_job_status(self, job_id, new_status, user_id):
+        """
+        Met à jour le statut d'une offre d'emploi
+
+        Args:
+            job_id: ID de l'offre d'emploi
+            new_status: Nouveau statut ('draft', 'published', 'closed')
+            user_id: ID de l'utilisateur effectuant la modification
+
+        Returns:
+            Le JobPosting mis à jour
+
+        Raises:
+            ValueError: Si le changement de statut n'est pas autorisé
+        """
+        # Vérifier que l'offre existe et appartient à l'utilisateur
+        job = JobPosting.query.filter_by(id=job_id, created_by=user_id).first()
+
+        if not job:
+            abort(403, description="Offre d'emploi non trouvée ou accès non autorisé")
+
+        current_status = job.status
+
+        # Règles de transition de statut
+        if current_status == 'draft':
+            if new_status not in ['published', 'draft']:
+                abort(400, description="Une offre en brouillon ne peut être que publiée ou rester en brouillon")
+
+            if new_status == 'published':
+                job.published_at = datetime.utcnow()
+                # Définir une date de clôture par défaut (+30 jours) si non spécifiée
+                if not job.closes_at:
+                    job.closes_at = datetime.utcnow() + timedelta(days=30)
+
+        elif current_status == 'published':
+            if new_status != 'closed':
+                abort(400, description="Une offre publiée ne peut être que fermée")
+            job.closes_at = datetime.utcnow()
+
+        elif current_status == 'closed':
+            abort(400, description="Une offre fermée ne peut plus changer de statut")
+
+        job.status = new_status
+        job.updated_at = datetime.utcnow()
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erreur lors de la mise à jour du statut de l'offre: {e}")
+            raise e
+
+        return job
+
+    def get_job_posting(self, job_id, user_id=None):
+        """
+        Récupère une offre d'emploi par son ID
+
+        Args:
+            job_id: ID de l'offre d'emploi
+            user_id: ID de l'utilisateur (optionnel, pour vérifier les droits)
+
+        Returns:
+            Le JobPosting ou None si non trouvé
+        """
+        # Si un user_id est fourni, vérifier qu'il est le créateur de l'offre
+        # Sinon, permettre l'accès à l'offre (cas d'une consultation publique)
+        if user_id:
+            job = JobPosting.query.filter_by(id=job_id, created_by=user_id).first()
+            if not job:
+                abort(403, description="Offre d'emploi non trouvée ou accès non autorisé")
+        else:
+            job = JobPosting.query.get(job_id)
+            if not job:
+                abort(404, description="Offre d'emploi non trouvée")
+
+        return job
+
+    def get_job_postings(self, organization_id=None, status=None, user_id=None, limit=20, offset=0):
+        """
+        Récupère une liste d'offres d'emploi avec filtres optionnels
+
+        Args:
+            organization_id: Filtre par organisation (optionnel)
+            status: Filtre par statut ('draft', 'published', 'closed') (optionnel)
+            user_id: Filtre par créateur (optionnel)
+            limit: Nombre maximum d'offres à retourner
+            offset: Décalage pour la pagination
+
+        Returns:
+            Liste de JobPosting et nombre total
+        """
+        query = JobPosting.query
+
+        # Appliquer les filtres
+        if organization_id:
+            query = query.filter(JobPosting.organization_id == organization_id)
+
+        if status:
+            query = query.filter(JobPosting.status == status)
+
+        if user_id:
+            query = query.filter(JobPosting.created_by == user_id)
+
+        # Récupérer le nombre total pour la pagination
+        total_count = query.count()
+
+        # Appliquer la pagination et trier par date de mise à jour
+        jobs = query.order_by(JobPosting.updated_at.desc()).limit(limit).offset(offset).all()
+
+        return jobs, total_count
+
+    def delete_job_posting(self, job_id, user_id):
+        """
+        Supprime une offre d'emploi
+
+        Args:
+            job_id: ID de l'offre d'emploi
+            user_id: ID de l'utilisateur effectuant la suppression
+
+        Returns:
+            True si supprimé avec succès
+
+        Raises:
+            ValueError: Si l'offre n'existe pas ou ne peut pas être supprimée
+        """
+        # Vérifier que l'offre existe et appartient à l'utilisateur
+        job = JobPosting.query.filter_by(id=job_id, created_by=user_id).first()
+
+        if not job:
+            abort(403, description="Offre d'emploi non trouvée ou accès non autorisé")
+
+        # Seules les offres en brouillon peuvent être supprimées
+        if job.status != 'draft':
+            abort(400, description="Seules les offres en brouillon peuvent être supprimées")
+
+        try:
+            db.session.delete(job)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erreur lors de la suppression de l'offre: {e}")
+            raise e
+
+        return True
+
+    def publish_job_posting(self, job_id, user_id):
+        """
+        Publie une offre d'emploi (change son statut de 'draft' à 'published')
+
+        Args:
+            job_id: ID de l'offre d'emploi
+            user_id: ID de l'utilisateur effectuant la publication
+
+        Returns:
+            Le JobPosting mis à jour
+        """
+        return self.update_job_status(job_id, 'published', user_id)
+
+    def close_job_posting(self, job_id, user_id):
+        """
+        Ferme une offre d'emploi (change son statut à 'closed')
+
+        Args:
+            job_id: ID de l'offre d'emploi
+            user_id: ID de l'utilisateur effectuant la fermeture
+
+        Returns:
+            Le JobPosting mis à jour
+        """
+        return self.update_job_status(job_id, 'closed', user_id)
