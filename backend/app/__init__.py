@@ -144,7 +144,7 @@ def register_blueprints(app):
     Args:
         app (Flask): Application Flask
     """
-    from .routes import interview_bp, resume_bp, user_bp
+    from .routes import interview_bp, resume_bp, user_bp, job_postings_bp
     from .routes.notification import notification_bp
     from .routes.auth_routes import auth_bp
     from .routes.subscription_routes import subscription_bp
@@ -176,6 +176,7 @@ def register_blueprints(app):
     app.register_blueprint(ai_assistant_bp, url_prefix='/api/ai-assistants')
     app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
     app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
+    app.register_blueprint(job_postings_bp, url_prefix='/api/job-postings')
     
     
 

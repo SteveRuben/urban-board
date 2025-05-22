@@ -1,7 +1,7 @@
 # backend/services/ai_service.py
 import json
 import requests
-from app import app
+from flask import current_app
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -20,9 +20,9 @@ class AIService:
     
     def __init__(self):
         # Configuration de l'API d'IA (par exemple, OpenAI, Claude, etc.)
-        self.api_key = app.config.get('AI_API_KEY', '')
-        self.api_url = app.config.get('AI_API_URL', 'https://api.anthropic.com/v1/messages')
-        self.model = app.config.get('AI_MODEL', 'claude-3-haiku-20240307')
+        self.api_key = current_app.config.get('AI_API_KEY', '')
+        self.api_url = current_app.config.get('AI_API_URL', 'https://api.anthropic.com/v1/messages')
+        self.model = current_app.config.get('AI_MODEL', 'claude-3-haiku-20240307')
         
         # Charger la liste des compétences courantes
         self.common_skills = self._load_common_skills()

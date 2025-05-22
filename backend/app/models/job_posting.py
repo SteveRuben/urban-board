@@ -45,8 +45,7 @@ class JobPosting(db.Model):
     # Relations
     organization = relationship("Organization", back_populates="job_postings")
     creator = relationship("User")
-    interview_schedules = relationship("InterviewSchedule", secondary="job_applications",
-                                     viewonly=True)
+    interview_schedules = relationship("InterviewSchedule", secondary="job_applications",viewonly=True)
     applications = relationship("JobApplication", back_populates="job_posting", cascade="all, delete-orphan")
     
     def __repr__(self):
@@ -54,6 +53,11 @@ class JobPosting(db.Model):
     
     def to_dict(self):
         """Convertit l'objet en dictionnaire pour l'API"""
+        
+        creator_name = None
+        if self.creator:
+            creator_name = f"{self.creator.first_name} {self.creator.last_name}".strip()
+    
         return {
             'id': self.id,
             'title': self.title,
@@ -73,7 +77,7 @@ class JobPosting(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'organization_name': self.organization.name if self.organization else None,
-            'creator_name': self.creator.name if self.creator else None,
+            'creator_name': creator_name,
             'application_count': len(self.applications) if self.applications else 0
         }
 

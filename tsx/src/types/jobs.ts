@@ -1,0 +1,50 @@
+export type JobPostingStatus = 'draft' | 'published' | 'closed';
+
+export interface JobPosting {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string | null;
+  responsibilities: string | null;
+  location: string | null;
+  employment_type: string | null;
+  remote_policy: string | null;
+  salary_range_min: number | null;
+  salary_range_max: number | null;
+  salary_currency: string;
+  status: JobPostingStatus;
+  published_at: string | null;
+  closes_at: string | null;
+  is_featured: boolean;
+  created_at: string;
+  updated_at: string;
+  organization_name: string;
+  creator_name: string;
+  application_count: number;
+}
+
+export interface JobPostingFormData {
+  title: string;
+  description: string;
+  requirements?: string;
+  responsibilities?: string;
+  location?: string;
+  employment_type?: string;
+  remote_policy?: string;
+  salary_range_min?: number | null;
+  salary_range_max?: number | null;
+  salary_currency?: string;
+  status?: JobPostingStatus;
+  closes_at?: string;
+}
+
+export interface Pagination {
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface JobPostingsResponse {
+  data: JobPosting[];
+  pagination: Pagination;
+}
