@@ -22,6 +22,8 @@ export interface JobPosting {
   organization_name: string;
   creator_name: string;
   application_count: number;
+  source_url? : string,
+  source? : string
 }
 
 export interface JobPostingFormData {

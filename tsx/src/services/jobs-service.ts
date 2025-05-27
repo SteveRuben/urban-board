@@ -720,14 +720,14 @@ export class JobService {
   static async createJobPostingFromFile(data: {
     title: string;
     file_url: string;
-    // requirements?: string;
-    // responsibilities?: string;
+    requirements?: string;
+    responsibilities?: string;
     location?: string;
-    // employment_type?: string;
-    // remote_policy?: string;
-    // salary_range_min?: number;
-    // salary_range_max?: number;
-    // salary_currency?: string;
+    employment_type?: string;
+    remote_policy?: string;
+    salary_range_min?: number;
+    salary_range_max?: number;
+    salary_currency?: string;
   }): Promise<{
     success: boolean;
     message: string;

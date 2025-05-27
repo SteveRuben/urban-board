@@ -1,7 +1,7 @@
 import os
 import re
 from uuid import UUID
-from flask import g, request, jsonify, abort, current_app, send_from_directory
+from flask import g, request, jsonify, abort, current_app, send_from_directory, url_for
 from app.models.job_posting import JobPosting, JobApplication
 from app.routes.user import token_required
 from app.services.job_posting_service import JobPostingService
