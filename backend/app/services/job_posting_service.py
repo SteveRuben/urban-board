@@ -1244,7 +1244,7 @@ class JobPostingService:
             job_data = {
                 'title': title,
                 'description': description or f"Offre d'emploi: {title}",
-                'source': 'uploaded_file',
+                'source': 'imported',
                 'source_url': file_url,
                 'status': 'draft'  # Commence toujours en brouillon pour révision
             }
