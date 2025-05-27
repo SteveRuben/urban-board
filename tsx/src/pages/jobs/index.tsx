@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { PlusCircle, Edit, Trash, Eye, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Eye, CheckCircle, XCircle, Search, Filter, Users } from 'lucide-react';
 import { JobService } from '@/services/jobs-service';
 import { JobPosting, Pagination } from '@/types/jobs';
 
@@ -43,7 +43,6 @@ export default function JobsPage() {
     fetchJobPostings();
   }, [pagination.offset, pagination.limit, statusFilter]);
 
-  // Simuler la fonctionnalité de recherche sur le frontend
   const filteredJobPostings = searchTerm 
     ? jobPostings.filter(job => 
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -269,6 +268,21 @@ export default function JobsPage() {
                             ) : (
                               <span>Fermée le {formatDate(job.closes_at)}</span>
                             )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <span className="text-sm text-gray-900 font-medium">{job.application_count}</span>
+                              {job.status === 'published' && job.application_count > 0 && (
+                                <Link
+                                  href={`/jobs/${job.id}/applications`}
+                                  className="ml-2 inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full hover:bg-blue-200"
+                                  title="Voir les candidatures"
+                                >
+                                  <Users className="h-3 w-3 mr-1" />
+                                  Voir
+                                </Link>
+                              )}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {job.application_count}

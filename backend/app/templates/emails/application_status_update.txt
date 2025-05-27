@@ -1,0 +1,24 @@
+Bonjour {{ candidate_name }},
+
+Nous avons une mise à jour concernant votre candidature pour le poste :
+
+{{ job_title }}
+Entreprise : {{ organization_name }}
+Statut : {{ status_message }}
+{% if notes %}Notes : {{ notes }}{% endif %}
+
+{% if new_status == 'hired' %}
+Félicitations ! Nous sommes ravis de vous accueillir dans notre équipe. Quelqu'un de notre équipe RH vous contactera sous peu pour discuter des prochaines étapes.
+{% elif new_status == 'interview_scheduled' %}
+Excellente nouvelle ! Nous souhaitons vous rencontrer. Vous devriez recevoir sous peu un email avec les détails de l'entretien.
+{% elif new_status == 'rejected' %}
+Nous vous remercions pour l'intérêt que vous avez porté à notre entreprise. Malheureusement, nous avons décidé de poursuivre avec d'autres candidats pour ce poste. Nous vous encourageons à consulter nos autres offres d'emploi.
+{% endif %}
+
+Merci pour votre intérêt pour notre entreprise.
+
+Cordialement,
+L'équipe de recrutement
+
+---
+Cet email a été envoyé automatiquement, merci de ne pas y répondre.

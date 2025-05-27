@@ -10,7 +10,7 @@ import WebSocketService from "@/hooks/websocket-service";
 
 
 // Les chemins qui utilisent toujours le layout principal, même pour les utilisateurs connectés
-const alwaysPublicPaths: string[] = ['/', '/about', '/pricing', '/contact', '/legal', '/documentation'];
+const alwaysPublicPaths: string[] = ['/', '/about', '/pricing', '/contact', '/legal', '/documentation','/jobs-applications','/jobs-applications/[id]'];
 
 // Les chemins qui utilisent toujours le layout d'authentification (pas de layout)
 const authPaths: string[] = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'];

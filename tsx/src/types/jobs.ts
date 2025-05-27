@@ -1,4 +1,5 @@
 export type JobPostingStatus = 'draft' | 'published' | 'closed';
+export type ApplicationStatus = 'new' | 'reviewed' | 'interview_scheduled' | 'rejected' | 'hired';
 
 export interface JobPosting {
   id: string;
@@ -38,6 +39,33 @@ export interface JobPostingFormData {
   closes_at?: string;
 }
 
+export interface JobApplication {
+  id: string;
+  candidate_name: string;
+  candidate_email: string;
+  candidate_phone: string | null;
+  resume_url: string | null;
+  cover_letter: string | null;
+  status: ApplicationStatus;
+  notes: string | null;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobApplicationFormData {
+  candidate_name: string;
+  candidate_email: string;
+  candidate_phone?: string;
+  resume_url?: string;
+  cover_letter?: string;
+  source?: string;
+}
+
+export interface JobApplicationDetails extends JobApplication {
+  job_posting: JobPosting;
+}
+
 export interface Pagination {
   total: number;
   limit: number;
@@ -47,4 +75,41 @@ export interface Pagination {
 export interface JobPostingsResponse {
   data: JobPosting[];
   pagination: Pagination;
+}
+
+export interface PublicJobPostingsResponse {
+  data: JobPosting[];
+  pagination: Pagination & {
+    page: number;
+    pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+}
+
+export interface JobApplicationsResponse {
+  data: JobApplication[];
+  job_posting: JobPosting | null;
+  pagination: Pagination;
+}
+
+export interface UploadResponse {
+  success: boolean;
+  message: string;
+  file_url: string;
+}
+
+export interface ApplicationResponse {
+  success: boolean;
+  message: string;
+  application_id: string;
+}
+
+export interface PublicJobFilters {
+  location?: string;
+  employment_type?: string;
+  remote_policy?: string;
+  salary_min?: number;
+  salary_max?: number;
+  keywords?: string;
 }
