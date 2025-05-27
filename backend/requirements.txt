@@ -19,7 +19,7 @@ executing==2.2.0
 fake-useragent==2.1.0
 filelock==3.16.1
 fpdf==1.7.2
-h11==0.14.0
+h11==0.16.0
 idna==3.10
 importlib_metadata==8.6.1
 ipykernel==6.29.5
