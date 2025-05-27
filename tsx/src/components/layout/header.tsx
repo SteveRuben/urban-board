@@ -15,6 +15,7 @@ const Header = ({ variant = 'public' }) => {
     { name: 'Tarifs', href: '/pricing' },
     { name: 'À propos', href: '/about' },
     { name: 'Contact', href: '/contact' },
+    { name: 'MesOffres', href: '/jobs-applications' },
   ];
 
   return (

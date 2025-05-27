@@ -1,0 +1,16 @@
+Bonjour {{ recruiter_name }},
+
+Une nouvelle candidature a été soumise pour votre offre d'emploi :
+
+{{ job_title }}
+Candidat : {{ candidate_name }}
+Date de candidature : {{ application_date }}
+
+Connectez-vous à votre tableau de bord pour consulter les détails de cette candidature et gérer le processus de recrutement.
+
+Lien vers le tableau de bord : {{ dashboard_url }}
+
+Bonne journée !
+
+---
+RecruteIA - Plateforme de recrutement intelligente 
