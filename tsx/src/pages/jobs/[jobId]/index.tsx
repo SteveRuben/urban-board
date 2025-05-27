@@ -11,7 +11,8 @@ import { JobPosting } from '@/types/jobs';
 
 export default function JobPostingDetailPage() {
   const router = useRouter();
-  const { id } = router.query;
+  const { jobId } = router.query;
+  const id  = jobId
   
   const [jobPosting, setJobPosting] = useState<JobPosting | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -331,7 +332,7 @@ export default function JobPostingDetailPage() {
                             <button
                               onClick={() => {
                                 // Copier le lien de l'offre
-                                const url = `${window.location.origin}/careers/jobs/${jobPosting.id}`;
+                                const url = `${window.location.origin}/jobs-applications/${jobPosting.id}`;
                                 navigator.clipboard.writeText(url);
                                 alert('Lien de l\'offre copié dans le presse-papiers!');
                               }}

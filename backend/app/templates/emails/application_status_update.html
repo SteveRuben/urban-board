@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Mise à jour de votre candidature</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #FF9800; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .status-update { background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #FF9800; }
+        .status-hired { border-left-color: #4CAF50; }
+        .status-rejected { border-left-color: #F44336; }
+        .status-interview { border-left-color: #2196F3; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Mise à jour de votre candidature</h1>
+        </div>
+        
+        <div class="content">
+            <p>Bonjour <strong>{{ candidate_name }}</strong>,</p>
+            
+            <p>Nous avons une mise à jour concernant votre candidature pour le poste :</p>
+            
+            <div class="status-update status-{{ new_status }}">
+                <h3>{{ job_title }}</h3>
+                <p><strong>Entreprise :</strong> {{ organization_name }}</p>
+                <p><strong>Statut :</strong> {{ status_message }}</p>
+                {% if notes %}
+                <p><strong>Notes :</strong> {{ notes }}</p>
+                {% endif %}
+            </div>
+            
+            {% if new_status == 'hired' %}
+            <p>🎉 Félicitations ! Nous sommes ravis de vous accueillir dans notre équipe. Quelqu'un de notre équipe RH vous contactera sous peu pour discuter des prochaines étapes.</p>
+            {% elif new_status == 'interview_scheduled' %}
+            <p>📅 Excellente nouvelle ! Nous souhaitons vous rencontrer. Vous devriez recevoir sous peu un email avec les détails de l'entretien.</p>
+            {% elif new_status == 'rejected' %}
+            <p>Nous vous remercions pour l'intérêt que vous avez porté à notre entreprise. Malheureusement, nous avons décidé de poursuivre avec d'autres candidats pour ce poste. Nous vous encourageons à consulter nos autres offres d'emploi.</p>
+            {% endif %}
+            
+            <p>Merci pour votre intérêt pour notre entreprise.</p>
+            
+            <p>Cordialement,<br>L'équipe de recrutement</p>
+        </div>
+        
+        <div class="footer">
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+        </div>
+    </div>
+</body>
+</html>

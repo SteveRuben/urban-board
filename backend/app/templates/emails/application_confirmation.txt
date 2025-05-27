@@ -1,0 +1,19 @@
+Bonjour {{ candidate_name }},
+
+Nous avons bien reçu votre candidature pour le poste suivant :
+
+{{ job_title }}
+Entreprise : {{ organization_name }}
+{% if job_location %}Localisation : {{ job_location }}{% endif %}
+{% if employment_type %}Type de contrat : {{ employment_type }}{% endif %}
+Date de candidature : {{ application_date }}
+
+Votre candidature va être examinée par notre équipe de recrutement. Nous vous recontacterons dans les plus brefs délais si votre profil correspond à nos attentes.
+
+Merci pour votre intérêt pour notre entreprise !
+
+Cordialement,
+L'équipe de recrutement
+
+---
+Cet email a été envoyé automatiquement, merci de ne pas y répondre.
