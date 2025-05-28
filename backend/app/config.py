@@ -84,12 +84,24 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     
+    # Configuration Google OAuth
+    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+    GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:5000/api/integrations/calendar/callback')
+    GOOGLE_SCOPES = os.getenv('GOOGLE_SCOPES', 'https://www.googleapis.com/auth/calendar.readonly').split(',')
+    GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
+
+    # Chemin pour stocker les tokens (ajoutez aussi dans init_app)
+    GOOGLE_TOKENS_DIR = os.path.join(DATA_DIR, 'google_tokens')
+    GOOGLE_CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'client_secret.json')
+    
     @staticmethod
     def init_app(app):
         """Initialisation de l'application avec cette configuration"""
         # Créer les répertoires nécessaires
         os.makedirs(Config.DATA_DIR, exist_ok=True)
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(Config.GOOGLE_TOKENS_DIR, exist_ok=True)  # Nouveau
         os.makedirs(os.path.dirname(Config.LOG_FILE), exist_ok=True)
 
 
@@ -150,7 +162,8 @@ class ProductionConfig(Config):
     @staticmethod
     def init_app(app):
         Config.init_app(app)
-        
+        assert Config.GOOGLE_CLIENT_ID and Config.GOOGLE_CLIENT_SECRET, \
+        "Google OAuth credentials must be configured in production"
         # Vérification des configurations critiques
         assert Config.SECRET_KEY != 'ma_cle_secrete_par_defaut', (
             "ERREUR: La clé secrète par défaut est utilisée en production. "

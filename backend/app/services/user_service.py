@@ -460,7 +460,7 @@ class UserService:
             return None, f"Erreur lors de la mise à jour des préférences de notification: {str(e)}"
     
     @staticmethod
-    def get_integration_auth_url(integration_id):
+    def get_integration_auth_url(user_id, integration_id):
         """
         Génère une URL d'authentification pour une intégration
         """
@@ -470,6 +470,11 @@ class UserService:
             valid_integrations = ['calendar', 'microsoft', 'ats', 'slack']
             if integration_id not in valid_integrations:
                 return None, "Intégration non valide"
+            
+            # Gestion spécifique pour Google Calendar
+            if integration_id == 'calendar':
+                from ..services.google_calendar_service import GoogleCalendarService
+                return GoogleCalendarService.get_auth_url(user_id=user_id)
             
             # Créer une URL d'authentification fictive
             # Dans une implémentation réelle, vous devriez utiliser l'API OAuth du service concerné
@@ -496,6 +501,19 @@ class UserService:
             if not user:
                 return False, "Utilisateur non trouvé"
             
+            if integration_id == 'calendar':
+                from ..models.user_integration import UserIntegration
+                integration = UserIntegration.query.filter_by(
+                    user_id=user_id,
+                    service='google_calendar'
+                ).first()
+                
+                if integration:
+                    db.session.delete(integration)
+                    db.session.commit()
+                    return True, "Google Calendar déconnecté avec succès"
+                return False, "Google Calendar n'était pas connecté"
+        
             # Simuler la déconnexion
             # Dans une implémentation réelle, vous devriez supprimer les tokens d'accès et les références
             
@@ -567,3 +585,19 @@ class UserService:
             "onboarding_completed": user.onboarding_completed,
             "onboarding_required": not has_organization and not user.onboarding_completed
         }
+    
+    @staticmethod
+    def save_integration_credentials(user_id, service, credentials):
+        """Sauvegarde les credentials d'une intégration"""
+        try:
+            # Implémentation similaire à GoogleCalendarService.handle_callback
+            # Mais générique pour toutes les intégrations
+            pass
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def get_integration_status(user_id):
+        """Récupère le statut des intégrations pour un utilisateur"""
+        # Implémentez cette méthode pour vérifier quelles intégrations sont connectées
+        pass

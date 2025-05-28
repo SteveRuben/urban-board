@@ -9,7 +9,7 @@ interface RetryableRequestConfig extends AxiosRequestConfig {
 }
 
 // Configuration d'axios avec les intercepteurs pour gérer automatiquement les tokens
-const api: AxiosInstance = axios.create({
+export const api: AxiosInstance = axios.create({
   baseURL: '/api'
 });
 

@@ -14,6 +14,7 @@ RecruteIA combine la puissance de l'IA avec l'expertise humaine pour offrir deux
 
 - **Mode autonome** : L'IA mène l'entretien entièrement avec le candidat
 - **Mode collaboratif** : Le recruteur conduit l'entretien avec l'assistance de l'IA
+- **Mode Hybride** : peer reviewing with all the participants
 
 ## Fonctionnalités principales
 
