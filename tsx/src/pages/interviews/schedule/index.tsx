@@ -1,0 +1,1006 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react"
+import { useRouter } from "next/router"
+import Head from "next/head"
+import Link from "next/link"
+import DashboardLayout from "@/components/layout/dashboard-layout"
+import AIAssistantService from "@/services/ai-assistant-service"
+import { InterviewSchedulingService } from "@/services/interview-scheduling-service"
+import type { InterviewScheduleFormData } from "@/types/interview-scheduling"
+import {
+  Brain,
+  RefreshCw,
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  Calendar,
+  User,
+  Briefcase,
+  ChevronRight,
+  ChevronLeft,
+  Trash2,
+  Plus,
+  Info,
+  Star,
+  Video,
+  MessageSquare,
+  Users,
+  Check,
+} from "lucide-react"
+import { AIAssistant, AIAssistantCapabilities, normalizeAssistant } from "@/types/assistant"
+
+// Types
+interface FormDataType {
+  job_role: string
+  experience_level: "debutant" | "intermediaire" | "experimente" | "expert"
+  job_description: string
+  candidate_name: string
+  candidate_email: string
+  candidate_phone: string
+  scheduled_time: string
+  interview_mode: "autonomous" | "collaborative"
+  interview_duration: number
+  custom_questions: string[]
+  cv_file_path: string | null
+  team_id: string
+  ai_assistants: string[]
+  application_id: string
+  job_id: string
+  timezone: string
+  mode: "autonomous" | "collaborative"
+}
+
+const getAssistantCapabilities = (assistant: AIAssistant): string[] => {
+  const normalizedAssistant = normalizeAssistant(assistant);
+  
+  const capabilities: AIAssistantCapabilities = normalizedAssistant.capabilities || {};
+  const capabilityLabels: string[] = [];
+  
+  // Mapper les capabilities du modèle vers des labels affichables avec vérifications de type
+  if (capabilities.generateQuestions === true) capabilityLabels.push('Questions');
+  if (capabilities.evaluateResponses === true) capabilityLabels.push('Évaluation');
+  if (capabilities.provideFeedback === true) capabilityLabels.push('Feedback');
+  if (capabilities.suggestFollowUps === true) capabilityLabels.push('Suivi');
+  if (capabilities.realTimeCoaching === true) capabilityLabels.push('Coaching');
+  if (capabilities.biometricIntegration === true) capabilityLabels.push('Biométrie');
+  
+  // Si aucune capability spécifique n'est trouvée, retourner un label générique
+  if (capabilityLabels.length === 0) {
+    capabilityLabels.push('Assistant général');
+  }
+  
+  return capabilityLabels;
+};
+
+const ScheduleInterviewPage = () => {
+  const router = useRouter()
+  const { applicationId, jobId, candidateName, candidateEmail, jobTitle, jobDesc, cv_file_path } = router.query
+
+  const [step, setStep] = useState<number>(2) // Commencer à l'étape 2
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [assistants, setAssistants] = useState<AIAssistant[]>([])
+  const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [formData, setFormData] = useState<FormDataType>({
+    job_role: "",
+    job_description: "",
+    experience_level: "intermediaire",
+    candidate_name: "",
+    candidate_email: "",
+    candidate_phone: "",
+    scheduled_time: "",
+    interview_mode: "autonomous",
+    interview_duration: 30,
+    custom_questions: [],
+    cv_file_path: null,
+    team_id: "",
+    ai_assistants: [],
+    application_id: "",
+    job_id: "",
+    timezone: "Europe/Paris",
+    mode: "autonomous",
+  })
+
+  // Pré-remplir le formulaire avec les paramètres d'URL
+  useEffect(() => {
+    if (candidateName && typeof candidateName === "string") {
+      setFormData((prev) => ({ ...prev, candidate_name: decodeURIComponent(candidateName) }))
+    }
+    if (candidateEmail && typeof candidateEmail === "string") {
+      setFormData((prev) => ({ ...prev, candidate_email: decodeURIComponent(candidateEmail) }))
+    }
+    if (jobTitle && typeof jobTitle === "string") {
+      setFormData((prev) => ({ ...prev, job_role: decodeURIComponent(jobTitle) }))
+    }
+    if (applicationId && typeof applicationId === "string") {
+      setFormData((prev) => ({ ...prev, application_id: applicationId }))
+    }
+    if (jobId && typeof jobId === "string") {
+      setFormData((prev) => ({ ...prev, job_id: jobId }))
+    }
+    if (jobDesc && typeof jobDesc === "string") {
+      setFormData((prev) => ({ ...prev, job_description: jobDesc }))
+    }
+    if (cv_file_path && typeof cv_file_path === "string") {
+      setFormData((prev) => ({ ...prev, cv_file_path: cv_file_path }))
+    }
+  }, [candidateName, candidateEmail, jobTitle, applicationId, jobId, jobDesc, cv_file_path])
+
+  // Charger les assistants IA disponibles
+  useEffect(() => {
+    const fetchAssistants = async () => {
+      try {
+        setLoadingAssistants(true)
+        const userAssistants = await AIAssistantService.getAllAssistants()
+        setAssistants(userAssistants)
+      } catch (error) {
+        console.error("Erreur lors du chargement des assistants:", error)
+      } finally {
+        setLoadingAssistants(false)
+      }
+    }
+
+    fetchAssistants()
+  }, [])
+
+  // Gérer les changements de champs du formulaire
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }))
+  }
+
+  // Ajouter une question personnalisée
+  const addCustomQuestion = () => {
+    setFormData((prev) => ({
+      ...prev,
+      custom_questions: [...prev.custom_questions, ""],
+    }))
+  }
+
+  // Mettre à jour une question personnalisée
+  const updateCustomQuestion = (index: number, value: string) => {
+    const updatedQuestions = [...formData.custom_questions]
+    updatedQuestions[index] = value
+    setFormData((prev) => ({
+      ...prev,
+      custom_questions: updatedQuestions,
+    }))
+  }
+
+  // Supprimer une question personnalisée
+  const removeCustomQuestion = (index: number) => {
+    const updatedQuestions = formData.custom_questions.filter((_, i) => i !== index)
+    setFormData((prev) => ({
+      ...prev,
+      custom_questions: updatedQuestions,
+    }))
+  }
+
+  // Gérer la sélection/désélection des assistants IA
+  const toggleAIAssistant = (assistantId: string) => {
+    setFormData((prev) => {
+      const currentAssistants = prev.ai_assistants || []
+      if (currentAssistants.includes(assistantId)) {
+        return {
+          ...prev,
+          ai_assistants: currentAssistants.filter((id) => id !== assistantId),
+        }
+      } else {
+        return {
+          ...prev,
+          ai_assistants: [...currentAssistants, assistantId],
+        }
+      }
+    })
+  }
+
+  // Mapper les données du formulaire vers le format du service
+  const mapFormDataToServiceData = (data: FormDataType): InterviewScheduleFormData => {
+    return {
+      candidate_name: data.candidate_name,
+      candidate_email: data.candidate_email,
+      candidate_phone: data.candidate_phone || undefined,
+      title: `Entretien ${data.job_role} - ${data.candidate_name}`,
+      description: data.job_description || undefined,
+      position: data.job_role,
+      scheduled_at: data.scheduled_time,
+      duration_minutes: data.interview_duration,
+      timezone: data.timezone,
+      mode: data.mode,
+      ai_assistant_id: data.ai_assistants.length > 0 ? data.ai_assistants[0] : undefined,
+      predefined_questions: data.custom_questions.filter(q => q.trim() !== ''),
+    }
+  }
+
+  // Soumettre le formulaire pour créer l'entretien
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSubmitError(null)
+
+    try {
+      setIsSubmitting(true)
+
+      // Valider les données avant soumission
+      const serviceData = mapFormDataToServiceData(formData)
+      const validationErrors = InterviewSchedulingService.validateScheduleData(serviceData)
+      
+      if (Object.keys(validationErrors).length > 0) {
+        const firstError = Object.values(validationErrors)[0]
+        setSubmitError(firstError)
+        return
+      }
+
+      console.log("Création de la planification d'entretien avec les données:", serviceData)
+
+      // Appeler le service pour créer la planification
+      const schedule = await InterviewSchedulingService.createSchedule(serviceData)
+      
+      console.log("Planification créée avec succès:", schedule)
+
+      // Rediriger vers la page de la planification créée
+      router.push(`/interviews/schedule/${schedule.id}?created=true`)
+      
+    } catch (error: any) {
+      console.error("Erreur lors de la création de la planification:", error)
+      setSubmitError(error.message || "Impossible de créer la planification. Veuillez réessayer.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Valider le formulaire avant de passer à l'étape suivante
+  const validateAndProceed = () => {
+    setSubmitError(null)
+    
+    if (step === 2) {
+      // Valider les paramètres d'entretien
+      if (!formData.interview_duration) {
+        setSubmitError("Veuillez spécifier une durée d'entretien.")
+        return
+      }
+      if (!formData.candidate_name.trim()) {
+        setSubmitError("Le nom du candidat est requis.")
+        return
+      }
+      if (!formData.candidate_email.trim()) {
+        setSubmitError("L'email du candidat est requis.")
+        return
+      }
+      if (!formData.job_role.trim()) {
+        setSubmitError("Le poste est requis.")
+        return
+      }
+      setStep(3)
+    }
+  }
+
+  // Revenir à l'étape précédente
+  const goBack = () => {
+    setSubmitError(null)
+    if (step > 2) {
+      setStep(step - 1)
+    } else {
+      // Retourner à la liste des candidatures
+      router.push(`/jobs/${jobId}/applications`)
+    }
+  }
+
+  // Obtenir un label pour le type d'assistant
+  const getAssistantTypeLabel = (type: string): string => {
+    switch (type) {
+      case "recruiter":
+        return "Recruteur"
+      case "evaluator":
+        return "Évaluateur"
+      case "analyzer":
+        return "Analyseur"
+      default:
+        return "Assistant général"
+    }
+  }
+
+  // Obtenir une couleur pour le type d'assistant
+  const getAssistantTypeColor = (type: string): string => {
+    switch (type) {
+      case "recruiter":
+        return "bg-blue-100 text-blue-800"
+      case "evaluator":
+        return "bg-purple-100 text-purple-800"
+      case "analyzer":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  // Obtenir une icône pour le type d'assistant
+  const getAssistantTypeIcon = (type: string) => {
+    switch (type) {
+      case "recruiter":
+        return <Users className="h-4 w-4" />
+      case "evaluator":
+        return <Star className="h-4 w-4" />
+      case "analyzer":
+        return <Brain className="h-4 w-4" />
+      default:
+        return <MessageSquare className="h-4 w-4" />
+    }
+  }
+
+  const getAssistantTypeSafe = (assistant: AIAssistant): string => {
+    return assistant.assistantType || assistant.assistant_type || 'general';
+  };
+  return (
+    <>
+      <Head>
+        <title>Programmer un entretien - {formData.candidate_name} - RecruteIA</title>
+        <meta name="description" content="Programmer un entretien assisté par IA pour ce candidat" />
+      </Head>
+
+      <div className="bg-gray-50 py-8 min-h-screen">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            {/* En-tête */}
+            <div className="mb-8">
+              <Link
+                href={`/jobs/${jobId}/applications`}
+                className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 bg-white px-3 py-1.5 rounded-full shadow-sm transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Retour aux candidatures
+              </Link>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Programmer un entretien</h1>
+              <div className="flex flex-wrap items-center gap-2 text-gray-600">
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-1 text-gray-500" />
+                  <span className="font-medium">{formData.candidate_name}</span>
+                </div>
+                <span className="text-gray-400">•</span>
+                <div className="flex items-center">
+                  <Briefcase className="h-4 w-4 mr-1 text-gray-500" />
+                  <span className="font-medium">{formData.job_role}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Affichage des erreurs */}
+            {submitError && (
+              <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{submitError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Étapes */}
+            <div className="mb-8 bg-white rounded-lg shadow-sm p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-600 text-white">
+                    <Check className="h-5 w-5" />
+                  </div>
+                  <div className="ml-2 text-sm font-medium text-gray-500">Candidat sélectionné</div>
+                </div>
+                <div className="h-0.5 flex-1 mx-4 bg-primary-600"></div>
+                <div className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      step >= 2 ? "bg-primary-600 text-white" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    2
+                  </div>
+                  <div className="ml-2 text-sm font-medium">Paramètres d'entretien</div>
+                </div>
+                <div className={`h-0.5 flex-1 mx-4 ${step > 2 ? "bg-primary-600" : "bg-gray-200"}`}></div>
+                <div className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      step >= 3 ? "bg-primary-600 text-white" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    3
+                  </div>
+                  <div className="ml-2 text-sm font-medium">Confirmation</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Formulaire */}
+            <form onSubmit={handleSubmit}>
+              {/* Étape 2 : Paramètres d'entretien */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  {/* Section: Mode d'entretien */}
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <Video className="h-5 w-5 mr-2 text-primary-600" />
+                      Mode d'entretien
+                    </h2>
+
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className={`border rounded-lg p-5 cursor-pointer transition-all ${
+                          formData.mode === "autonomous"
+                            ? "border-primary-600 bg-blue-50 shadow-md"
+                            : "border-gray-200 hover:border-primary-300 hover:bg-gray-50"
+                        }`}
+                        onClick={() => setFormData((prev) => ({ ...prev, mode: "autonomous" }))}
+                      >
+                        <div className="flex items-center">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                              formData.mode === "autonomous"
+                                ? "border-primary-600 bg-blue-600"
+                                : "border-gray-300"
+                            }`}
+                          >
+                            {formData.mode === "autonomous" && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <label className="ml-3 font-medium text-gray-800">
+                            Mode autonome
+                          </label>
+                        </div>
+                        <p className="mt-3 text-sm text-gray-600 ml-8">
+                          L'IA mène l'entretien de manière autonome, pose des questions et évalue les réponses
+                        </p>
+                        <div className="mt-3 ml-8 flex items-center">
+                          <Brain className="h-4 w-4 text-primary-600 mr-1" />
+                          <span className="text-xs text-primary-700">Entièrement automatisé</span>
+                        </div>
+                      </div>
+                      <div
+                        className={`border rounded-lg p-5 cursor-pointer transition-all ${
+                          formData.mode === "collaborative"
+                            ? "border-gray-600 bg-blue-50 shadow-md"
+                            : "border-gray-200 hover:border-primary-300 hover:bg-gray-50"
+                        }`}
+                        onClick={() => setFormData((prev) => ({ ...prev, mode: "collaborative" }))}
+                      >
+                        <div className="flex items-center">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                              formData.mode === "collaborative"
+                                ? "border-gray-600 bg-blue-600"
+                                : "border-gray-300"
+                            }`}
+                          >
+                            {formData.mode === "collaborative" && <Check className="h-3 w-3 text-white " />}
+                          </div>
+                          <label className="ml-3 font-medium text-gray-800">
+                            Mode collaboratif
+                          </label>
+                        </div>
+                        <p className="mt-3 text-sm text-gray-600 ml-8">
+                          Vous menez l'entretien avec l'assistance de l'IA qui suggère des questions et analyse les
+                          réponses
+                        </p>
+                        <div className="mt-3 ml-8 flex items-center">
+                          <Users className="h-4 w-4 text-gray-600 mr-1" />
+                          <span className="text-xs text-gray-700">Collaboration humain-IA</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  {/* Section: Paramètres généraux */}
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-primary-600" />
+                      Paramètres généraux
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="candidate_phone" className="block text-sm font-medium text-gray-700 mb-1">
+                          Téléphone du candidat
+                        </label>
+                        <input
+                          type="tel"
+                          id="candidate_phone"
+                          name="candidate_phone"
+                          value={formData.candidate_phone}
+                          onChange={handleChange}
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          placeholder="+33 6 12 34 56 78"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="experience_level" className="block text-sm font-medium text-gray-700 mb-1">
+                          Niveau d'expérience requis <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="experience_level"
+                          name="experience_level"
+                          value={formData.experience_level}
+                          onChange={handleChange}
+                          required
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                        >
+                          <option value="debutant">Débutant (0-2 ans)</option>
+                          <option value="intermediaire">Intermédiaire (2-5 ans)</option>
+                          <option value="experimente">Expérimenté (5-8 ans)</option>
+                          <option value="expert">Expert (8+ ans)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="interview_duration" className="block text-sm font-medium text-gray-700 mb-1">
+                          Durée de l'entretien <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="interview_duration"
+                          name="interview_duration"
+                          value={formData.interview_duration}
+                          onChange={handleChange}
+                          required
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                        >
+                          <option value="15">15 minutes</option>
+                          <option value="30">30 minutes</option>
+                          <option value="45">45 minutes</option>
+                          <option value="60">60 minutes</option>
+                          <option value="90">90 minutes</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 mb-1">
+                          Fuseau horaire
+                        </label>
+                        <select
+                          id="timezone"
+                          name="timezone"
+                          value={formData.timezone}
+                          onChange={handleChange}
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                        >
+                          <option value="Europe/Paris">Europe/Paris (UTC+1)</option>
+                          <option value="Europe/London">Europe/London (UTC+0)</option>
+                          <option value="America/New_York">America/New_York (UTC-5)</option>
+                          <option value="America/Los_Angeles">America/Los_Angeles (UTC-8)</option>
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label htmlFor="scheduled_time" className="block text-sm font-medium text-gray-700 mb-1">
+                          Date et heure planifiées
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                            <Calendar className="h-5 w-5" />
+                          </div>
+                          <input
+                            type="datetime-local"
+                            id="scheduled_time"
+                            name="scheduled_time"
+                            value={formData.scheduled_time}
+                            onChange={handleChange}
+                            className="w-full pl-10 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500 flex items-center">
+                          <Info className="h-3 w-3 mr-1" />
+                          Optionnel - si vous souhaitez planifier l'entretien pour plus tard
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section: Assistants IA */}
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <Brain className="h-5 w-5 mr-2 text-primary-600" />
+                        Assistants IA
+                      </h2>
+                      <Link
+                        href="/ai-assistants/create"
+                        target="_blank"
+                        className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center bg-primary-50 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Créer un assistant
+                      </Link>
+                    </div>
+
+                    {loadingAssistants ? (
+                      <div className="flex justify-center items-center p-10 border border-dashed border-gray-300 rounded-md bg-gray-50">
+                        <RefreshCw className="h-6 w-6 animate-spin text-primary-600 mr-2" />
+                        <span className="text-gray-500">Chargement des assistants IA...</span>
+                      </div>
+                    ) : assistants.length === 0 ? (
+                      <div className="text-center p-8 border border-dashed border-gray-300 rounded-md bg-gray-50">
+                        <Brain className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                        <p className="text-gray-600 mb-4">Vous n'avez pas encore d'assistants IA.</p>
+                        <Link
+                          href="/ai-assistants/new"
+                          target="_blank"
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                          <Plus className="h-4 w-4 mr-2 bg-blue-500" />
+                          Créer un assistant IA
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto p-3 border border-gray-200 rounded-md bg-gray-50">
+                        {assistants.map((assistant) => (
+                        <div
+                          key={assistant.id}
+                          className={`flex items-center rounded-lg p-4 cursor-pointer transition-all ${
+                            formData.ai_assistants.includes(assistant.id)
+                              ? "bg-white border-2 border-primary-300 shadow-md"
+                              : "bg-white border border-gray-200 hover:border-gray-300"
+                          }`}
+                          onClick={() => toggleAIAssistant(assistant.id)}
+                        >
+                          <div className="flex-shrink-0">
+                            <div className="h-12 w-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+                              <Brain className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                          <div className="ml-4 flex-1">
+                            <div className="font-medium text-gray-900">{assistant.name}</div>
+                            <div className="text-sm text-gray-500 flex items-center flex-wrap gap-2 mt-1">
+                              <span
+                                className={`${getAssistantTypeColor(
+                                  getAssistantTypeSafe(assistant)
+                                )} text-xs px-2 py-0.5 rounded-full flex items-center`}
+                              >
+                                {getAssistantTypeIcon(getAssistantTypeSafe(assistant))}
+                                <span className="ml-1">{getAssistantTypeLabel(getAssistantTypeSafe(assistant))}</span>
+                              </span>
+                              <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                                {assistant.model}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {getAssistantCapabilities(assistant).map((capability, index) => (
+                                <span
+                                  key={index}
+                                  className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full"
+                                >
+                                  {capability}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="ml-2">
+                            <div
+                              className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
+                                formData.ai_assistants.includes(assistant.id)
+                                  ? "border-primary-600 bg-blue-600"
+                                  : "border-gray-300"
+                              }`}
+                            >
+                              {formData.ai_assistants.includes(assistant.id) && (
+                                <Check className="h-4 w-4 text-white" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      </div>
+                    )}
+                    <p className="mt-3 text-sm text-gray-600 flex items-center">
+                      <Info className="h-4 w-4 mr-1 text-gray-400" />
+                      Les assistants IA sélectionnés participeront à l'entretien en analysant les réponses en temps réel
+                    </p>
+                  </div>
+
+                  {/* Section: Questions personnalisées */}
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <MessageSquare className="h-5 w-5 mr-2 text-primary-600" />
+                        Questions personnalisées
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={addCustomQuestion}
+                        className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center bg-primary-50 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Ajouter une question
+                      </button>
+                    </div>
+
+                    {formData.custom_questions.length > 0 ? (
+                      <div className="space-y-4 mt-3">
+                        {formData.custom_questions.map((question, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <span className="bg-primary-100 text-primary-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                                  Question {index + 1}
+                                </span>
+                              </div>
+                              <textarea
+                                value={question}
+                                onChange={(e) => updateCustomQuestion(index, e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                                placeholder="Saisissez votre question ici..."
+                                rows={2}
+                              ></textarea>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeCustomQuestion(index)}
+                              className="ml-3 text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition-colors"
+                              aria-label="Supprimer cette question"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center p-8 border border-dashed border-gray-300 rounded-md bg-gray-50">
+                        <MessageSquare className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                        <p className="text-gray-600 mb-2">Aucune question personnalisée.</p>
+                        <button
+                          type="button"
+                          onClick={addCustomQuestion}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter une question
+                        </button>
+                      </div>
+                    )}
+
+                    <p className="mt-3 text-sm text-gray-600 flex items-center">
+                      <Info className="h-4 w-4 mr-1 text-gray-400" />
+                      Ces questions seront posées en complément des questions générées automatiquement par l'IA
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Étape 3 : Confirmation */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  {/* Section: Résumé des informations */}
+                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                      <Info className="h-5 w-5 mr-2 text-primary-600" />
+                      Récapitulatif de l'entretien
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-1">Candidat</h3>
+                          <p className="font-medium text-gray-900">{formData.candidate_name}</p>
+                          {formData.candidate_email && (
+                            <p className="text-gray-600 text-sm">{formData.candidate_email}</p>
+                          )}
+                          {formData.candidate_phone && (
+                            <p className="text-gray-600 text-sm">{formData.candidate_phone}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-1">Poste recherché</h3>
+                          <p className="font-medium text-gray-900">{formData.job_role}</p>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-1">Niveau d'expérience</h3>
+                          <p className="font-medium text-gray-900">
+                            {formData.experience_level === "debutant"
+                              ? "Débutant (0-2 ans)"
+                              : formData.experience_level === "intermediaire"
+                                ? "Intermédiaire (2-5 ans)"
+                                : formData.experience_level === "experimente"
+                                  ? "Expérimenté (5-8 ans)"
+                                  : "Expert (8+ ans)"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        
+
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-1">Mode d'entretien</h3>
+                          <p className="font-medium text-gray-900">
+                            {formData.mode === "autonomous" ? "Mode autonome" : "Mode collaboratif"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-1">Durée prévue</h3>
+                          <p className="font-medium text-gray-900">
+                            {InterviewSchedulingService.formatDuration(formData.interview_duration)}
+                          </p>
+                        </div>
+
+                        {formData.scheduled_time && (
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-500 mb-1">Date et heure</h3>
+                            <p className="font-medium text-gray-900">
+                              {InterviewSchedulingService.formatScheduledDateTime(formData.scheduled_time, formData.timezone)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Affichage des assistants IA sélectionnés */}
+                    {formData.ai_assistants.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h3 className="text-sm font-medium text-gray-500 mb-3">
+                          Assistants IA sélectionnés ({formData.ai_assistants.length})
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {formData.ai_assistants.map((assistantId) => {
+                            const assistant = assistants.find((a) => a.id === assistantId)
+                            return assistant ? (
+                              <div
+                                key={assistantId}
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                              >
+                                <Brain className="h-3 w-3 mr-1" />
+                                {assistant.name}
+                              </div>
+                            ) : null
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.custom_questions.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h3 className="text-sm font-medium text-gray-500 mb-3">
+                          Questions personnalisées ({formData.custom_questions.filter(q => q.trim()).length})
+                        </h3>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {formData.custom_questions.filter(q => q.trim()).map((question, index) => (
+                            <li key={index} className="text-gray-600 text-sm">
+                              {question}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {formData.ai_assistants.length === 0 && (
+                      <div className="mt-6 bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <AlertTriangle className="h-5 w-5" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm">
+                              Aucun assistant IA n'a été sélectionné. L'entretien sera mené uniquement avec l'IA
+                              générique du système.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 text-blue-700">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <Info className="h-5 w-5" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm">
+                            {formData.interview_mode === "autonomous"
+                              ? "L'IA mènera cet entretien de manière autonome. Vous pourrez consulter les résultats une fois terminé."
+                              : "Vous mènerez l'entretien avec l'assistance de l'IA, qui vous suggérera des questions et évaluera les réponses."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Boutons de navigation améliorés */}
+              <div className="mt-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="group px-6 py-3 bg-white border-2 border-gray-400 rounded-lg text-gray-800 hover:border-gray-600 hover:bg-gray-100 transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium"
+                  >
+                    <ChevronLeft className="h-5 w-5 mr-2 text-gray-600 group-hover:-translate-x-1 transition-transform duration-200" />
+                    <span>{step === 2 ? "Retour aux candidatures" : "Étape précédente"}</span>
+                  </button>
+
+                  {/* Indicateur de progression */}
+                  <div className="flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-full">
+                    <div className="text-sm font-medium text-gray-700">Étape {step} sur 3</div>
+                    <div className="flex space-x-1">
+                      {[2, 3].map((stepNumber) => (
+                        <div
+                          key={stepNumber}
+                          className={`w-3 h-3 rounded-full transition-colors duration-200 ${
+                            step >= stepNumber ? "bg-blue-600" : "bg-gray-400"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {step < 3 ? (
+                    <button
+                      type="button"
+                      onClick={validateAndProceed}
+                      className="group px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium border border-blue-600"
+                    >
+                      <span>Continuer</span>
+                      <ChevronRight className="h-5 w-5 ml-2 text-white group-hover:translate-x-1 transition-transform duration-200" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className={`group px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium border border-green-600 ${
+                        isSubmitting ? "opacity-70 cursor-not-allowed transform-none" : ""
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="animate-spin h-5 w-5 mr-2 text-white" />
+                          <span>Programmation en cours...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="h-5 w-5 mr-2 text-white group-hover:scale-110 transition-transform duration-200" />
+                          <span>Programmer l'entretien</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Barre de progression */}
+                <div className="mt-6 w-full bg-gray-300 rounded-full h-3 shadow-inner">
+                  <div
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
+                    style={{ width: `${((step - 1) / 2) * 100}%` }}
+                  ></div>
+                </div>
+
+                {/* Texte d'aide */}
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    {step === 2
+                      ? "Configurez les paramètres de votre entretien"
+                      : "Vérifiez les informations avant de programmer l'entretien"}
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+ScheduleInterviewPage.getLayout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>
+export default ScheduleInterviewPage

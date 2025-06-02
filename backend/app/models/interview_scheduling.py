@@ -73,7 +73,7 @@ class InterviewSchedule(db.Model):
             'id': self.id,
             'organization_id': self.organization_id,
             'recruiter_id': self.recruiter_id,
-            'recruiter_name': self.recruiter.name if self.recruiter else None,
+            'recruiter_name': self.recruiter.first_name if self.recruiter else None,
             'candidate_name': self.candidate_name,
             'candidate_email': self.candidate_email,
             'candidate_phone': self.candidate_phone,

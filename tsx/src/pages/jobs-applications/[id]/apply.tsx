@@ -242,7 +242,7 @@ const JobApplicationPage: NextPageWithLayout = () => {
                     <div>
                       <h3 className="font-medium text-gray-900">Confirmation par email</h3>
                       <p className="text-gray-600 text-sm">
-                        Vous recevrez un email de confirmation dans les prochaines minutes à l'adresse{" "}
+                        Vous recevrez un email de confirmation dans les prochaines minutes à votre adresse {applicationData.candidate_email}
                         <span className="font-medium">{applicationData.candidate_email}</span>
                       </p>
                     </div>

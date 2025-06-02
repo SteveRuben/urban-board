@@ -6,7 +6,7 @@ from email.mime.application import MIMEApplication
 from datetime import datetime
 import os
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from flask import current_app
+from flask import current_app, app
 
 class EmailService:
     """Service pour gérer l'envoi d'emails dans l'application"""
@@ -45,11 +45,11 @@ class EmailService:
             # Charger le template HTML
             html_template = self.jinja_env.get_template(f"{template_name}.html")
             text_template = self.jinja_env.get_template(f"{template_name}.txt")
-            
+
             # Rendre les templates avec le contexte
             html_content = html_template.render(**context)
             text_content = text_template.render(**context)
-            
+
             # Créer le message
             message = MIMEMultipart('alternative')
             message['Subject'] = subject
@@ -83,14 +83,15 @@ class EmailService:
     def send_interview_invitation(self, email, candidate_name, interview_title, recruiter_name, 
                                  scheduled_at, duration_minutes, timezone, access_token, description=None):
         """Envoie une invitation à un entretien"""
+        print('..........135..............')
         subject = f"Invitation: {interview_title}"
-        
+        print('..........8..............')
         # Générer le lien d'accès
         interview_url = f"{app.config.get('FRONTEND_URL', 'https://recruteai.com')}/interview/join/{access_token}"
         
         # Formater la date pour l'affichage
         formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
-        
+        print('..........9..............')
         # Préparer le contexte pour le template
         context = {
             'candidate_name': candidate_name,
@@ -105,7 +106,7 @@ class EmailService:
                 interview_title, description, scheduled_at, duration_minutes, timezone
             )
         }
-        
+        print('..........10..............')
         return self.send_email(email, subject, 'interview_invitation', context)
     
     def send_interview_reminder(self, email, candidate_name, interview_title, recruiter_name, 

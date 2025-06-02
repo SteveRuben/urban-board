@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import aiAssistantService from '@/services/ai-assistant-service';
-import  dateUtils  from '@/lib/util';
+import  {formatDate}  from '@/lib/utils';
 import { InterviewModeBadgeProps, AIAssistantCardProps, AIAssistant } from '@/types/assistant';
 
 
@@ -167,7 +167,7 @@ const AIAssistantCard: React.FC<AIAssistantCardProps> = ({ assistant, onDelete, 
         <div className="mt-4 border-t pt-4 flex items-center justify-between text-sm">
           <div className="flex items-center text-gray-500">
             <CalendarIcon className="h-4 w-4 mr-1" />
-            <span>Créé le {dateUtils.formatDate(assistant.createdAt)}</span>
+            <span>Créé le {formatDate(assistant.createdAt)}</span>
           </div>
           <div className="flex items-center">
             <span className="text-gray-500">

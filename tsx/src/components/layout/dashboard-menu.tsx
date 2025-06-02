@@ -16,6 +16,7 @@ import {
   UsersIcon
 } from '@heroicons/react/24/outline';
 import { Subscription } from '@/types';
+import { Code2 } from 'lucide-react';
 
 interface DashboardMenuProps {
   userRole?: string;
@@ -98,6 +99,12 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ userRole = 'recruiter', s
           href: '/candidates'
         }
       ]
+    },
+    {
+      name: "Codingame",
+      href: "/codingame",
+      icon: Code2,
+      access: true,
     },
     {
       name: 'Analyse de CV',

@@ -1,6 +1,6 @@
 # backend/routes/interview_scheduling_routes.py
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, g
+from app.routes.user import token_required
 from ..services.interview_scheduling_service import InterviewSchedulingService
 from ..services.organization_service import OrganizationService
 from ..services.audit_service import AuditService
@@ -9,29 +9,89 @@ from app import db
 
 scheduling_bp = Blueprint('scheduling', __name__, url_prefix='/api/scheduling')
 
-
 scheduling_service = InterviewSchedulingService()
 organization_service = OrganizationService()
 audit_service = AuditService()
 
+# Constantes pour la validation
+VALID_INTERVIEW_MODES = ['collaborative', 'autonomous']
+VALID_STATUSES = ['scheduled', 'confirmed', 'in_progress', 'completed', 'canceled', 'no_show']
+
+def get_current_user_id():
+    """Retourne l'ID utilisateur actuel sous forme de string"""
+    return str(g.current_user.user_id)
+
+def validate_interview_data(data, is_update=False):
+    """Valide les données d'entretien"""
+    errors = {}
+    
+    # Validation du mode d'entretien
+    if 'mode' in data:
+        if not data['mode'] or data['mode'] not in VALID_INTERVIEW_MODES:
+            errors['mode'] = f"Le mode doit être l'un des suivants: {', '.join(VALID_INTERVIEW_MODES)}"
+    elif not is_update:  # Requis seulement pour la création
+        errors['mode'] = "Le mode d'entretien est requis"
+    
+    # Validation des champs requis pour la création
+    if not is_update:
+        required_fields = ['candidate_name', 'candidate_email', 'title', 'position', 'scheduled_at']
+        for field in required_fields:
+            if not data.get(field):
+                errors[field] = f"Le champ {field} est requis"
+    
+    # Validation de l'email
+    if 'candidate_email' in data and data['candidate_email']:
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, data['candidate_email']):
+            errors['candidate_email'] = "Format d'email invalide"
+    
+    # Validation de la date
+    if 'scheduled_at' in data and data['scheduled_at']:
+        try:
+            scheduled_date = datetime.fromisoformat(data['scheduled_at'])
+            if scheduled_date <= datetime.now():
+                errors['scheduled_at'] = "La date doit être dans le futur"
+        except ValueError:
+            errors['scheduled_at'] = "Format de date invalide"
+    
+    # Validation de la durée
+    if 'duration_minutes' in data and data['duration_minutes']:
+        if not isinstance(data['duration_minutes'], int) or data['duration_minutes'] < 15 or data['duration_minutes'] > 480:
+            errors['duration_minutes'] = "La durée doit être entre 15 minutes et 8 heures"
+    
+    return errors
+
 @scheduling_bp.route('/schedules', methods=['POST'])
-@jwt_required()
+@token_required
 def create_schedule():
     """Crée une nouvelle planification d'entretien"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     data = request.get_json()
-    
-    # Récupérer l'organisation de l'utilisateur
-    organization = organization_service.get_user_organization(user_id)
-    if not organization:
+    print('/////////////')
+    print(data)
+    if not data:
         return jsonify({
             'status': 'error',
-            'message': 'Aucune organisation trouvée pour cet utilisateur'
-        }), 404
+            'message': 'Aucune donnée fournie'
+        }), 400
     
+    # Valider les données
+    validation_errors = validate_interview_data(data)
+    if validation_errors:
+        return jsonify({
+            'status': 'error',
+            'message': 'Données invalides',
+            'errors': validation_errors
+        }), 400
+    
+    # Récupérer l'organisation de l'utilisateur
+    organization = g.current_user.current_organization_id
+    print('/////////////'+organization)
+    print(data)
     try:
         schedule = scheduling_service.create_schedule(
-            organization_id=organization.id,
+            organization_id=organization,
             recruiter_id=user_id,
             data=data
         )
@@ -53,10 +113,16 @@ def create_schedule():
         }), 500
 
 @scheduling_bp.route('/schedules/<schedule_id>', methods=['GET'])
-@jwt_required()
+@token_required
 def get_schedule(schedule_id):
     """Récupère les détails d'une planification"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
+    
+    if not schedule_id:
+        return jsonify({
+            'status': 'error',
+            'message': 'ID de planification requis'
+        }), 400
     
     schedule = scheduling_service.get_schedule(schedule_id)
     if not schedule:
@@ -68,7 +134,7 @@ def get_schedule(schedule_id):
     # Vérifier que l'utilisateur a le droit d'accéder à cette planification
     if schedule.recruiter_id != user_id:
         # Vérifier si l'utilisateur est membre de l'organisation
-        from models.organization import OrganizationMember
+        from ..models.organization import OrganizationMember
         is_member = OrganizationMember.query.filter_by(
             organization_id=schedule.organization_id,
             user_id=user_id
@@ -86,11 +152,26 @@ def get_schedule(schedule_id):
     }), 200
 
 @scheduling_bp.route('/schedules/<schedule_id>', methods=['PUT'])
-@jwt_required()
+@token_required
 def update_schedule(schedule_id):
     """Met à jour une planification d'entretien"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     data = request.get_json()
+    
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'Aucune donnée fournie'
+        }), 400
+    
+    # Valider les données
+    validation_errors = validate_interview_data(data, is_update=True)
+    if validation_errors:
+        return jsonify({
+            'status': 'error',
+            'message': 'Données invalides',
+            'errors': validation_errors
+        }), 400
     
     try:
         schedule = scheduling_service.update_schedule(
@@ -116,10 +197,10 @@ def update_schedule(schedule_id):
         }), 500
 
 @scheduling_bp.route('/schedules/<schedule_id>/cancel', methods=['POST'])
-@jwt_required()
+@token_required
 def cancel_schedule(schedule_id):
     """Annule une planification d'entretien"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     data = request.get_json() or {}
     reason = data.get('reason')
     
@@ -147,13 +228,20 @@ def cancel_schedule(schedule_id):
         }), 500
 
 @scheduling_bp.route('/schedules/me', methods=['GET'])
-@jwt_required()
+@token_required
 def get_my_schedules():
     """Récupère les planifications de l'utilisateur connecté"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     
     # Récupérer les paramètres de filtrage
     status = request.args.get('status')
+    
+    # Validation du statut
+    if status and status not in VALID_STATUSES and status != 'all':
+        return jsonify({
+            'status': 'error',
+            'message': f'Statut invalide. Valeurs autorisées: {", ".join(VALID_STATUSES + ["all"])}'
+        }), 400
     
     from_date = None
     if 'from_date' in request.args:
@@ -177,7 +265,7 @@ def get_my_schedules():
     
     schedules = scheduling_service.get_user_schedules(
         user_id=user_id,
-        status=status,
+        status=status if status != 'all' else None,
         from_date=from_date,
         to_date=to_date
     )
@@ -188,10 +276,10 @@ def get_my_schedules():
     }), 200
 
 @scheduling_bp.route('/organizations/current/schedules', methods=['GET'])
-@jwt_required()
+@token_required
 def get_organization_schedules():
     """Récupère les planifications de l'organisation"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     
     # Récupérer l'organisation de l'utilisateur
     organization = organization_service.get_user_organization(user_id)
@@ -212,6 +300,13 @@ def get_organization_schedules():
     
     # Récupérer les paramètres de filtrage
     status = request.args.get('status')
+    
+    # Validation du statut
+    if status and status not in VALID_STATUSES and status != 'all':
+        return jsonify({
+            'status': 'error',
+            'message': f'Statut invalide. Valeurs autorisées: {", ".join(VALID_STATUSES + ["all"])}'
+        }), 400
     
     from_date = None
     if 'from_date' in request.args:
@@ -235,7 +330,7 @@ def get_organization_schedules():
     
     schedules = scheduling_service.get_organization_schedules(
         organization_id=organization.id,
-        status=status,
+        status=status if status != 'all' else None,
         from_date=from_date,
         to_date=to_date
     )
@@ -248,6 +343,12 @@ def get_organization_schedules():
 @scheduling_bp.route('/schedules/access/<access_token>', methods=['GET'])
 def get_schedule_by_token(access_token):
     """Récupère les détails d'une planification par son token d'accès (pour le candidat)"""
+    if not access_token:
+        return jsonify({
+            'status': 'error',
+            'message': 'Token d\'accès requis'
+        }), 400
+    
     schedule = scheduling_service.get_schedule_by_token(access_token)
     if not schedule:
         return jsonify({
@@ -282,10 +383,10 @@ def get_schedule_by_token(access_token):
     }), 200
 
 @scheduling_bp.route('/schedules/<schedule_id>/confirm', methods=['POST'])
-@jwt_required()
+@token_required
 def confirm_schedule(schedule_id):
     """Confirme une planification d'entretien"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     
     schedule = scheduling_service.get_schedule(schedule_id)
     if not schedule:
@@ -300,6 +401,13 @@ def confirm_schedule(schedule_id):
             'status': 'error',
             'message': 'Vous n\'êtes pas autorisé à confirmer cet entretien'
         }), 403
+    
+    # Vérifier que l'entretien peut être confirmé
+    if schedule.status not in ['scheduled']:
+        return jsonify({
+            'status': 'error',
+            'message': f'Impossible de confirmer un entretien avec le statut: {schedule.status}'
+        }), 400
     
     try:
         # Mettre à jour le statut
@@ -329,10 +437,10 @@ def confirm_schedule(schedule_id):
         }), 500
 
 @scheduling_bp.route('/schedules/<schedule_id>/no-show', methods=['POST'])
-@jwt_required()
+@token_required
 def mark_no_show(schedule_id):
     """Marque un candidat comme absent à l'entretien"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     
     try:
         schedule = scheduling_service.mark_as_no_show(
@@ -357,10 +465,10 @@ def mark_no_show(schedule_id):
         }), 500
 
 @scheduling_bp.route('/schedules/<schedule_id>/start', methods=['POST'])
-@jwt_required()
+@token_required
 def start_interview(schedule_id):
     """Démarre un entretien planifié"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     data = request.get_json()
     
     if not data or 'interview_id' not in data:
@@ -384,7 +492,7 @@ def start_interview(schedule_id):
             action='start',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Début de l'entretien avec {schedule.candidate_name}"
+            description=f"Début de l'entretien {schedule.mode} avec {schedule.candidate_name}"
         )
         
         return jsonify({
@@ -404,10 +512,10 @@ def start_interview(schedule_id):
         }), 500
 
 @scheduling_bp.route('/schedules/<schedule_id>/complete', methods=['POST'])
-@jwt_required()
+@token_required
 def complete_interview(schedule_id):
     """Marque un entretien comme terminé"""
-    user_id = get_jwt_identity()
+    user_id = get_current_user_id()
     
     try:
         schedule = scheduling_service.mark_as_completed(schedule_id)
@@ -419,7 +527,7 @@ def complete_interview(schedule_id):
             action='complete',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Fin de l'entretien avec {schedule.candidate_name}"
+            description=f"Fin de l'entretien {schedule.mode} avec {schedule.candidate_name}"
         )
         
         return jsonify({
@@ -437,3 +545,25 @@ def complete_interview(schedule_id):
             'status': 'error',
             'message': f'Une erreur est survenue: {str(e)}'
         }), 500
+
+# Route utilitaire pour obtenir les modes d'entretien disponibles
+@scheduling_bp.route('/modes', methods=['GET'])
+def get_interview_modes():
+    """Retourne la liste des modes d'entretien disponibles"""
+    modes = [
+        {
+            'value': 'collaborative',
+            'label': 'Collaboratif',
+            'description': 'Entretien avec assistant IA et interaction directe avec le recruteur'
+        },
+        {
+            'value': 'autonomous',
+            'label': 'Autonome',
+            'description': 'Entretien autonome géré entièrement par l\'assistant IA'
+        }
+    ]
+    
+    return jsonify({
+        'status': 'success',
+        'data': modes
+    }), 200

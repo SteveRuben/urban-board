@@ -1,1 +1,277 @@
-[]
+[
+  {
+    "id": "9b2b5895-0ed3-4b0d-b6c3-0e33138aa22a",
+    "user_id": "fankamnjjjjgaleu@gmail.com",
+    "type": "application_confirmation",
+    "title": "Confirmation de candidature - Test1",
+    "message": "Votre candidature pour le poste de Test1 a \u00e9t\u00e9 re\u00e7ue avec succ\u00e8s.",
+    "link": "/applications/6ee10e24-9bef-4741-8de0-1bd90592501f",
+    "reference_id": "6ee10e24-9bef-4741-8de0-1bd90592501f",
+    "read": false,
+    "date": "2025-06-02T01:58:26.769332"
+  },
+  {
+    "id": "6e597eb8-6330-4fd5-ab57-7c2d2460819b",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "new_application",
+    "title": "Nouvelle candidature pour Test1",
+    "message": "fn a postul\u00e9 pour le poste de Test1.",
+    "link": "/dashboard/applications/6ee10e24-9bef-4741-8de0-1bd90592501f",
+    "reference_id": "6ee10e24-9bef-4741-8de0-1bd90592501f",
+    "read": false,
+    "date": "2025-06-02T01:58:32.148459"
+  },
+  {
+    "id": "b6944d5a-9b9f-4a7e-8de5-4533f0bc09f2",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 04:38",
+    "link": "/interviews/scheduled/b17fa384-d00f-45e0-a785-39e493afc92e",
+    "reference_id": "b17fa384-d00f-45e0-a785-39e493afc92e",
+    "read": false,
+    "date": "2025-06-02T04:38:54.487412"
+  },
+  {
+    "id": "b54076e8-434d-4fad-a579-8a8ff5ea124c",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 04:38",
+    "link": "/interviews/scheduled/6beaf68b-2676-4545-89fa-8e9f08fa43cb",
+    "reference_id": "6beaf68b-2676-4545-89fa-8e9f08fa43cb",
+    "read": false,
+    "date": "2025-06-02T04:39:47.473045"
+  },
+  {
+    "id": "4e5c2820-420e-4c03-9140-4b127b9cf638",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:22",
+    "link": "/interviews/scheduled/2f11fb84-45cd-4304-9ff0-9d30e5cc5f3c",
+    "reference_id": "2f11fb84-45cd-4304-9ff0-9d30e5cc5f3c",
+    "read": false,
+    "date": "2025-06-02T09:23:54.364045"
+  },
+  {
+    "id": "9bd51088-ecae-44c8-9e26-d45df5e5105b",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:22",
+    "link": "/interviews/scheduled/6e35fa69-2cbd-4414-abe1-8dd0e1968d21",
+    "reference_id": "6e35fa69-2cbd-4414-abe1-8dd0e1968d21",
+    "read": false,
+    "date": "2025-06-02T09:24:10.086463"
+  },
+  {
+    "id": "ab4179b2-f2c2-4287-9a4f-35d436ba88e9",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:22",
+    "link": "/interviews/scheduled/a709a7a0-b654-49a6-aac1-167553b5032f",
+    "reference_id": "a709a7a0-b654-49a6-aac1-167553b5032f",
+    "read": false,
+    "date": "2025-06-02T09:25:38.030762"
+  },
+  {
+    "id": "fd892325-d832-4197-b3e7-8e71eb7ef640",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/1390025f-f0d9-4f97-8bed-dc88fb66b77c",
+    "reference_id": "1390025f-f0d9-4f97-8bed-dc88fb66b77c",
+    "read": false,
+    "date": "2025-06-02T09:26:08.198076"
+  },
+  {
+    "id": "2b390e05-924a-420d-a2cd-5c44d3633968",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/a958d466-9ef6-472f-9f3a-0663cbd5340b",
+    "reference_id": "a958d466-9ef6-472f-9f3a-0663cbd5340b",
+    "read": false,
+    "date": "2025-06-02T09:28:48.407180"
+  },
+  {
+    "id": "723cec63-6bfc-4ba9-9bed-96ee0a76680c",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/531fb00b-cd52-407a-a0eb-0b6671514b55",
+    "reference_id": "531fb00b-cd52-407a-a0eb-0b6671514b55",
+    "read": false,
+    "date": "2025-06-02T09:29:54.642109"
+  },
+  {
+    "id": "5c76ea84-d2c1-410d-8860-1abb949fbfc8",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/8631d2b7-1544-4a5b-8b93-c814cb70576f",
+    "reference_id": "8631d2b7-1544-4a5b-8b93-c814cb70576f",
+    "read": false,
+    "date": "2025-06-02T09:39:05.470441"
+  },
+  {
+    "id": "1ecb4641-9824-4686-8d6b-f92dc52b2450",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/910e8914-a035-4010-84ac-48bfd5701401",
+    "reference_id": "910e8914-a035-4010-84ac-48bfd5701401",
+    "read": false,
+    "date": "2025-06-02T09:41:12.620546"
+  },
+  {
+    "id": "7326d9f9-b990-4d03-a88b-c918f93f081b",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/0fbf76a0-288c-4b10-a3e3-049e7d4be34c",
+    "reference_id": "0fbf76a0-288c-4b10-a3e3-049e7d4be34c",
+    "read": false,
+    "date": "2025-06-02T09:41:50.905673"
+  },
+  {
+    "id": "e74e4311-efc9-4777-9f92-e742d4fee140",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 09:25",
+    "link": "/interviews/scheduled/72167642-6336-4936-a4df-23298feca040",
+    "reference_id": "72167642-6336-4936-a4df-23298feca040",
+    "read": false,
+    "date": "2025-06-02T09:43:45.483803"
+  },
+  {
+    "id": "76b9cb06-46cb-4dcd-a7ce-89fa1f9b9a27",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/ae05e2d2-e171-4a56-a2b5-42ae709f2e65",
+    "reference_id": "ae05e2d2-e171-4a56-a2b5-42ae709f2e65",
+    "read": false,
+    "date": "2025-06-02T10:11:04.458483"
+  },
+  {
+    "id": "53daca59-6b88-4e93-bc8b-6cc4f4b4c9ce",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/2fa08e7e-340d-48a5-b3e5-b931d373c01c",
+    "reference_id": "2fa08e7e-340d-48a5-b3e5-b931d373c01c",
+    "read": false,
+    "date": "2025-06-02T10:11:18.313512"
+  },
+  {
+    "id": "8644dc6e-6e01-42e0-a103-74939544598c",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/ec4727ae-33b3-4a6f-a96e-4c581284403c",
+    "reference_id": "ec4727ae-33b3-4a6f-a96e-4c581284403c",
+    "read": false,
+    "date": "2025-06-02T10:11:34.580982"
+  },
+  {
+    "id": "842a847a-1897-4caf-8831-66b706fe59de",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/236fd9fb-6a59-4f2d-a7ef-16fe841259f0",
+    "reference_id": "236fd9fb-6a59-4f2d-a7ef-16fe841259f0",
+    "read": false,
+    "date": "2025-06-02T10:13:59.695101"
+  },
+  {
+    "id": "d23bef87-45ac-4186-b7f4-0ac4db2a7f78",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/11730912-a833-4fad-8eb0-ad79faa00d40",
+    "reference_id": "11730912-a833-4fad-8eb0-ad79faa00d40",
+    "read": false,
+    "date": "2025-06-02T10:15:30.275856"
+  },
+  {
+    "id": "2cb5bc62-1d90-4d1d-9402-2e685195486a",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/e8da4f1d-c8d2-466c-906d-9106e57a43ed",
+    "reference_id": "e8da4f1d-c8d2-466c-906d-9106e57a43ed",
+    "read": false,
+    "date": "2025-06-02T10:17:09.901691"
+  },
+  {
+    "id": "7039f2a9-9e97-433a-a898-7ac6db1c4670",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/71c29e48-b215-4fb6-abd5-00b9e2ff408f",
+    "reference_id": "71c29e48-b215-4fb6-abd5-00b9e2ff408f",
+    "read": false,
+    "date": "2025-06-02T10:17:19.857789"
+  },
+  {
+    "id": "a0459e9c-c434-488e-98db-8e210dc2c6b9",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 09:49",
+    "link": "/interviews/scheduled/0deec522-ae2e-4e6e-b6e9-16d3a3ddf95a",
+    "reference_id": "0deec522-ae2e-4e6e-b6e9-16d3a3ddf95a",
+    "read": false,
+    "date": "2025-06-02T10:19:06.526881"
+  },
+  {
+    "id": "1019cbcc-01f9-4b7a-8ce4-180791564c4a",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 12/06/2025 \u00e0 10:23",
+    "link": "/interviews/scheduled/3d7fa22d-dc70-4ebf-9338-9122393f514e",
+    "reference_id": "3d7fa22d-dc70-4ebf-9338-9122393f514e",
+    "read": false,
+    "date": "2025-06-02T10:23:38.055793"
+  },
+  {
+    "id": "a72f956d-2ac7-4cf2-8aa1-ef595c09a794",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 12:48",
+    "link": "/interviews/scheduled/a1838f1e-4046-4d44-b8b9-826898814cf7",
+    "reference_id": "a1838f1e-4046-4d44-b8b9-826898814cf7",
+    "read": false,
+    "date": "2025-06-02T12:49:08.184146"
+  },
+  {
+    "id": "d8f3d4da-b495-46c6-88e4-b13a0b1b1a49",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_rescheduled",
+    "title": "Entretien reprogramm\u00e9",
+    "message": "L'entretien avec fn a \u00e9t\u00e9 reprogramm\u00e9 pour le 14/06/2025 \u00e0 11:48",
+    "link": "/interviews/scheduled/a1838f1e-4046-4d44-b8b9-826898814cf7",
+    "reference_id": "a1838f1e-4046-4d44-b8b9-826898814cf7",
+    "read": false,
+    "date": "2025-06-02T13:00:03.484271"
+  }
+]

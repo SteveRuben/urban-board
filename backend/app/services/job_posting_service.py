@@ -1,6 +1,6 @@
 # backend/services/job_posting_service.py
 import uuid
-from ..services.email_service import EmailService
+from ..services.notification_service import NotificationService
 from flask import abort,current_app, url_for, jsonify, send_file
 import requests
 from bs4 import BeautifulSoup
@@ -20,7 +20,8 @@ class JobPostingService:
     
     def __init__(self):
         self.ai_service = AIService()
-        self.email_service = EmailService()
+        self.notification_service = NotificationService()
+
 
         # Configuration pour l'upload de fichiers
         self.upload_folder = os.environ.get('UPLOAD_FOLDER', 'uploads/job_files')
@@ -861,88 +862,109 @@ class JobPostingService:
             print(f"Erreur lors de la récupération des détails: {str(e)}")
             raise
     
+    # def _send_application_confirmation(self, application, job):
+    #     """Envoie un email de confirmation au candidat"""
+    #     try:
+    #         subject = f"Confirmation de candidature - {job.title}"
+            
+    #         context = {
+    #             'candidate_name': application.candidate_name,
+    #             'job_title': job.title,
+    #             'organization_name': job.organization.name if job.organization else 'l\'entreprise',
+    #             'application_date': application.created_at.strftime("%d/%m/%Y à %H:%M"),
+    #             'job_location': job.location,
+    #             'employment_type': job.employment_type
+    #         }
+            
+    #         self.email_service.send_email(
+    #             application.candidate_email,
+    #             subject,
+    #             'application_confirmation',
+    #             context
+    #         )
+    #     except Exception as e:
+    #         print(f"Erreur lors de l'envoi de l'email de confirmation: {str(e)}")
+    
+    # def _send_new_application_notification(self, application, job):
+    #     """Envoie une notification au recruteur pour une nouvelle candidature"""
+    #     try:
+    #         if not job.creator:
+    #             return
+            
+    #         subject = f"Nouvelle candidature pour {job.title}"
+            
+    #         context = {
+    #             'recruiter_name': f"{job.creator.first_name} {job.creator.last_name}".strip(),
+    #             'candidate_name': application.candidate_name,
+    #             'job_title': job.title,
+    #             'application_date': application.created_at.strftime("%d/%m/%Y à %H:%M"),
+    #             'dashboard_url': f"{current_app.config.get('FRONTEND_URL', '')}/dashboard/applications"
+    #         }
+            
+    #         self.email_service.send_email(
+    #             job.creator.email,
+    #             subject,
+    #             'new_application_notification',
+    #             context
+    #         )
+    #     except Exception as e:
+    #         print(f"Erreur lors de l'envoi de la notification: {str(e)}")
+    
+    # def _send_status_update_notification(self, application, old_status, new_status):
+    #     """Envoie une notification au candidat lors d'un changement de statut"""
+    #     try:
+    #         # Définir les messages selon le statut
+    #         status_messages = {
+    #             'reviewed': 'Votre candidature a été examinée',
+    #             'interview_scheduled': 'Un entretien a été planifié',
+    #             'rejected': 'Votre candidature n\'a pas été retenue',
+    #             'hired': 'Félicitations ! Votre candidature a été acceptée'
+    #         }
+            
+    #         if new_status not in status_messages:
+    #             return
+            
+    #         subject = f"Mise à jour de votre candidature - {application.job_posting.title}"
+            
+    #         context = {
+    #             'candidate_name': application.candidate_name,
+    #             'job_title': application.job_posting.title,
+    #             'organization_name': application.job_posting.organization.name if application.job_posting.organization else 'l\'entreprise',
+    #             'status_message': status_messages[new_status],
+    #             'new_status': new_status,
+    #             'notes': application.notes
+    #         }
+            
+    #         self.email_service.send_email(
+    #             application.candidate_email,
+    #             subject,
+    #             'application_status_update',
+    #             context
+    #         )
+    #     except Exception as e:
+    #         print(f"Erreur lors de l'envoi de la notification de statut: {str(e)}")      
+
     def _send_application_confirmation(self, application, job):
         """Envoie un email de confirmation au candidat"""
         try:
-            subject = f"Confirmation de candidature - {job.title}"
-            
-            context = {
-                'candidate_name': application.candidate_name,
-                'job_title': job.title,
-                'organization_name': job.organization.name if job.organization else 'l\'entreprise',
-                'application_date': application.created_at.strftime("%d/%m/%Y à %H:%M"),
-                'job_location': job.location,
-                'employment_type': job.employment_type
-            }
-            
-            self.email_service.send_email(
-                application.candidate_email,
-                subject,
-                'application_confirmation',
-                context
-            )
+            return self.notification_service.create_application_confirmation_notification(application, job)
         except Exception as e:
             print(f"Erreur lors de l'envoi de l'email de confirmation: {str(e)}")
     
     def _send_new_application_notification(self, application, job):
         """Envoie une notification au recruteur pour une nouvelle candidature"""
         try:
-            if not job.creator:
-                return
-            
-            subject = f"Nouvelle candidature pour {job.title}"
-            
-            context = {
-                'recruiter_name': f"{job.creator.first_name} {job.creator.last_name}".strip(),
-                'candidate_name': application.candidate_name,
-                'job_title': job.title,
-                'application_date': application.created_at.strftime("%d/%m/%Y à %H:%M"),
-                'dashboard_url': f"{current_app.config.get('FRONTEND_URL', '')}/dashboard/applications"
-            }
-            
-            self.email_service.send_email(
-                job.creator.email,
-                subject,
-                'new_application_notification',
-                context
-            )
+            return self.notification_service.create_new_application_notification(application, job)
         except Exception as e:
             print(f"Erreur lors de l'envoi de la notification: {str(e)}")
     
     def _send_status_update_notification(self, application, old_status, new_status):
         """Envoie une notification au candidat lors d'un changement de statut"""
         try:
-            # Définir les messages selon le statut
-            status_messages = {
-                'reviewed': 'Votre candidature a été examinée',
-                'interview_scheduled': 'Un entretien a été planifié',
-                'rejected': 'Votre candidature n\'a pas été retenue',
-                'hired': 'Félicitations ! Votre candidature a été acceptée'
-            }
-            
-            if new_status not in status_messages:
-                return
-            
-            subject = f"Mise à jour de votre candidature - {application.job_posting.title}"
-            
-            context = {
-                'candidate_name': application.candidate_name,
-                'job_title': application.job_posting.title,
-                'organization_name': application.job_posting.organization.name if application.job_posting.organization else 'l\'entreprise',
-                'status_message': status_messages[new_status],
-                'new_status': new_status,
-                'notes': application.notes
-            }
-            
-            self.email_service.send_email(
-                application.candidate_email,
-                subject,
-                'application_status_update',
-                context
-            )
+            return self.notification_service.create_status_update_notification(application, old_status, new_status)
         except Exception as e:
-            print(f"Erreur lors de l'envoi de la notification de statut: {str(e)}")      
-
+            print(f"Erreur lors de l'envoi de la notification de statut: {str(e)}")
+    
     def upload_resume(self, file):
         """
         Upload un CV et retourne l'URL

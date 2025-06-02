@@ -142,7 +142,7 @@ class SubscriptionService:
     
     def check_interview_limit(self, user_id):
         """Vérifie si l'utilisateur a atteint sa limite d'entretiens mensuelle"""
-        from models.interview import Interview
+        from ..models.interview_scheduling import InterviewSchedule
         
         # Récupérer le plan et les limites
         plan_name = self.get_user_plan(user_id)
@@ -157,9 +157,9 @@ class SubscriptionService:
         start_of_month = datetime(now.year, now.month, 1)
         
         # Compter les entretiens du mois
-        interview_count = Interview.query.filter(
-            Interview.recruiter_id == user_id,
-            Interview.created_at >= start_of_month
+        interview_count = InterviewSchedule.query.filter(
+            InterviewSchedule.recruiter_id == user_id,
+            InterviewSchedule.created_at >= start_of_month
         ).count()
         
         return interview_count < monthly_limit
@@ -188,7 +188,7 @@ class SubscriptionService:
         ).count()
         
         # Inclure également les invitations en cours
-        from models.invitation import Invitation
+        from ..models.invitation import Invitation
         invitations_count = Invitation.query.filter_by(
             organization_id=organization_id,
             status='pending'

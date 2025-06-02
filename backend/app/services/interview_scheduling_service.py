@@ -11,11 +11,24 @@ from app import db
 class InterviewSchedulingService:
     """Service pour gérer la planification des entretiens"""
     
+    # Constantes pour les modes d'entretien
+    VALID_MODES = ['collaborative', 'autonomous']
+    VALID_STATUSES = ['scheduled', 'confirmed', 'in_progress', 'completed', 'canceled', 'no_show']
+    
     def __init__(self):
         self.notification_service = NotificationService()
-        self.email_service = EmailService()
         self.audit_service = AuditService()
         self.subscription_service = SubscriptionService()
+    
+    def _validate_mode(self, mode):
+        """Valide le mode d'entretien"""
+        if mode not in self.VALID_MODES:
+            raise ValueError(f"Mode d'entretien invalide. Modes autorisés: {', '.join(self.VALID_MODES)}")
+    
+    def _validate_status(self, status):
+        """Valide le statut d'entretien"""
+        if status not in self.VALID_STATUSES:
+            raise ValueError(f"Statut invalide. Statuts autorisés: {', '.join(self.VALID_STATUSES)}")
     
     def create_schedule(self, organization_id, recruiter_id, data):
         """
@@ -30,12 +43,30 @@ class InterviewSchedulingService:
             L'objet InterviewSchedule créé
         """
         # Vérifier les limites d'entretiens du plan
-        if not self.subscription_service.check_interview_limit(recruiter_id):
-            raise ValueError("Limite d'entretiens atteinte pour votre plan d'abonnement")
+        # if not self.subscription_service.check_interview_limit(recruiter_id):
+        #     raise ValueError("Limite d'entretiens atteinte pour votre plan d'abonnement")
         
+        # Valider le mode d'entretien
+        mode = data.get('mode')
+        if not mode:
+            raise ValueError("Le mode d'entretien est requis")
+        self._validate_mode(mode)
+        # Validation des champs requis
+        required_fields = ['candidate_name', 'candidate_email', 'title', 'position', 'scheduled_at']
+        for field in required_fields:
+            if not data.get(field):
+                raise ValueError(f"Le champ {field} est requis")
+        # Validation de la date
+        try:
+            scheduled_at = datetime.fromisoformat(data.get('scheduled_at'))
+            if scheduled_at <= datetime.now():
+                raise ValueError("La date doit être dans le futur")
+        except ValueError as e:
+            if "futur" in str(e):
+                raise e
+            raise ValueError("Format de date invalide")
         # Créer la planification
         schedule = InterviewSchedule(
-            id=str(uuid.uuid4()),
             organization_id=organization_id,
             recruiter_id=recruiter_id,
             candidate_name=data.get('candidate_name'),
@@ -44,16 +75,14 @@ class InterviewSchedulingService:
             title=data.get('title'),
             description=data.get('description'),
             position=data.get('position'),
-            scheduled_at=datetime.fromisoformat(data.get('scheduled_at')),
+            scheduled_at=scheduled_at,
             duration_minutes=data.get('duration_minutes', 30),
             timezone=data.get('timezone', 'Europe/Paris'),
-            mode=data.get('mode'),
+            mode=mode,
             ai_assistant_id=data.get('ai_assistant_id'),
             predefined_questions=data.get('predefined_questions'),
-            access_token=str(uuid.uuid4()),
             status='scheduled'
         )
-        
         db.session.add(schedule)
         db.session.commit()
         
@@ -64,32 +93,24 @@ class InterviewSchedulingService:
             action='create',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Entretien planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}"
+            description=f"Entretien {mode} planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}"
         )
-        
+        print(schedule.access_token)
         # Envoyer les notifications
         try:
             # Notification au recruteur
-            self.notification_service.send_notification(
-                user_id=recruiter_id,
-                title="Nouvel entretien planifié",
-                message=f"Vous avez planifié un entretien avec {schedule.candidate_name} pour le {schedule.scheduled_at}",
-                type="interview_scheduled",
-                data={"schedule_id": schedule.id}
+            self.notification_service.create_interview_scheduled_notification(
+                recruiter_id=recruiter_id,
+                schedule_data={
+                    'candidate_name': schedule.candidate_name,
+                    'scheduled_at': schedule.scheduled_at.strftime("%d/%m/%Y à %H:%M"),
+                    'schedule_id': schedule.id,
+                    'mode': mode
+                }
             )
+            # Email d'invitation au candidat
+            self.notification_service.send_interview_invitation_email(schedule)
             
-            # Email au candidat
-            self.email_service.send_interview_invitation(
-                email=schedule.candidate_email,
-                candidate_name=schedule.candidate_name,
-                interview_title=schedule.title,
-                recruiter_name=schedule.recruiter.name,
-                scheduled_at=schedule.scheduled_at,
-                duration_minutes=schedule.duration_minutes,
-                timezone=schedule.timezone,
-                access_token=schedule.access_token,
-                description=schedule.description
-            )
         except Exception as e:
             print(f"Erreur lors de l'envoi des notifications: {str(e)}")
         
@@ -114,7 +135,7 @@ class InterviewSchedulingService:
         # Vérifier que le recruteur a le droit de modifier
         if schedule.recruiter_id != recruiter_id:
             # Vérifier si le recruteur est admin dans l'organisation
-            from models.organization import OrganizationMember
+            from ..models.organization import OrganizationMember
             is_admin = OrganizationMember.query.filter_by(
                 organization_id=schedule.organization_id,
                 user_id=recruiter_id,
@@ -124,17 +145,30 @@ class InterviewSchedulingService:
             if not is_admin:
                 raise ValueError("Vous n'avez pas la permission de modifier cet entretien")
         
+        # Valider le mode si fourni
+        if 'mode' in data and data['mode']:
+            self._validate_mode(data['mode'])
+        
         # Vérifier si la date a changé
         date_changed = False
         if 'scheduled_at' in data and data['scheduled_at']:
-            new_date = datetime.fromisoformat(data['scheduled_at'])
-            date_changed = new_date != schedule.scheduled_at
+            try:
+                new_date = datetime.fromisoformat(data['scheduled_at'])
+                if new_date <= datetime.now():
+                    raise ValueError("La date doit être dans le futur")
+                date_changed = new_date != schedule.scheduled_at
+            except ValueError as e:
+                if "futur" in str(e):
+                    raise e
+                raise ValueError("Format de date invalide")
         
         # Mettre à jour les champs
         for field in ['candidate_name', 'candidate_email', 'candidate_phone', 
                       'title', 'description', 'position', 'duration_minutes', 
                       'timezone', 'mode', 'ai_assistant_id', 'predefined_questions', 'status']:
             if field in data and data[field] is not None:
+                if field == 'status':
+                    self._validate_status(data[field])
                 setattr(schedule, field, data[field])
         
         if 'scheduled_at' in data and data['scheduled_at']:
@@ -150,32 +184,26 @@ class InterviewSchedulingService:
             action='update',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Modification de l'entretien avec {schedule.candidate_name}"
+            description=f"Modification de l'entretien {schedule.mode} avec {schedule.candidate_name}"
         )
         
         # Si la date a changé, envoyer des notifications
         if date_changed:
             try:
                 # Notification au recruteur
-                self.notification_service.send_notification(
-                    user_id=schedule.recruiter_id,
-                    title="Entretien reprogrammé",
-                    message=f"L'entretien avec {schedule.candidate_name} a été reprogrammé pour le {schedule.scheduled_at}",
-                    type="interview_rescheduled",
-                    data={"schedule_id": schedule.id}
+                self.notification_service.create_interview_rescheduled_notification(
+                    recruiter_id=schedule.recruiter_id,
+                    schedule_data={
+                        'candidate_name': schedule.candidate_name,
+                        'scheduled_at': schedule.scheduled_at.strftime("%d/%m/%Y à %H:%M"),
+                        'schedule_id': schedule.id,
+                        'mode': schedule.mode
+                    }
                 )
                 
                 # Email au candidat
-                self.email_service.send_interview_rescheduled(
-                    email=schedule.candidate_email,
-                    candidate_name=schedule.candidate_name,
-                    interview_title=schedule.title,
-                    recruiter_name=schedule.recruiter.name,
-                    scheduled_at=schedule.scheduled_at,
-                    duration_minutes=schedule.duration_minutes,
-                    timezone=schedule.timezone,
-                    access_token=schedule.access_token
-                )
+                self.notification_service.send_interview_rescheduled_email(schedule)
+                
             except Exception as e:
                 print(f"Erreur lors de l'envoi des notifications: {str(e)}")
         
@@ -200,7 +228,7 @@ class InterviewSchedulingService:
         # Vérifier que l'utilisateur a le droit d'annuler
         if schedule.recruiter_id != user_id:
             # Vérifier si l'utilisateur est admin dans l'organisation
-            from models.organization import OrganizationMember
+            from ..models.organization import OrganizationMember
             is_admin = OrganizationMember.query.filter_by(
                 organization_id=schedule.organization_id,
                 user_id=user_id,
@@ -209,6 +237,10 @@ class InterviewSchedulingService:
             
             if not is_admin:
                 raise ValueError("Vous n'avez pas la permission d'annuler cet entretien")
+        
+        # Vérifier que l'entretien peut être annulé
+        if schedule.status in ['completed', 'canceled']:
+            raise ValueError(f"Impossible d'annuler un entretien avec le statut: {schedule.status}")
         
         # Mettre à jour le statut
         schedule.status = 'canceled'
@@ -223,29 +255,25 @@ class InterviewSchedulingService:
             action='cancel',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Annulation de l'entretien avec {schedule.candidate_name}" + 
+            description=f"Annulation de l'entretien {schedule.mode} avec {schedule.candidate_name}" + 
                         (f" - Raison: {reason}" if reason else "")
         )
         
         # Envoyer des notifications
         try:
             # Notification au recruteur
-            self.notification_service.send_notification(
-                user_id=schedule.recruiter_id,
-                title="Entretien annulé",
-                message=f"L'entretien avec {schedule.candidate_name} a été annulé",
-                type="interview_canceled",
-                data={"schedule_id": schedule.id}
+            self.notification_service.create_interview_canceled_notification(
+                recruiter_id=schedule.recruiter_id,
+                schedule_data={
+                    'candidate_name': schedule.candidate_name,
+                    'schedule_id': schedule.id,
+                    'mode': schedule.mode
+                }
             )
             
             # Email au candidat
-            self.email_service.send_interview_canceled(
-                email=schedule.candidate_email,
-                candidate_name=schedule.candidate_name,
-                interview_title=schedule.title,
-                recruiter_name=schedule.recruiter.name,
-                reason=reason
-            )
+            self.notification_service.send_interview_canceled_email(schedule, reason)
+            
         except Exception as e:
             print(f"Erreur lors de l'envoi des notifications: {str(e)}")
         
@@ -275,6 +303,7 @@ class InterviewSchedulingService:
         query = InterviewSchedule.query.filter_by(recruiter_id=user_id)
         
         if status:
+            self._validate_status(status)
             query = query.filter_by(status=status)
         
         if from_date:
@@ -301,6 +330,7 @@ class InterviewSchedulingService:
         query = InterviewSchedule.query.filter_by(organization_id=organization_id)
         
         if status:
+            self._validate_status(status)
             query = query.filter_by(status=status)
         
         if from_date:
@@ -311,7 +341,7 @@ class InterviewSchedulingService:
         
         return query.order_by(InterviewSchedule.scheduled_at).all()
     
-    def send_reminders(self):
+    def send_reminders(self):   
         """
         Envoie des rappels pour les entretiens à venir
         Cette méthode est destinée à être exécutée par un job planifié
@@ -324,7 +354,7 @@ class InterviewSchedulingService:
         reminder_window = now + timedelta(hours=24)
         
         schedules = InterviewSchedule.query.filter(
-            InterviewSchedule.status == 'scheduled',
+            InterviewSchedule.status.in_(['scheduled', 'confirmed']),
             InterviewSchedule.scheduled_at >= now,
             InterviewSchedule.scheduled_at <= reminder_window,
             InterviewSchedule.reminder_sent == False
@@ -333,32 +363,25 @@ class InterviewSchedulingService:
         count = 0
         for schedule in schedules:
             try:
-                # Email au candidat
-                self.email_service.send_interview_reminder(
-                    email=schedule.candidate_email,
-                    candidate_name=schedule.candidate_name,
-                    interview_title=schedule.title,
-                    recruiter_name=schedule.recruiter.name,
-                    scheduled_at=schedule.scheduled_at,
-                    duration_minutes=schedule.duration_minutes,
-                    timezone=schedule.timezone,
-                    access_token=schedule.access_token
-                )
+                # Email de rappel au candidat
+                self.notification_service.send_interview_reminder_email(schedule)
                 
                 # Notification au recruteur
-                self.notification_service.send_notification(
-                    user_id=schedule.recruiter_id,
-                    title="Rappel d'entretien",
-                    message=f"Rappel: Vous avez un entretien avec {schedule.candidate_name} demain à {schedule.scheduled_at.strftime('%H:%M')}",
-                    type="interview_reminder",
-                    data={"schedule_id": schedule.id}
+                self.notification_service.create_interview_reminder_notification(
+                    recruiter_id=schedule.recruiter_id,
+                    schedule_data={
+                        'candidate_name': schedule.candidate_name,
+                        'time': schedule.scheduled_at.strftime('%H:%M'),
+                        'schedule_id': schedule.id,
+                        'mode': schedule.mode
+                    }
                 )
                 
                 # Marquer comme rappel envoyé
                 schedule.reminder_sent = True
                 count += 1
             except Exception as e:
-                print(f"Erreur lors de l'envoi du rappel: {str(e)}")
+                print(f"Erreur lors de l'envoi du rappel pour {schedule.id}: {str(e)}")
         
         db.session.commit()
         return count
@@ -377,6 +400,10 @@ class InterviewSchedulingService:
         schedule = self.get_schedule(schedule_id)
         if not schedule:
             raise ValueError(f"Planification introuvable: {schedule_id}")
+        
+        # Vérifier que l'entretien peut être démarré
+        if schedule.status not in ['scheduled', 'confirmed']:
+            raise ValueError(f"Impossible de démarrer un entretien avec le statut: {schedule.status}")
         
         schedule.status = 'in_progress'
         schedule.interview_id = interview_id
@@ -399,6 +426,10 @@ class InterviewSchedulingService:
         if not schedule:
             raise ValueError(f"Planification introuvable: {schedule_id}")
         
+        # Vérifier que l'entretien peut être terminé
+        if schedule.status != 'in_progress':
+            raise ValueError(f"Impossible de terminer un entretien avec le statut: {schedule.status}")
+        
         schedule.status = 'completed'
         schedule.updated_at = datetime.utcnow()
         db.session.commit()
@@ -420,6 +451,10 @@ class InterviewSchedulingService:
         if not schedule:
             raise ValueError(f"Planification introuvable: {schedule_id}")
         
+        # Vérifier que l'entretien peut être marqué comme no-show
+        if schedule.status not in ['scheduled', 'confirmed']:
+            raise ValueError(f"Impossible de marquer comme absent un entretien avec le statut: {schedule.status}")
+        
         schedule.status = 'no_show'
         schedule.updated_at = datetime.utcnow()
         db.session.commit()
@@ -431,7 +466,47 @@ class InterviewSchedulingService:
             action='mark_no_show',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Absence du candidat {schedule.candidate_name} à l'entretien"
+            description=f"Absence du candidat {schedule.candidate_name} à l'entretien {schedule.mode}"
         )
         
         return schedule
+    
+    def get_mode_statistics(self, organization_id, from_date=None, to_date=None):
+        """
+        Obtient des statistiques sur les modes d'entretien
+        
+        Args:
+            organization_id: ID de l'organisation
+            from_date: Date de début (optionnel)
+            to_date: Date de fin (optionnel)
+            
+        Returns:
+            Dictionnaire avec les statistiques par mode
+        """
+        query = InterviewSchedule.query.filter_by(organization_id=organization_id)
+        
+        if from_date:
+            query = query.filter(InterviewSchedule.scheduled_at >= from_date)
+        
+        if to_date:
+            query = query.filter(InterviewSchedule.scheduled_at <= to_date)
+        
+        schedules = query.all()
+        
+        stats = {
+            'collaborative': {'total': 0, 'completed': 0, 'canceled': 0, 'no_show': 0},
+            'autonomous': {'total': 0, 'completed': 0, 'canceled': 0, 'no_show': 0}
+        }
+        
+        for schedule in schedules:
+            mode = schedule.mode
+            if mode in stats:
+                stats[mode]['total'] += 1
+                if schedule.status == 'completed':
+                    stats[mode]['completed'] += 1
+                elif schedule.status == 'canceled':
+                    stats[mode]['canceled'] += 1
+                elif schedule.status == 'no_show':
+                    stats[mode]['no_show'] += 1
+        
+        return stats

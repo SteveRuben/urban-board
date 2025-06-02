@@ -1,4 +1,5 @@
 import "@/styles/globals.css";
+import CodingameLayout from "@/components/codingame/codingame-layout";
 import React, { useEffect } from 'react';
 import type { AppProps } from "next/app";
 import { I18nProvider } from "@/provider/i18n";
@@ -64,6 +65,13 @@ function AppWithLayout({ Component, pageProps }: AppPropsWithLayout): React.Reac
   // Pour les pages d'onboarding, pas de layout
   if (onboardingPaths.some(path => router.pathname.startsWith(path))) {
     return <Component {...pageProps} />;
+  }
+  if (router.pathname.startsWith("/codingame")) {
+    return (
+      <CodingameLayout>
+        {(authToken) => <Component {...pageProps} authToken={authToken} />}
+      </CodingameLayout>
+    );
   }
 
   // Si c'est une page publique ou si l'utilisateur n'est pas encore connecté
