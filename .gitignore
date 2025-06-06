@@ -40,3 +40,4 @@ frontend/.next/**/*
 /docs/tmp/***
 backend/.env
 /debug.log
+backend/data/google_tokens/google_token.json
