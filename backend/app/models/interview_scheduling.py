@@ -5,6 +5,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from . import job_posting
 from app import db
+# from .meeting_platform import MeetingP·latform
+
 
 class InterviewSchedule(db.Model):
     __tablename__ = 'interview_schedules'
@@ -50,6 +52,23 @@ class InterviewSchedule(db.Model):
     # Résultat de l'entretien (lien vers l'entretien réalisé)
     interview_id = db.Column(db.String(36), db.ForeignKey("interviews.id"), nullable=True)
     
+
+     # ID de l'événement Google Calendar
+    google_event_id = db.Column(db.String(255), nullable=True)
+    # Lien Google Meet
+    meet_link = db.Column(db.Text, nullable=True)
+    # Lien vers l'événement dans Google Calendar
+    calendar_link = db.Column(db.Text, nullable=True)
+    
+    
+    # Statut de la synchronisation avec Google Calendar
+    calendar_sync_status = db.Column(db.Enum(
+        'pending', 'synced', 'error', 'disabled', 
+        name='calendar_sync_status'), default='pending')
+    # Message d'erreur de synchronisation si applicable
+    calendar_sync_error = db.Column(db.Text, nullable=True)
+    
+    
     # Métadonnées
     created_at = db.Column(db.DateTime, default=func.now())
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
@@ -63,6 +82,7 @@ class InterviewSchedule(db.Model):
     job_posting_id = db.Column(db.String(36), db.ForeignKey("job_postings.id"), nullable=True)
     job_posting = relationship("JobPosting", back_populates="interview_schedules")
     job_application = relationship("JobApplication", back_populates="interview_schedule", uselist=False)
+    
     
     def __repr__(self):
         return f"<InterviewSchedule {self.candidate_name} - {self.scheduled_at}>"

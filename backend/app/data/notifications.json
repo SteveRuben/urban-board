@@ -273,5 +273,49 @@
     "reference_id": "a1838f1e-4046-4d44-b8b9-826898814cf7",
     "read": false,
     "date": "2025-06-02T13:00:03.484271"
+  },
+  {
+    "id": "cf3b985c-12cb-4856-8b1e-e746bfc4b8e2",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec ah pour le 21/06/2025 \u00e0 09:33",
+    "link": "/interviews/scheduled/a8d3f3f3-3264-4677-9a43-4b3b64b3747c",
+    "reference_id": "a8d3f3f3-3264-4677-9a43-4b3b64b3747c",
+    "read": false,
+    "date": "2025-06-06T09:34:05.505786"
+  },
+  {
+    "id": "ebf9de90-3071-414c-8e1b-76e0bc67daef",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 28/06/2025 \u00e0 09:40",
+    "link": "/interviews/scheduled/07cd9b80-569e-487c-9615-eadb05a1e8f4",
+    "reference_id": "07cd9b80-569e-487c-9615-eadb05a1e8f4",
+    "read": false,
+    "date": "2025-06-06T09:40:15.420446"
+  },
+  {
+    "id": "f5b07397-023b-486e-a69c-1034b6633a15",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec Ngaleugni pour le 21/06/2025 \u00e0 14:07",
+    "link": "/interviews/scheduled/53f5ce31-1aea-4b6d-870f-9ddd17d3efc8",
+    "reference_id": "53f5ce31-1aea-4b6d-870f-9ddd17d3efc8",
+    "read": false,
+    "date": "2025-06-06T14:08:48.143284"
+  },
+  {
+    "id": "20c91c0f-cc52-4942-ba11-41bdab912017",
+    "user_id": "6daca06d-3a2b-494c-8e86-dad034054317",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 14/06/2025 \u00e0 14:10",
+    "link": "/interviews/scheduled/cbe0dd67-84a0-46f0-825a-3ad891837a8a",
+    "reference_id": "cbe0dd67-84a0-46f0-825a-3ad891837a8a",
+    "read": false,
+    "date": "2025-06-06T14:10:21.100982"
   }
 ]

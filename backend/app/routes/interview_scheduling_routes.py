@@ -1,4 +1,5 @@
 # backend/routes/interview_scheduling_routes.py
+from ..models.interview_scheduling import InterviewSchedule
 from flask import Blueprint, request, jsonify, g
 from app.routes.user import token_required
 from ..services.interview_scheduling_service import InterviewSchedulingService
@@ -567,3 +568,215 @@ def get_interview_modes():
         'status': 'success',
         'data': modes
     }), 200
+    
+@scheduling_bp.route('/test-google', methods=['GET'])
+@token_required
+def test_google_integration():
+    """Test de l'intégration Google Calendar/Meet"""
+    try:
+        result = scheduling_service.test_google_integration()
+        return jsonify({
+            'status': 'success' if result['success'] else 'error',
+            'data': result
+        }), 200 if result['success'] else 500
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur lors du test Google: {str(e)}'
+        }), 500
+
+@scheduling_bp.route('/schedules/<schedule_id>/retry-sync', methods=['POST'])
+@token_required
+def retry_meeting_sync(schedule_id):
+    """Réessaie la synchronisation du meeting Google Calendar"""
+    user_id = get_current_user_id()
+    
+    try:
+        schedule = scheduling_service.retry_meeting_sync(schedule_id, user_id)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Synchronisation relancée avec succès',
+            'data': {
+                'schedule_id': schedule.id,
+                'sync_status': schedule.calendar_sync_status,
+                'meet_link': schedule.meet_link,
+                'calendar_link': schedule.calendar_link,
+                'sync_error': schedule.calendar_sync_error
+            }
+        }), 200
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Une erreur est survenue: {str(e)}'
+        }), 500
+
+@scheduling_bp.route('/schedules/<schedule_id>/meeting-info', methods=['GET'])
+@token_required
+def get_meeting_info(schedule_id):
+    """Récupère les informations du meeting Google Calendar"""
+    user_id = get_current_user_id()
+    
+    schedule = scheduling_service.get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Planification introuvable'
+        }), 404
+    
+    # Vérifier les permissions
+    if schedule.recruiter_id != user_id:
+        from ..models.organization import OrganizationMember
+        is_member = OrganizationMember.query.filter_by(
+            organization_id=schedule.organization_id,
+            user_id=user_id
+        ).first() is not None
+        
+        if not is_member:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
+    
+    meeting_info = schedule.get_meeting_info()
+    
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'has_meeting': schedule.has_valid_meeting(),
+            'meeting_info': meeting_info,
+            'sync_status': schedule.calendar_sync_status,
+            'sync_error': schedule.calendar_sync_error
+        }
+    }), 200
+
+@scheduling_bp.route('/schedules/access/<access_token>/meeting', methods=['GET'])
+def get_candidate_meeting_info(access_token):
+    """Récupère les informations du meeting pour le candidat via son token d'accès"""
+    if not access_token:
+        return jsonify({
+            'status': 'error',
+            'message': 'Token d\'accès requis'
+        }), 400
+    
+    schedule = scheduling_service.get_schedule_by_token(access_token)
+    if not schedule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Lien d\'entretien invalide ou expiré'
+        }), 404
+    
+    # Vérifier si l'entretien n'est pas déjà passé
+    if schedule.status not in ['scheduled', 'confirmed']:
+        return jsonify({
+            'status': 'error',
+            'message': f'Cet entretien est {schedule.status}'
+        }), 400
+    
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'schedule_id': schedule.id,
+            'title': schedule.title,
+            'scheduled_at': schedule.scheduled_at.isoformat(),
+            'duration_minutes': schedule.duration_minutes,
+            'meet_link': schedule.meet_link,
+            'calendar_link': schedule.calendar_link,
+            'has_meeting': schedule.has_valid_meeting(),
+            'sync_status': schedule.calendar_sync_status,
+            'instructions': self._get_meeting_instructions(schedule)
+        }
+    }), 200
+
+def _get_meeting_instructions(schedule):
+    """Génère les instructions pour le candidat"""
+    if not schedule.has_valid_meeting():
+        return {
+            'message': 'Le lien de réunion sera disponible prochainement.',
+            'fallback': 'Veuillez contacter le recruteur si vous ne recevez pas le lien.'
+        }
+    
+    return {
+        'message': 'Cliquez sur le lien Meet ci-dessous pour rejoindre l\'entretien.',
+        'recommendations': [
+            'Testez votre connexion internet et votre caméra avant l\'entretien',
+            'Trouvez un endroit calme et bien éclairé',
+            'Préparez vos documents (CV, portfolio, etc.)',
+            'Connectez-vous 5 minutes avant l\'heure prévue'
+        ]
+    }
+
+@scheduling_bp.route('/organization/meeting-stats', methods=['GET'])
+@token_required
+def get_meeting_statistics():
+    """Récupère les statistiques des meetings de l'organisation"""
+    user_id = get_current_user_id()
+    
+    # Récupérer l'organisation de l'utilisateur
+    organization = organization_service.get_user_organization(user_id)
+    if not organization:
+        return jsonify({
+            'status': 'error',
+            'message': 'Aucune organisation trouvée pour cet utilisateur'
+        }), 404
+    
+    # Vérifier que l'utilisateur est membre de l'organisation
+    is_member = organization_service.is_member(organization.id, user_id)
+    if not is_member:
+        return jsonify({
+            'status': 'error',
+            'message': 'Accès non autorisé'
+        }), 403
+    
+    try:
+        # Calculer les statistiques
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+        
+        # Derniers 30 jours
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        
+        # Requête pour les statistiques
+        schedules = InterviewSchedule.query.filter(
+            InterviewSchedule.organization_id == organization.id,
+            InterviewSchedule.created_at >= thirty_days_ago
+        ).all()
+        
+        stats = {
+            'total_interviews': len(schedules),
+            'with_meeting': len([s for s in schedules if s.has_valid_meeting()]),
+            'sync_status': {
+                'synced': len([s for s in schedules if s.calendar_sync_status == 'synced']),
+                'pending': len([s for s in schedules if s.calendar_sync_status == 'pending']),
+                'error': len([s for s in schedules if s.calendar_sync_status == 'error']),
+                'disabled': len([s for s in schedules if s.calendar_sync_status == 'disabled'])
+            },
+            'by_mode': {
+                'collaborative': len([s for s in schedules if s.mode == 'collaborative']),
+                'autonomous': len([s for s in schedules if s.mode == 'autonomous'])
+            }
+        }
+        
+        # Calculer le taux de succès
+        if stats['total_interviews'] > 0:
+            stats['success_rate'] = round((stats['with_meeting'] / stats['total_interviews']) * 100, 1)
+        else:
+            stats['success_rate'] = 0
+        
+        return jsonify({
+            'status': 'success',
+            'data': stats,
+            'period': '30 derniers jours'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur lors du calcul des statistiques: {str(e)}'
+        }), 500
+

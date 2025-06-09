@@ -1,15 +1,22 @@
 # backend/services/interview_scheduling_service.py
 from datetime import datetime, timedelta
 import uuid
+
+from ..services.teams_service import TeamsService
 from ..models.interview_scheduling import InterviewSchedule
 from ..services.notification_service import NotificationService
 from ..services.email_service import EmailService
 from ..services.audit_service import AuditService
 from ..services.subscription_service import SubscriptionService
+from ..services.meet_service import MeetService
 from app import db
 
 class InterviewSchedulingService:
-    """Service pour gérer la planification des entretiens"""
+    """Service pour gérer la planification des entretiens avec intégration Google Meet"""
+    
+    # Constantes pour les modes d'entretien
+    VALID_MODES = ['collaborative', 'autonomous']
+    VALID_STATUSES = ['scheduled', 'confirmed', 'in_progress', 'completed', 'canceled', 'no_show']
     
     # Constantes pour les modes d'entretien
     VALID_MODES = ['collaborative', 'autonomous']
@@ -19,6 +26,109 @@ class InterviewSchedulingService:
         self.notification_service = NotificationService()
         self.audit_service = AuditService()
         self.subscription_service = SubscriptionService()
+        self.meet_service = MeetService()
+        self.teams_service = TeamsService()
+
+    
+    def _validate_mode(self, mode):
+        """Valide le mode d'entretien"""
+        if mode not in self.VALID_MODES:
+            raise ValueError(f"Mode d'entretien invalide. Modes autorisés: {', '.join(self.VALID_MODES)}")
+    
+    def _validate_status(self, status):
+        """Valide le statut d'entretien"""
+        if status not in self.VALID_STATUSES:
+            raise ValueError(f"Statut invalide. Statuts autorisés: {', '.join(self.VALID_STATUSES)}")
+    
+    def _get_recruiter_email(self, recruiter_id):
+        """Récupère l'email du recruteur"""
+        from ..models.user import User
+        recruiter = User.query.get(recruiter_id)
+        return recruiter.email if recruiter else None
+    
+    def _create_or_update_meeting(self, schedule, is_update=False):
+        """
+        Crée ou met à jour le meeting Google Calendar
+        
+        Args:
+            schedule: Objet InterviewSchedule
+            is_update: Boolean indiquant si c'est une mise à jour
+        
+        Returns:
+            Boolean indiquant le succès
+        """
+        if not self.meet_service.is_available():
+            print("Service Google Meet non disponible - continuons sans meeting")
+            schedule.calendar_sync_status = 'disabled'
+            schedule.calendar_sync_error = 'Service Google Calendar non configuré'
+            return False
+        
+        try:
+            recruiter_email = self._get_recruiter_email(schedule.recruiter_id)
+            if not recruiter_email:
+                raise Exception("Email du recruteur introuvable")
+            
+            # Préparer les données pour le service Meet
+            meet_data = {
+                'schedule_id': schedule.id,
+                'title': schedule.title,
+                'description': schedule.description,
+                'candidate_name': schedule.candidate_name,
+                'candidate_email': schedule.candidate_email,
+                'recruiter_email': recruiter_email,
+                'scheduled_at': schedule.scheduled_at,
+                'duration_minutes': schedule.duration_minutes,
+                'timezone': schedule.timezone,
+                'position': schedule.position,
+                'mode': schedule.mode
+            }
+            
+            if is_update and schedule.google_event_id:
+                # Mise à jour d'un événement existant
+                result = self.meet_service.update_meeting(schedule.google_event_id, meet_data)
+            else:
+                # Création d'un nouveau meeting
+                result = self.meet_service.create_meeting(meet_data)
+            
+            # Mettre à jour l'objet schedule avec les informations du meeting
+            schedule.google_event_id = result['event_id']
+            schedule.meet_link = result['meet_link']
+            schedule.calendar_link = result['html_link']
+            schedule.calendar_sync_status = 'synced'
+            schedule.calendar_sync_error = None
+            
+            return True
+            
+        except Exception as e:
+            print(f"Erreur lors de la {'mise à jour' if is_update else 'création'} du meeting: {str(e)}")
+            schedule.calendar_sync_status = 'error'
+            schedule.calendar_sync_error = str(e)
+            return False
+    
+    def _cancel_meeting(self, schedule, reason=None):
+        """
+        Annule le meeting Google Calendar
+        
+        Args:
+            schedule: Objet InterviewSchedule
+            reason: Raison de l'annulation
+        
+        Returns:
+            Boolean indiquant le succès
+        """
+        if not schedule.google_event_id or not self.meet_service.is_available():
+            return True  # Pas de meeting à annuler ou service non disponible
+        
+        try:
+            success = self.meet_service.cancel_meeting(schedule.google_event_id, reason)
+            if success:
+                schedule.calendar_sync_status = 'synced'
+                schedule.calendar_sync_error = None
+            return success
+        except Exception as e:
+            print(f"Erreur lors de l'annulation du meeting: {str(e)}")
+            schedule.calendar_sync_error = f"Erreur annulation: {str(e)}"
+            return False
     
     def _validate_mode(self, mode):
         """Valide le mode d'entretien"""
@@ -32,7 +142,7 @@ class InterviewSchedulingService:
     
     def create_schedule(self, organization_id, recruiter_id, data):
         """
-        Crée une nouvelle planification d'entretien
+        Crée une nouvelle planification d'entretien avec meeting Google Calendar
         
         Args:
             organization_id: ID de l'organisation
@@ -45,6 +155,28 @@ class InterviewSchedulingService:
         # Vérifier les limites d'entretiens du plan
         # if not self.subscription_service.check_interview_limit(recruiter_id):
         #     raise ValueError("Limite d'entretiens atteinte pour votre plan d'abonnement")
+        
+        # Valider le mode d'entretien
+        mode = data.get('mode')
+        if not mode:
+            raise ValueError("Le mode d'entretien est requis")
+        self._validate_mode(mode)
+        
+        # Validation des champs requis
+        required_fields = ['candidate_name', 'candidate_email', 'title', 'position', 'scheduled_at']
+        for field in required_fields:
+            if not data.get(field):
+                raise ValueError(f"Le champ {field} est requis")
+        
+        # Validation de la date
+        try:
+            scheduled_at = datetime.fromisoformat(data.get('scheduled_at'))
+            if scheduled_at <= datetime.now():
+                raise ValueError("La date doit être dans le futur")
+        except ValueError as e:
+            if "futur" in str(e):
+                raise e
+            raise ValueError("Format de date invalide")
         
         # Valider le mode d'entretien
         mode = data.get('mode')
@@ -77,13 +209,22 @@ class InterviewSchedulingService:
             position=data.get('position'),
             scheduled_at=scheduled_at,
             duration_minutes=data.get('duration_minutes', 30),
-            timezone=data.get('timezone', 'Europe/Paris'),
+            timezone=data.get('timezone', 'Africa/Douala'),
             mode=mode,
             ai_assistant_id=data.get('ai_assistant_id'),
             predefined_questions=data.get('predefined_questions'),
-            status='scheduled'
+            status='scheduled',
+            calendar_sync_status='pending'
         )
+        
+        # Sauvegarder d'abord pour avoir un ID
         db.session.add(schedule)
+        db.session.flush()  # Pour obtenir l'ID sans commit complet
+        
+        # Créer le meeting Google Calendar
+        meeting_success = self._create_or_update_meeting(schedule, is_update=False)
+        
+        # Commit final
         db.session.commit()
         
         # Enregistrer dans les logs d'audit
@@ -93,9 +234,14 @@ class InterviewSchedulingService:
             action='create',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Entretien {mode} planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}"
+            description=f"Entretien {mode} planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}" +
+                        (f" - Meeting créé: {schedule.meet_link}" if meeting_success else " - Erreur création meeting")
         )
-        print(schedule.access_token)
+        
+        print(f"Schedule créé avec access_token: {schedule.access_token}")
+        if meeting_success:
+            print(f"Meeting créé avec succès: {schedule.meet_link}")
+        
         # Envoyer les notifications
         try:
             # Notification au recruteur
@@ -105,10 +251,14 @@ class InterviewSchedulingService:
                     'candidate_name': schedule.candidate_name,
                     'scheduled_at': schedule.scheduled_at.strftime("%d/%m/%Y à %H:%M"),
                     'schedule_id': schedule.id,
-                    'mode': mode
+                    'mode': mode,
+                    'meet_link': schedule.meet_link
                 }
             )
             # Email d'invitation au candidat
+            self.notification_service.send_interview_invitation_email(schedule)
+            
+            # Email d'invitation au candidat avec lien Meet
             self.notification_service.send_interview_invitation_email(schedule)
             
         except Exception as e:
@@ -118,7 +268,7 @@ class InterviewSchedulingService:
     
     def update_schedule(self, schedule_id, recruiter_id, data):
         """
-        Met à jour une planification d'entretien
+        Met à jour une planification d'entretien et son meeting Google Calendar
         
         Args:
             schedule_id: ID de la planification
@@ -149,18 +299,29 @@ class InterviewSchedulingService:
         if 'mode' in data and data['mode']:
             self._validate_mode(data['mode'])
         
-        # Vérifier si la date a changé
+        # Vérifier si des données importantes ont changé (nécessitant une mise à jour du meeting)
+        meeting_update_needed = False
         date_changed = False
+        
         if 'scheduled_at' in data and data['scheduled_at']:
             try:
                 new_date = datetime.fromisoformat(data['scheduled_at'])
                 if new_date <= datetime.now():
                     raise ValueError("La date doit être dans le futur")
-                date_changed = new_date != schedule.scheduled_at
+                if new_date != schedule.scheduled_at:
+                    date_changed = True
+                    meeting_update_needed = True
             except ValueError as e:
                 if "futur" in str(e):
                     raise e
                 raise ValueError("Format de date invalide")
+        
+        # Autres champs qui nécessitent une mise à jour du meeting
+        meeting_fields = ['title', 'description', 'candidate_name', 'candidate_email', 'duration_minutes', 'timezone']
+        for field in meeting_fields:
+            if field in data and data[field] != getattr(schedule, field):
+                meeting_update_needed = True
+                break
         
         # Mettre à jour les champs
         for field in ['candidate_name', 'candidate_email', 'candidate_phone', 
@@ -175,6 +336,12 @@ class InterviewSchedulingService:
             schedule.scheduled_at = datetime.fromisoformat(data['scheduled_at'])
         
         schedule.updated_at = datetime.utcnow()
+        
+        # Mettre à jour le meeting si nécessaire
+        meeting_success = True
+        if meeting_update_needed and schedule.calendar_sync_status != 'disabled':
+            meeting_success = self._create_or_update_meeting(schedule, is_update=True)
+        
         db.session.commit()
         
         # Enregistrer dans les logs d'audit
@@ -184,7 +351,8 @@ class InterviewSchedulingService:
             action='update',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Modification de l'entretien {schedule.mode} avec {schedule.candidate_name}"
+            description=f"Modification de l'entretien {schedule.mode} avec {schedule.candidate_name}" +
+                        (f" - Meeting mis à jour" if meeting_update_needed and meeting_success else "")
         )
         
         # Si la date a changé, envoyer des notifications
@@ -197,11 +365,12 @@ class InterviewSchedulingService:
                         'candidate_name': schedule.candidate_name,
                         'scheduled_at': schedule.scheduled_at.strftime("%d/%m/%Y à %H:%M"),
                         'schedule_id': schedule.id,
-                        'mode': schedule.mode
+                        'mode': schedule.mode,
+                        'meet_link': schedule.meet_link
                     }
                 )
                 
-                # Email au candidat
+                # Email au candidat avec nouveau lien Meet
                 self.notification_service.send_interview_rescheduled_email(schedule)
                 
             except Exception as e:
@@ -211,7 +380,7 @@ class InterviewSchedulingService:
     
     def cancel_schedule(self, schedule_id, user_id, reason=None):
         """
-        Annule une planification d'entretien
+        Annule une planification d'entretien et son meeting Google Calendar
         
         Args:
             schedule_id: ID de la planification
@@ -242,6 +411,9 @@ class InterviewSchedulingService:
         if schedule.status in ['completed', 'canceled']:
             raise ValueError(f"Impossible d'annuler un entretien avec le statut: {schedule.status}")
         
+        # Annuler le meeting Google Calendar
+        self._cancel_meeting(schedule, reason)
+        
         # Mettre à jour le statut
         schedule.status = 'canceled'
         schedule.cancellation_reason = reason
@@ -256,7 +428,7 @@ class InterviewSchedulingService:
             entity_type='interview_schedule',
             entity_id=schedule.id,
             description=f"Annulation de l'entretien {schedule.mode} avec {schedule.candidate_name}" + 
-                        (f" - Raison: {reason}" if reason else "")
+                        (f" - Raison: {reason}" if reason else "") + " - Meeting annulé"
         )
         
         # Envoyer des notifications
@@ -341,6 +513,51 @@ class InterviewSchedulingService:
         
         return query.order_by(InterviewSchedule.scheduled_at).all()
     
+    def retry_meeting_sync(self, schedule_id, user_id):
+        """
+        Réessaie la synchronisation du meeting Google Calendar
+        
+        Args:
+            schedule_id: ID de la planification
+            user_id: ID de l'utilisateur qui fait la demande
+            
+        Returns:
+            L'objet InterviewSchedule mis à jour
+        """
+        schedule = self.get_schedule(schedule_id)
+        if not schedule:
+            raise ValueError(f"Planification introuvable: {schedule_id}")
+        
+        # Vérifier les permissions
+        if schedule.recruiter_id != user_id:
+            from ..models.organization import OrganizationMember
+            is_admin = OrganizationMember.query.filter_by(
+                organization_id=schedule.organization_id,
+                user_id=user_id,
+                role='admin'
+            ).first() is not None
+            
+            if not is_admin:
+                raise ValueError("Vous n'avez pas la permission de modifier cet entretien")
+        
+        # Réessayer la synchronisation
+        meeting_success = self._create_or_update_meeting(schedule, is_update=bool(schedule.google_event_id))
+        
+        db.session.commit()
+        
+        # Log de l'action
+        self.audit_service.log_action(
+            organization_id=schedule.organization_id,
+            user_id=user_id,
+            action='retry_sync',
+            entity_type='interview_schedule',
+            entity_id=schedule.id,
+            description=f"Nouvelle tentative de synchronisation du meeting - " +
+                        ("Succès" if meeting_success else "Échec")
+        )
+        
+        return schedule
+    
     def send_reminders(self):   
         """
         Envoie des rappels pour les entretiens à venir
@@ -363,7 +580,7 @@ class InterviewSchedulingService:
         count = 0
         for schedule in schedules:
             try:
-                # Email de rappel au candidat
+                # Email de rappel au candidat avec lien Meet
                 self.notification_service.send_interview_reminder_email(schedule)
                 
                 # Notification au recruteur
@@ -373,7 +590,8 @@ class InterviewSchedulingService:
                         'candidate_name': schedule.candidate_name,
                         'time': schedule.scheduled_at.strftime('%H:%M'),
                         'schedule_id': schedule.id,
-                        'mode': schedule.mode
+                        'mode': schedule.mode,
+                        'meet_link': schedule.meet_link
                     }
                 )
                 
@@ -510,3 +728,18 @@ class InterviewSchedulingService:
                     stats[mode]['no_show'] += 1
         
         return stats
+    
+    def test_google_integration(self):
+        """
+        Teste l'intégration Google Calendar/Meet
+        
+        Returns:
+            Dictionnaire avec le résultat du test
+        """
+        return self.meet_service.test_connection()
+    
+    def test_teams_integration(self) -> dict:
+        """Tester l'intégration Teams"""
+        return self.teams_service.test_teams_integration()
+    
+    
