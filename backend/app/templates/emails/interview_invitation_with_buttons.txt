@@ -1,0 +1,37 @@
+Invitation à l'entretien - {{ interview_position }}
+
+Bonjour {{ candidate_name }},
+
+Nous avons le plaisir de vous inviter à un entretien pour le poste de {{ interview_position }} chez {{ organization_name }}.
+
+DÉTAILS DE L'ENTRETIEN :
+- Titre : {{ interview_title }}
+- Date et heure : {{ scheduled_at.strftime('%A %d %B %Y à %H:%M') }} ({{ timezone }})
+- Durée : {{ duration_minutes }} minutes
+- Mode : {% if mode == 'autonomous' %}Entretien autonome avec assistant IA{% else %}Entretien collaboratif avec recruteur et assistant IA{% endif %}
+{% if description %}- Description : {{ description }}{% endif %}
+
+{% if meet_link %}
+LIEN DE VISIOCONFÉRENCE :
+{{ meet_link }}
+
+{% if calendar_link %}Ajouter à votre calendrier : {{ calendar_link }}{% endif %}
+{% endif %}
+
+MERCI DE CONFIRMER VOTRE PRÉSENCE :
+
+✅ Pour confirmer votre présence :
+{{ confirm_url }}
+
+❌ Si vous ne pouvez pas participer :
+{{ cancel_url }}
+
+Pour toute question, n'hésitez pas à contacter {{ recruiter_name }}.
+
+Nous avons hâte de vous rencontrer !
+
+Cordialement,
+L'équipe {{ organization_name }}
+
+---
+Vous pouvez également accéder aux détails : {{ request.url_root }}interviews/access/{{ access_token }}

@@ -94,6 +94,8 @@ class Config:
     # Chemin pour stocker les tokens (ajoutez aussi dans init_app)
     GOOGLE_TOKENS_DIR = os.path.join(DATA_DIR, 'google_tokens')
     GOOGLE_CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'client_secret.json')
+    CANDIDATE_RESPONSE_SECRET = os.environ.get('CANDIDATE_RESPONSE_SECRET')
+    CANDIDATE_RESPONSE_EXPIRY_HOURS = int(os.environ.get('CANDIDATE_RESPONSE_EXPIRY_HOURS', '48'))
     
     @staticmethod
     def init_app(app):

@@ -9,7 +9,7 @@ import Link from "next/link"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import AIAssistantService from "@/services/ai-assistant-service"
 import { InterviewSchedulingService } from "@/services/interview-scheduling-service"
-import type { InterviewScheduleFormData } from "@/types/interview-scheduling"
+import type { ErrorDetails, InterviewScheduleFormData } from "@/types/interview-scheduling"
 import {
   Brain,
   RefreshCw,
@@ -29,6 +29,7 @@ import {
   MessageSquare,
   Users,
   Check,
+  X,
 } from "lucide-react"
 import { AIAssistant, AIAssistantCapabilities, normalizeAssistant } from "@/types/assistant"
 
@@ -84,6 +85,106 @@ const ScheduleInterviewPage = () => {
   const [assistants, setAssistants] = useState<AIAssistant[]>([])
   const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const analyzeError = (error: any): ErrorDetails => {
+    console.error('Analyse de l\'erreur:', error);
+  
+    // Erreur de réseau
+    if (!error.response) {
+      return {
+        type: 'network',
+        message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        actionable: true,
+        suggestions: [
+          'Vérifiez votre connexion internet',
+          'Réessayez dans quelques instants',
+          'Contactez le support si le problème persiste'
+        ]
+      };
+    }
+  
+    const { status, data } = error.response;
+    
+    // Erreur 409 - Conflit (doublon)
+    if (status === 409) {
+      const errorType = data.error_type || 'duplicate';
+      let message = data.message || 'Un entretien existe déjà pour ce candidat';
+      let suggestions: string[] = [];
+  
+      switch (errorType) {
+        case 'already_scheduled':
+          suggestions = [
+            'Consultez l\'entretien existant',
+            'Annulez l\'ancien entretien si nécessaire',
+            'Choisissez un autre candidat'
+          ];
+          break;
+        case 'already_completed':
+          suggestions = [
+            'Consultez les résultats de l\'entretien précédent',
+            'Attendez la période de grâce (30 jours)',
+            'Contactez l\'administrateur pour une exception'
+          ];
+          break;
+        case 'previous_no_show':
+          suggestions = [
+            'Attendez la période de grâce (7 jours)',
+            'Contactez le candidat pour clarifier',
+            'Envisagez un autre mode de contact'
+          ];
+          break;
+      }
+  
+      return {
+        type: 'duplicate',
+        message,
+        details: { errorType, status },
+        actionable: true,
+        suggestions
+      };
+    }
+  
+    // Erreur 400 - Validation
+    if (status === 400) {
+      const errors = data.errors || [];
+      return {
+        type: 'validation',
+        message: data.message || 'Données invalides',
+        details: errors,
+        actionable: true,
+        suggestions: [
+          'Vérifiez tous les champs requis',
+          'Corrigez les erreurs indiquées',
+          'Contactez le support si nécessaire'
+        ]
+      };
+    }
+  
+    // Erreur 500 - Serveur
+    if (status >= 500) {
+      return {
+        type: 'server',
+        message: 'Erreur interne du serveur. Veuillez réessayer plus tard.',
+        actionable: true,
+        suggestions: [
+          'Réessayez dans quelques minutes',
+          'Sauvegardez vos données localement',
+          'Contactez le support technique'
+        ]
+      };
+    }
+  
+    // Autres erreurs
+    return {
+      type: 'unknown',
+      message: data.message || error.message || 'Une erreur inattendue est survenue',
+      details: { status, data },
+      actionable: false,
+      suggestions: ['Contactez le support technique avec les détails de cette erreur']
+    };
+  };
+  
   const [formData, setFormData] = useState<FormDataType>({
     job_role: "",
     job_description: "",
@@ -217,44 +318,200 @@ const ScheduleInterviewPage = () => {
       mode: data.mode,
       ai_assistant_id: data.ai_assistants.length > 0 ? data.ai_assistants[0] : undefined,
       predefined_questions: data.custom_questions.filter(q => q.trim() !== ''),
+      job_id: data.job_id,
     }
   }
 
   // Soumettre le formulaire pour créer l'entretien
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setSubmitError(null)
-
+    e.preventDefault();
+    setSubmitError(null);
+    setErrorDetails(null);
+  
     try {
-      setIsSubmitting(true)
-
+      setIsSubmitting(true);
+  
       // Valider les données avant soumission
-      const serviceData = mapFormDataToServiceData(formData)
-      const validationErrors = InterviewSchedulingService.validateScheduleData(serviceData)
+      const serviceData = mapFormDataToServiceData(formData);
+      const validationErrors = InterviewSchedulingService.validateScheduleData(serviceData);
       
       if (Object.keys(validationErrors).length > 0) {
-        const firstError = Object.values(validationErrors)[0]
-        setSubmitError(firstError)
-        return
+        const firstError = Object.values(validationErrors)[0];
+        setErrorDetails({
+          type: 'validation',
+          message: 'Veuillez corriger les erreurs de validation',
+          details: validationErrors,
+          actionable: true,
+          suggestions: ['Vérifiez tous les champs requis', 'Corrigez les erreurs indiquées']
+        });
+        setShowErrorModal(true);
+        return;
       }
-
-      console.log("Création de la planification d'entretien avec les données:", serviceData)
-
+  
+      console.log("Création de la planification d'entretien avec les données:", serviceData);
+  
       // Appeler le service pour créer la planification
-      const schedule = await InterviewSchedulingService.createSchedule(serviceData)
+      const schedule = await InterviewSchedulingService.createSchedule(serviceData);
       
-      console.log("Planification créée avec succès:", schedule)
-
+      console.log("Planification créée avec succès:", schedule);
+  
       // Rediriger vers la page de la planification créée
-      router.push(`/interviews/schedule/${schedule.id}?created=true`)
+      router.push(`/interviews/schedule/${schedule.id}?created=true`);
       
     } catch (error: any) {
-      console.error("Erreur lors de la création de la planification:", error)
-      setSubmitError(error.message || "Impossible de créer la planification. Veuillez réessayer.")
+      console.error("Erreur lors de la création de la planification:", error);
+      
+      const errorDetails = analyzeError(error);
+      setErrorDetails(errorDetails);
+      setShowErrorModal(true);
+      
+      // Afficher aussi l'erreur simple pour compatibilité
+      setSubmitError(errorDetails.message);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
+  
+  // Composant Modal d'erreur amélioré
+  const ErrorModal = ({ 
+    isOpen, 
+    onClose, 
+    errorDetails 
+  }: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    errorDetails: ErrorDetails | null; 
+  }) => {
+    if (!isOpen || !errorDetails) return null;
+  
+    const getErrorIcon = () => {
+      switch (errorDetails.type) {
+        case 'duplicate':
+          return <AlertTriangle className="h-8 w-8 text-amber-500" />;
+        case 'validation':
+          return <AlertTriangle className="h-8 w-8 text-red-500" />;
+        case 'network':
+          return <RefreshCw className="h-8 w-8 text-blue-500" />;
+        case 'server':
+          return <AlertTriangle className="h-8 w-8 text-red-500" />;
+        default:
+          return <AlertTriangle className="h-8 w-8 text-gray-500" />;
+      }
+    };
+  
+    const getErrorColor = () => {
+      switch (errorDetails.type) {
+        case 'duplicate':
+          return 'border-amber-200 bg-amber-50';
+        case 'validation':
+          return 'border-red-200 bg-red-50';
+        case 'network':
+          return 'border-blue-200 bg-blue-50';
+        case 'server':
+          return 'border-red-200 bg-red-50';
+        default:
+          return 'border-gray-200 bg-gray-50';
+      }
+    };
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className={`p-6 border-l-4 ${getErrorColor()}`}>
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {getErrorIcon()}
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {errorDetails.type === 'duplicate' && 'Entretien existant détecté'}
+                  {errorDetails.type === 'validation' && 'Erreur de validation'}
+                  {errorDetails.type === 'network' && 'Problème de connexion'}
+                  {errorDetails.type === 'server' && 'Erreur du serveur'}
+                  {errorDetails.type === 'unknown' && 'Erreur inattendue'}
+                </h3>
+                
+                <p className="text-gray-700 mb-4">
+                  {errorDetails.message}
+                </p>
+  
+                {/* Détails spécifiques pour les erreurs de validation */}
+                {errorDetails.type === 'validation' && errorDetails.details && (
+                  <div className="mb-4 p-3 bg-red-100 rounded-md">
+                    <h4 className="text-sm font-medium text-red-800 mb-2">Erreurs détectées:</h4>
+                    <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                      {Object.entries(errorDetails.details).map(([field, error]) => (
+                        <li key={field}>{error as string}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+  
+                {/* Suggestions d'actions */}
+                {errorDetails.suggestions && errorDetails.suggestions.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-800 mb-2">Que pouvez-vous faire ?</h4>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      {errorDetails.suggestions.map((suggestion, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+  
+                {/* Actions spécifiques pour les doublons */}
+                {errorDetails.type === 'duplicate' && (
+                  <div className="flex flex-col gap-2 mb-4">
+                    <button
+                      onClick={() => {
+                        // Logique pour voir l'entretien existant
+                        router.push(`/interviews?candidate=${encodeURIComponent(formData.candidate_email)}`);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      Voir l'entretien existant
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Logique pour contacter le candidat
+                        window.location.href = `mailto:${formData.candidate_email}?subject=Concernant votre entretien`;
+                      }}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
+                    >
+                      Contacter le candidat
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+  
+          <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+            {errorDetails.type === 'network' && (
+              <button
+                onClick={() => {
+                  onClose();
+                  // Relancer la soumission
+                  document.querySelector('form')?.requestSubmit();
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Réessayer
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Valider le formulaire avant de passer à l'étape suivante
   const validateAndProceed = () => {
@@ -372,18 +629,44 @@ const ScheduleInterviewPage = () => {
             </div>
 
             {/* Affichage des erreurs */}
-            {submitError && (
+            {submitError && !showErrorModal && (
               <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                <div className="flex justify-between items-start">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700">{submitError}</p>
+                      {errorDetails?.type === 'duplicate' && (
+                        <button
+                          onClick={() => setShowErrorModal(true)}
+                          className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                        >
+                          Voir les options disponibles
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{submitError}</p>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setSubmitError(null);
+                      setErrorDetails(null);
+                    }}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-            )}
+            )}  
+
+            {/* Modal d'erreur */}
+            <ErrorModal 
+              isOpen={showErrorModal}
+              onClose={() => setShowErrorModal(false)}
+              errorDetails={errorDetails}
+            />
 
             {/* Étapes */}
             <div className="mb-8 bg-white rounded-lg shadow-sm p-4">

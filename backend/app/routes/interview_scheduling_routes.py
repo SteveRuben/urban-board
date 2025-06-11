@@ -10,6 +10,16 @@ from app import db
 
 scheduling_bp = Blueprint('scheduling', __name__, url_prefix='/api/scheduling')
 
+UPDATABLE_FIELDS = [
+    'scheduled_at', 
+    'duration_minutes', 
+    'timezone', 
+    'mode', 
+    'ai_assistant_id', 
+    'predefined_questions'
+]
+
+
 scheduling_service = InterviewSchedulingService()
 organization_service = OrganizationService()
 audit_service = AuditService()
@@ -58,19 +68,62 @@ def validate_interview_data(data, is_update=False):
     
     # Validation de la durée
     if 'duration_minutes' in data and data['duration_minutes']:
+        if  int(data['duration_minutes']) < 15 or int(data['duration_minutes']) > 480:
+            errors['duration_minutes'] = "La durée doit être entre 15 minutes et 8 heures"
+    
+    return errors
+
+def validate_interview_update_data(data):
+    """Valide les données d'entretien pour la mise à jour (champs limités)"""
+    errors = {}
+    
+    # Validation du mode d'entretien (si fourni)
+    if 'mode' in data and data['mode']:
+        if data['mode'] not in VALID_INTERVIEW_MODES:
+            errors['mode'] = f"Le mode doit être l'un des suivants: {', '.join(VALID_INTERVIEW_MODES)}"
+    
+    # Validation de la date (si fournie)
+    if 'scheduled_at' in data and data['scheduled_at']:
+        try:
+            scheduled_date = datetime.fromisoformat(data['scheduled_at'])
+            if scheduled_date <= datetime.now():
+                errors['scheduled_at'] = "La date doit être dans le futur"
+        except ValueError:
+            errors['scheduled_at'] = "Format de date invalide"
+    
+    # Validation de la durée (si fournie)
+    if 'duration_minutes' in data and data['duration_minutes'] is not None:
         if not isinstance(data['duration_minutes'], int) or data['duration_minutes'] < 15 or data['duration_minutes'] > 480:
             errors['duration_minutes'] = "La durée doit être entre 15 minutes et 8 heures"
+    
+    # Validation du fuseau horaire (si fourni)
+    if 'timezone' in data and data['timezone']:
+        valid_timezones = ['Europe/Paris', 'Europe/London', 'America/New_York', 'America/Los_Angeles']
+        if data['timezone'] not in valid_timezones:
+            errors['timezone'] = f"Fuseau horaire non supporté. Valeurs autorisées: {', '.join(valid_timezones)}"
+    
+    # Validation des questions prédéfinies (si fournies)
+    if 'predefined_questions' in data and data['predefined_questions'] is not None:
+        if not isinstance(data['predefined_questions'], list):
+            errors['predefined_questions'] = "Les questions prédéfinies doivent être une liste"
+        else:
+            for i, question in enumerate(data['predefined_questions']):
+                if not isinstance(question, str):
+                    errors['predefined_questions'] = f"La question {i+1} doit être une chaîne de caractères"
+                    break
+                if len(question.strip()) > 500:
+                    errors['predefined_questions'] = f"La question {i+1} est trop longue (max 500 caractères)"
+                    break
     
     return errors
 
 @scheduling_bp.route('/schedules', methods=['POST'])
 @token_required
 def create_schedule():
-    """Crée une nouvelle planification d'entretien"""
+    """Crée une nouvelle planification d'entretien avec email interactif"""
     user_id = get_current_user_id()
     data = request.get_json()
-    print('/////////////')
-    print(data)
+    
     if not data:
         return jsonify({
             'status': 'error',
@@ -88,20 +141,24 @@ def create_schedule():
     
     # Récupérer l'organisation de l'utilisateur
     organization = g.current_user.current_organization_id
-    print('/////////////'+organization)
-    print(data)
+    
     try:
+        # Créer la planification avec le service modifié
         schedule = scheduling_service.create_schedule(
             organization_id=organization,
             recruiter_id=user_id,
             data=data
         )
         
+        # Récupérer les infos complètes avec statut d'email
+        schedule_info = scheduling_service.get_schedule_with_response_info(schedule.id)
+        
         return jsonify({
             'status': 'success',
-            'message': 'Entretien planifié avec succès',
-            'data': schedule.to_dict()
+            'message': 'Entretien planifié avec succès. Email d\'invitation envoyé au candidat.',
+            'data': schedule_info
         }), 201
+        
     except ValueError as e:
         return jsonify({
             'status': 'error',
@@ -152,10 +209,14 @@ def get_schedule(schedule_id):
         'data': schedule.to_dict()
     }), 200
 
+def filter_updatable_data(data):
+    """Filtre les données pour ne garder que les champs modifiables"""
+    return {key: value for key, value in data.items() if key in UPDATABLE_FIELDS}
+
 @scheduling_bp.route('/schedules/<schedule_id>', methods=['PUT'])
 @token_required
 def update_schedule(schedule_id):
-    """Met à jour une planification d'entretien"""
+    """Met à jour une planification d'entretien avec notification candidat si reprogrammation"""
     user_id = get_current_user_id()
     data = request.get_json()
     
@@ -165,8 +226,17 @@ def update_schedule(schedule_id):
             'message': 'Aucune donnée fournie'
         }), 400
     
-    # Valider les données
-    validation_errors = validate_interview_data(data, is_update=True)
+    # Filtrer les données pour ne garder que les champs modifiables
+    filtered_data = filter_updatable_data(data)
+    
+    if not filtered_data:
+        return jsonify({
+            'status': 'error',
+            'message': f'Aucun champ modifiable fourni. Champs autorisés: {", ".join(UPDATABLE_FIELDS)}'
+        }), 400
+    
+    # Valider les données filtrées
+    validation_errors = validate_interview_update_data(filtered_data)
     if validation_errors:
         return jsonify({
             'status': 'error',
@@ -175,17 +245,34 @@ def update_schedule(schedule_id):
         }), 400
     
     try:
+        # Détecter si la date change
+        old_schedule = scheduling_service.get_schedule(schedule_id)
+        date_changed = False
+        if 'scheduled_at' in filtered_data:
+            from datetime import datetime
+            new_date = datetime.fromisoformat(filtered_data['scheduled_at'])
+            date_changed = new_date != old_schedule.scheduled_at
+        
+        # Mettre à jour avec le service modifié
         schedule = scheduling_service.update_schedule(
             schedule_id=schedule_id,
             recruiter_id=user_id,
-            data=data
+            data=filtered_data
         )
+        
+        # Récupérer les infos complètes
+        schedule_info = scheduling_service.get_schedule_with_response_info(schedule.id)
+        
+        message = 'Entretien modifié avec succès'
+        if date_changed:
+            message += '. Email de reprogrammation envoyé au candidat.'
         
         return jsonify({
             'status': 'success',
-            'message': 'Planification mise à jour avec succès',
-            'data': schedule.to_dict()
+            'message': message,
+            'data': schedule_info
         }), 200
+        
     except ValueError as e:
         return jsonify({
             'status': 'error',
@@ -349,21 +436,23 @@ def get_schedule_by_token(access_token):
             'status': 'error',
             'message': 'Token d\'accès requis'
         }), 400
-    
+    print('5..........5.....................')
     schedule = scheduling_service.get_schedule_by_token(access_token)
     if not schedule:
         return jsonify({
             'status': 'error',
             'message': 'Lien d\'entretien invalide ou expiré'
         }), 404
-    
+    print('6..........6.....................')
+
     # Vérifier si l'entretien n'est pas déjà passé
     if schedule.status not in ['scheduled', 'confirmed']:
         return jsonify({
             'status': 'error',
             'message': f'Cet entretien est {schedule.status}'
         }), 400
-    
+    print('7..........7.....................')
+
     # Pour le candidat, on ne renvoie que les informations nécessaires
     return jsonify({
         'status': 'success',
@@ -376,7 +465,7 @@ def get_schedule_by_token(access_token):
             'scheduled_at': schedule.scheduled_at.isoformat(),
             'duration_minutes': schedule.duration_minutes,
             'timezone': schedule.timezone,
-            'recruiter_name': schedule.recruiter.name if schedule.recruiter else None,
+            'recruiter_name': schedule.recruiter.first_name if schedule.recruiter else None,
             'organization_name': schedule.organization.name if schedule.organization else None,
             'access_token': schedule.access_token,
             'mode': schedule.mode
@@ -780,3 +869,206 @@ def get_meeting_statistics():
             'message': f'Erreur lors du calcul des statistiques: {str(e)}'
         }), 500
 
+@scheduling_bp.route('/schedules/<schedule_id>/candidate-responses', methods=['GET'])
+@token_required
+def get_candidate_responses(schedule_id):
+    """Récupère l'historique des réponses du candidat"""
+    user_id = get_current_user_id()
+    
+    schedule = scheduling_service.get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Planification introuvable'
+        }), 404
+    
+    # Vérifier que l'utilisateur a le droit d'accéder à cette planification
+    if schedule.recruiter_id != user_id:
+        from ..models.organization import OrganizationMember
+        is_member = OrganizationMember.query.filter_by(
+            organization_id=schedule.organization_id,
+            user_id=user_id
+        ).first() is not None
+        
+        if not is_member:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
+    
+    try:
+        # Récupérer les informations complètes
+        schedule_info = scheduling_service.get_schedule_with_response_info(schedule_id)
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'schedule_id': schedule_id,
+                'candidate_name': schedule.candidate_name,
+                'candidate_email': schedule.candidate_email,
+                'current_status': schedule.status,
+                'can_candidate_respond': schedule_info['can_candidate_respond'],
+                'response_history': schedule_info['response_history'],
+                'was_confirmed_by_candidate': schedule_info['was_confirmed_by_candidate'],
+                'was_canceled_by_candidate': schedule_info['was_canceled_by_candidate'],
+                'cancellation_reason': schedule.cancellation_reason
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur lors de la récupération des réponses: {str(e)}'
+        }), 500
+
+@scheduling_bp.route('/schedules/<schedule_id>/resend-invitation', methods=['POST'])
+@token_required
+def resend_invitation(schedule_id):
+    """Renvoie l'email d'invitation avec boutons de réponse"""
+    user_id = get_current_user_id()
+    
+    try:
+        success = scheduling_service.resend_invitation_with_buttons(schedule_id, user_id)
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'Invitation renvoyée avec succès',
+                'data': {
+                    'schedule_id': schedule_id,
+                    'email_sent': True
+                }
+            }), 200
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Échec lors de l\'envoi de l\'invitation'
+            }), 500
+            
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur lors du renvoi de l\'invitation: {str(e)}'
+        }), 500
+
+@scheduling_bp.route('/schedules/<schedule_id>/email-preview', methods=['GET'])
+@token_required
+def get_email_preview(schedule_id):
+    """Récupère un aperçu de l'email d'invitation"""
+    user_id = get_current_user_id()
+    
+    schedule = scheduling_service.get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Planification introuvable'
+        }), 404
+    
+    # Vérifier les permissions
+    if schedule.recruiter_id != user_id:
+        from ..models.organization import OrganizationMember
+        is_member = OrganizationMember.query.filter_by(
+            organization_id=schedule.organization_id,
+            user_id=user_id
+        ).first() is not None
+        
+        if not is_member:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
+    
+    try:
+        # Générer les URLs de réponse pour l'aperçu
+        from .candidate_response_routes import generate_candidate_response_urls
+        import os
+        
+        base_url = os.getenv('APP_BASE_URL', 'https://votre-domaine.com')
+        response_urls = generate_candidate_response_urls(schedule.access_token, base_url)
+        
+        preview_data = {
+            'schedule': schedule.to_dict(),
+            'email_data': {
+                'candidate_name': schedule.candidate_name,
+                'candidate_email': schedule.candidate_email,
+                'interview_title': schedule.title,
+                'interview_position': schedule.position,
+                'scheduled_at': schedule.scheduled_at,
+                'duration_minutes': schedule.duration_minutes,
+                'timezone': schedule.timezone,
+                'mode': schedule.mode,
+                'description': schedule.description,
+                'recruiter_name': schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                'organization_name': schedule.organization.name if schedule.organization else 'Notre entreprise',
+                'meet_link': schedule.meet_link,
+                'calendar_link': schedule.calendar_link,
+                'confirm_url': response_urls['confirm_url'],
+                'cancel_url': response_urls['cancel_url'],
+                'access_token': schedule.access_token
+            }
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'data': preview_data
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur lors de la génération de l\'aperçu: {str(e)}'
+        }), 500
+
+@scheduling_bp.route('/schedules/<schedule_id>/response-status', methods=['GET'])
+@token_required
+def get_response_status(schedule_id):
+    """Récupère le statut de réponse candidat simplifié"""
+    user_id = get_current_user_id()
+    
+    try:
+        schedule_info = scheduling_service.get_schedule_with_response_info(schedule_id)
+        if not schedule_info:
+            return jsonify({
+                'status': 'error',
+                'message': 'Planification introuvable'
+            }), 404
+        
+        # Vérifier les permissions
+        schedule = scheduling_service.get_schedule(schedule_id)
+        if schedule.recruiter_id != user_id:
+            from ..models.organization import OrganizationMember
+            is_member = OrganizationMember.query.filter_by(
+                organization_id=schedule.organization_id,
+                user_id=user_id
+            ).first() is not None
+            
+            if not is_member:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Accès non autorisé'
+                }), 403
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'schedule_id': schedule_id,
+                'current_status': schedule_info['status'],
+                'can_candidate_respond': schedule_info['can_candidate_respond']['can_respond'],
+                'response_reason': schedule_info['can_candidate_respond']['reason'],
+                'confirmed_by_candidate': schedule_info['was_confirmed_by_candidate'],
+                'canceled_by_candidate': schedule_info['was_canceled_by_candidate'],
+                'cancellation_reason': schedule_info.get('cancellation_reason'),
+                'last_response_date': schedule_info.get('updated_at')
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Erreur: {str(e)}'
+        }), 500

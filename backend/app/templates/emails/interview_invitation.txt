@@ -1,35 +1,43 @@
-<!-- templates/emails/interview_invitation.txt -->
+INVITATION À L'ENTRETIEN
+
 Bonjour {{ candidate_name }},
 
-Nous sommes heureux de vous inviter à un entretien pour "{{ interview_title }}".
+Nous avons le plaisir de vous inviter à un entretien pour le poste que vous avez sollicité.
 
 DÉTAILS DE L'ENTRETIEN :
-------------------------
-Date et heure : {{ scheduled_at }}
-Durée : {{ duration_minutes }} minutes
-Fuseau horaire : {{ timezone }}
-Recruteur : {{ recruiter_name }}
-{% if description %}Description : {{ description }}{% endif %}
+========================
+- Titre : {{ interview_title }}
+- Date et heure : {{ scheduled_at }}
+- Durée : {{ duration_minutes }} minutes
+- Fuseau horaire : {{ timezone }}
+{% if description %}
+- Description : {{ description }}
+{% endif %}
+- Recruteur : {{ recruiter_name }}
 
-L'entretien se déroulera en ligne via notre plateforme RecruteIA. 
-Veuillez accéder à votre entretien à l'heure prévue en utilisant ce lien :
+CONFIRMER VOTRE PRÉSENCE :
+==========================
+Merci de cliquer sur l'un des liens suivants :
+
+✅ Pour CONFIRMER votre présence :
+{{ confirm_url }}
+
+❌ Pour ANNULER :
+{{ cancel_url }}
+
+ACCÈS À L'ENTRETIEN :
+====================
+Le jour de l'entretien, utilisez ce lien pour rejoindre la salle virtuelle :
 {{ interview_url }}
 
-Pour une expérience optimale, nous vous recommandons de :
-- Utiliser un navigateur récent (Chrome, Firefox, Edge)
-- Tester votre microphone et caméra à l'avance
-- Vous installer dans un environnement calme avec une bonne connexion internet
-
-Vous pouvez ajouter cet entretien à votre calendrier avec ce lien :
-{{ add_to_calendar_url }}
-
-Si vous avez des questions ou si vous devez reporter cet entretien, veuillez contacter directement {{ recruiter_name }} ou répondre à cet email.
-
-Nous nous réjouissons de vous rencontrer !
+{% if add_to_calendar_url %}
+CALENDRIER :
+============
+Ajouter à votre calendrier : {{ add_to_calendar_url }}
+{% endif %}
 
 Cordialement,
-L'équipe RecruteIA
+{{ recruiter_name }}
+Équipe RecruteIA
 
----
-Ce message a été envoyé automatiquement par RecruteIA. Merci de ne pas y répondre directement.
-© 2025 RecruteIA. Tous droits réservés.
+Si vous avez des questions, n'hésitez pas à nous contacter.

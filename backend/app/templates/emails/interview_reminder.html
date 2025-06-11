@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rappel d'entretien</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #ffa500; margin-bottom: 10px; }
+        .alert-box { background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 8px; border: 2px solid #ffa500; }
+        .alert-box h3 { margin-top: 0; color: #856404; }
+        .info-item { margin: 10px 0; }
+        .info-item strong { color: #2c3e50; }
+        .buttons { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; border-radius: 6px; text-decoration: none; color: white; font-weight: bold; font-size: 16px; }
+        .btn-success { background-color: #28a745; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-primary { background-color: #007bff; }
+        .countdown { text-align: center; font-size: 24px; color: #ffa500; font-weight: bold; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Rappel d'entretien</h1>
+            <p>Votre entretien a lieu <strong>DEMAIN</strong> !</p>
+        </div>
+        
+        <div class="countdown">
+            🚨 DEMAIN 🚨
+        </div>
+        
+        <p>Bonjour <strong>{{ candidate_name }}</strong>,</p>
+        
+        <p>Nous vous rappelons que votre entretien <strong>{{ interview_title }}</strong> aura lieu demain.</p>
+        
+        <div class="alert-box">
+            <h3>📅 Détails de votre entretien de demain</h3>
+            <div class="info-item"><strong>Titre :</strong> {{ interview_title }}</div>
+            <div class="info-item"><strong>📅 Date et heure :</strong> {{ scheduled_at }}</div>
+            <div class="info-item"><strong>⏱️ Durée :</strong> {{ duration_minutes }} minutes</div>
+            <div class="info-item"><strong>🌍 Fuseau horaire :</strong> {{ timezone }}</div>
+            <div class="info-item"><strong>👤 Recruteur :</strong> {{ recruiter_name }}</div>
+        </div>
+        
+        <p><strong>⚠️ Dernière chance pour confirmer votre présence :</strong></p>
+        
+        <div class="buttons">
+            <a href="{{ confirm_url }}" class="btn btn-success">✅ Confirmer ma présence</a>
+            <a href="{{ cancel_url }}" class="btn btn-danger">❌ Annuler</a>
+        </div>
+        
+        <div class="alert-box">
+            <h3>🔗 Prêt pour demain ?</h3>
+            <p style="text-align: center;">
+                <a href="{{ interview_url }}" class="btn btn-primary" style="font-size: 18px; padding: 20px 40px;">
+                    🎥 REJOINDRE L'ENTRETIEN DEMAIN
+                </a>
+            </p>
+            <p style="text-align: center; font-size: 14px; color: #6c757d;">
+                <em>💡 Conseil : Bookmarquez ce lien pour demain !</em>
+            </p>
+        </div>
+        
+        <div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #004085;">📝 Conseils pour bien préparer votre entretien :</h4>
+            <ul style="margin-bottom: 0;">
+                <li>Testez votre connexion internet et votre microphone</li>
+                <li>Choisissez un endroit calme et bien éclairé</li>
+                <li>Préparez vos questions sur le poste et l'entreprise</li>
+                <li>Ayez votre CV à portée de main</li>
+            </ul>
+        </div>
+        
+        <div class="footer">
+            <p>À demain !</p>
+            <p><strong>{{ recruiter_name }}</strong><br>
+            Équipe RecruteIA</p>
+            
+            <p style="font-size: 12px; color: #999;">
+                <em>En cas de problème technique, contactez-nous immédiatement.</em>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -50,6 +50,8 @@ def create_app(config_name='dev'):
     
     # Initialiser l'application avec la configuration
     config.init_app(app)
+    
+    validate_candidate_response_config(app)
     # Dossier pour les uploads
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -158,6 +160,7 @@ def register_blueprints(app):
     from .routes.ai_collaboration_routes import ai_collab_bp
     from .routes.interview_scheduling_routes import scheduling_bp
     from .routes.challenge.challenge_route import challenge_bp
+    from .routes.candidate_response_routes import candidate_response_bp
 
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
@@ -177,7 +180,8 @@ def register_blueprints(app):
     app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
     app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
     app.register_blueprint(job_postings_bp, url_prefix='/api/job-postings')
-    
+    app.register_blueprint(candidate_response_bp)
+
     
 
     # Gestion des erreurs
@@ -246,6 +250,57 @@ def configure_logging(app):
     app.logger.addHandler(console_handler)
     app.logger.setLevel(log_level)
 
+def validate_candidate_response_config(app):
+    """
+    Valide la configuration du système de réponse candidat.
+    
+    Args:
+        app (Flask): Application Flask
+    """
+    required_configs = ['APP_BASE_URL', 'CANDIDATE_RESPONSE_SECRET']
+    
+    for config_key in required_configs:
+        if not app.config.get(config_key):
+            if app.config['ENV'] == 'production':
+                raise ValueError(f"Configuration manquante en production : {config_key}")
+            else:
+                app.logger.warning(f"Configuration manquante (développement) : {config_key}")
+    
+    # Valider l'URL de base
+    base_url = app.config.get('APP_BASE_URL', '')
+    if base_url and not (base_url.startswith('http://') or base_url.startswith('https://')):
+        app.logger.warning(f"APP_BASE_URL devrait commencer par http:// ou https://. Valeur actuelle : {base_url}")
+    
+    # Valider la durée d'expiration
+    expiry_hours = app.config.get('CANDIDATE_RESPONSE_EXPIRY_HOURS', 48)
+    if not isinstance(expiry_hours, int) or expiry_hours < 1 or expiry_hours > 168:
+        app.logger.warning(f"CANDIDATE_RESPONSE_EXPIRY_HOURS devrait être entre 1 et 168 heures. Valeur actuelle : {expiry_hours}")
+    
+    app.logger.info("✅ Configuration système de réponse candidat validée")
+
+def initialize_email_template_service(app):
+    """
+    Initialise le service de templates d'email.
+    
+    Args:
+        app (Flask): Application Flask
+    """
+    try:
+        # Vérifier la disponibilité de Jinja2 pour les templates
+        from jinja2 import Environment, FileSystemLoader
+        
+        # Configurer l'environnement Jinja2 pour les emails
+        email_templates_path = os.path.join(app.root_path, 'templates', 'emails')
+        if os.path.exists(email_templates_path):
+            email_env = Environment(loader=FileSystemLoader(email_templates_path))
+            app.config['EMAIL_JINJA_ENV'] = email_env
+            app.logger.info(f"✅ Service de templates email initialisé : {email_templates_path}")
+        else:
+            app.logger.warning(f"⚠️ Dossier templates email non trouvé : {email_templates_path}")
+            
+    except ImportError:
+        app.logger.warning("⚠️ Jinja2 non disponible pour les templates d'email")
+
 def initialize_services(app):
     """Initialise les services de l'application."""
     # Importer et initialiser le service WebSocket
@@ -253,4 +308,7 @@ def initialize_services(app):
     websocket_service = WebSocketService()
     websocket_service.init_app(app)
     
+    initialize_email_template_service(app)
+    
+    app.logger.info("✅ Services initialisés avec support système candidat")
     # Vous pouvez initialiser d'autres services ici

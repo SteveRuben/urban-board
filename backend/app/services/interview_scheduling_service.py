@@ -183,6 +183,22 @@ class InterviewSchedulingService:
         if not mode:
             raise ValueError("Le mode d'entretien est requis")
         self._validate_mode(mode)
+        
+        candidate_email = data.get('candidate_email')
+        job_posting_id = data.get('job_id')
+        
+        if job_posting_id and candidate_email:
+            existing_schedule = InterviewSchedule.query.filter_by(
+                candidate_email=candidate_email,
+                job_posting_id=job_posting_id,
+                organization_id=organization_id
+            ).filter(
+                InterviewSchedule.status.notin_(['canceled'])
+            ).first()
+        
+            if existing_schedule:
+                raise ValueError(f"Un entretien existe déjà pour {candidate_email} sur cette offre")
+        
         # Validation des champs requis
         required_fields = ['candidate_name', 'candidate_email', 'title', 'position', 'scheduled_at']
         for field in required_fields:
@@ -214,7 +230,8 @@ class InterviewSchedulingService:
             ai_assistant_id=data.get('ai_assistant_id'),
             predefined_questions=data.get('predefined_questions'),
             status='scheduled',
-            calendar_sync_status='pending'
+            calendar_sync_status='pending',
+            job_posting_id= data.get('job_id')
         )
         
         # Sauvegarder d'abord pour avoir un ID
@@ -255,11 +272,36 @@ class InterviewSchedulingService:
                     'meet_link': schedule.meet_link
                 }
             )
-            # Email d'invitation au candidat
-            self.notification_service.send_interview_invitation_email(schedule)
+            meeting_link = schedule.meet_link if schedule.meet_link else None
+
             
-            # Email d'invitation au candidat avec lien Meet
-            self.notification_service.send_interview_invitation_email(schedule)
+            email_sent = self.notification_service.email_service.send_interview_invitation(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token,
+                description=schedule.description,
+                meet_link=meeting_link
+            )
+        
+            # Log de l'envoi d'email
+            self.audit_service.log_action(
+                organization_id=organization_id,
+                user_id=recruiter_id,
+                action='send_invitation_email',
+                entity_type='interview_schedule',
+                entity_id=schedule.id,
+                description=f"Email d'invitation envoyé à {schedule.candidate_name}",
+                metadata={
+                    'email_sent': email_sent,
+                    'has_response_buttons': True,
+                    'candidate_email': schedule.candidate_email
+                }
+            )
             
         except Exception as e:
             print(f"Erreur lors de l'envoi des notifications: {str(e)}")
@@ -268,20 +310,20 @@ class InterviewSchedulingService:
     
     def update_schedule(self, schedule_id, recruiter_id, data):
         """
-        Met à jour une planification d'entretien et son meeting Google Calendar
-        
+        Met à jour une planification d'entretien avec des champs limités
+
         Args:
             schedule_id: ID de la planification
             recruiter_id: ID du recruteur qui fait la modification
-            data: Nouvelles données
-            
+            data: Nouvelles données (champs limités)
+
         Returns:
             L'objet InterviewSchedule mis à jour
         """
         schedule = InterviewSchedule.query.get(schedule_id)
         if not schedule:
             raise ValueError(f"Planification introuvable: {schedule_id}")
-        
+
         # Vérifier que le recruteur a le droit de modifier
         if schedule.recruiter_id != recruiter_id:
             # Vérifier si le recruteur est admin dans l'organisation
@@ -291,18 +333,22 @@ class InterviewSchedulingService:
                 user_id=recruiter_id,
                 role='admin'
             ).first() is not None
-            
+
             if not is_admin:
                 raise ValueError("Vous n'avez pas la permission de modifier cet entretien")
-        
+
+        # Vérifier que l'entretien peut encore être modifié
+        if schedule.status not in ['scheduled', 'confirmed']:
+            raise ValueError(f"Impossible de modifier un entretien avec le statut: {schedule.status}")
+
         # Valider le mode si fourni
         if 'mode' in data and data['mode']:
             self._validate_mode(data['mode'])
-        
+
         # Vérifier si des données importantes ont changé (nécessitant une mise à jour du meeting)
         meeting_update_needed = False
         date_changed = False
-        
+
         if 'scheduled_at' in data and data['scheduled_at']:
             try:
                 new_date = datetime.fromisoformat(data['scheduled_at'])
@@ -315,46 +361,52 @@ class InterviewSchedulingService:
                 if "futur" in str(e):
                     raise e
                 raise ValueError("Format de date invalide")
-        
+
         # Autres champs qui nécessitent une mise à jour du meeting
-        meeting_fields = ['title', 'description', 'candidate_name', 'candidate_email', 'duration_minutes', 'timezone']
+        meeting_fields = ['duration_minutes', 'timezone']
         for field in meeting_fields:
             if field in data and data[field] != getattr(schedule, field):
                 meeting_update_needed = True
                 break
-        
-        # Mettre à jour les champs
-        for field in ['candidate_name', 'candidate_email', 'candidate_phone', 
-                      'title', 'description', 'position', 'duration_minutes', 
-                      'timezone', 'mode', 'ai_assistant_id', 'predefined_questions', 'status']:
+            
+        # Mettre à jour uniquement les champs autorisés
+        for field in ['duration_minutes', 'timezone', 'mode', 'ai_assistant_id', 'predefined_questions']:
             if field in data and data[field] is not None:
-                if field == 'status':
-                    self._validate_status(data[field])
-                setattr(schedule, field, data[field])
-        
+                if field == 'ai_assistant_id' and data[field] == '':
+                    # Permettre de définir l'assistant à null/vide
+                    setattr(schedule, field, None)
+                elif field == 'predefined_questions':
+                    # Filtrer les questions vides
+                    filtered_questions = [q.strip() for q in data[field] if q.strip()]
+                    setattr(schedule, field, filtered_questions)
+                else:
+                    setattr(schedule, field, data[field])
+
+        # Mettre à jour la date si fournie
         if 'scheduled_at' in data and data['scheduled_at']:
             schedule.scheduled_at = datetime.fromisoformat(data['scheduled_at'])
-        
+
         schedule.updated_at = datetime.utcnow()
-        
+
         # Mettre à jour le meeting si nécessaire
         meeting_success = True
         if meeting_update_needed and schedule.calendar_sync_status != 'disabled':
             meeting_success = self._create_or_update_meeting(schedule, is_update=True)
-        
+
         db.session.commit()
-        
+
         # Enregistrer dans les logs d'audit
+        updated_fields = list(data.keys())
         self.audit_service.log_action(
             organization_id=schedule.organization_id,
             user_id=recruiter_id,
-            action='update',
+            action='update_limited',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Modification de l'entretien {schedule.mode} avec {schedule.candidate_name}" +
+            description=f"Modification des champs [{', '.join(updated_fields)}] de l'entretien {schedule.mode} avec {schedule.candidate_name}" +
                         (f" - Meeting mis à jour" if meeting_update_needed and meeting_success else "")
         )
-        
+
         # Si la date a changé, envoyer des notifications
         if date_changed:
             try:
@@ -369,14 +421,41 @@ class InterviewSchedulingService:
                         'meet_link': schedule.meet_link
                     }
                 )
+
+                # Email au candidat avec boutons de réponse
+
+                email_sent = self.notification_service.email_service.send_interview_rescheduled(
+                    email=schedule.candidate_email,
+                    candidate_name=schedule.candidate_name,
+                    interview_title=schedule.title,
+                    recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                    scheduled_at=schedule.scheduled_at,
+                    duration_minutes=schedule.duration_minutes,
+                    timezone=schedule.timezone,
+                    access_token=schedule.access_token
+                )
                 
-                # Email au candidat avec nouveau lien Meet
-                self.notification_service.send_interview_rescheduled_email(schedule)
-                
+                # Log de l'envoi d'email
+                self.audit_service.log_action(
+                    organization_id=schedule.organization_id,
+                    user_id=recruiter_id,
+                    action='send_rescheduled_email',
+                    entity_type='interview_schedule',
+                    entity_id=schedule.id,
+                    description=f"Email de reprogrammation envoyé à {schedule.candidate_name}",
+                    metadata={
+                        'email_sent': email_sent,
+                        'has_response_buttons': True,
+                        'candidate_email': schedule.candidate_email,
+                        'date_changed': True
+                    }
+                )
+
             except Exception as e:
                 print(f"Erreur lors de l'envoi des notifications: {str(e)}")
-        
+
         return schedule
+
     
     def cancel_schedule(self, schedule_id, user_id, reason=None):
         """
@@ -394,18 +473,18 @@ class InterviewSchedulingService:
         if not schedule:
             raise ValueError(f"Planification introuvable: {schedule_id}")
         
-        # Vérifier que l'utilisateur a le droit d'annuler
-        if schedule.recruiter_id != user_id:
-            # Vérifier si l'utilisateur est admin dans l'organisation
-            from ..models.organization import OrganizationMember
-            is_admin = OrganizationMember.query.filter_by(
-                organization_id=schedule.organization_id,
-                user_id=user_id,
-                role='admin'
-            ).first() is not None
+        # # Vérifier que l'utilisateur a le droit d'annuler
+        # if schedule.recruiter_id != user_id:
+        #     # Vérifier si l'utilisateur est admin dans l'organisation
+        #     from ..models.organization import OrganizationMember
+        #     is_admin = OrganizationMember.query.filter_by(
+        #         organization_id=schedule.organization_id,
+        #         user_id=user_id,
+        #         role='admin'
+        #     ).first() is not None
             
-            if not is_admin:
-                raise ValueError("Vous n'avez pas la permission d'annuler cet entretien")
+        #     if not is_admin:
+        #         raise ValueError("Vous n'avez pas la permission d'annuler cet entretien")
         
         # Vérifier que l'entretien peut être annulé
         if schedule.status in ['completed', 'canceled']:
@@ -457,6 +536,8 @@ class InterviewSchedulingService:
     
     def get_schedule_by_token(self, access_token):
         """Récupère une planification par son token d'accès"""
+        print('8..........8.....................')
+
         return InterviewSchedule.query.filter_by(access_token=access_token).first()
     
     def get_user_schedules(self, user_id, status=None, from_date=None, to_date=None):
@@ -741,5 +822,286 @@ class InterviewSchedulingService:
     def test_teams_integration(self) -> dict:
         """Tester l'intégration Teams"""
         return self.teams_service.test_teams_integration()
+    
+    def confirm_by_candidate(self, schedule_id):
+        """
+        Confirme un entretien suite à la réponse du candidat
+
+        Args:
+            schedule_id: ID de la planification
+
+        Returns:
+            Boolean: True si la confirmation a réussi, False sinon
+        """
+        try:
+            schedule = InterviewSchedule.query.get(schedule_id)
+            if not schedule:
+                raise ValueError(f"Planification introuvable: {schedule_id}")
+
+            # Vérifier que l'entretien peut être confirmé
+            if schedule.status not in ['scheduled']:
+                raise ValueError(f"Impossible de confirmer un entretien avec le statut: {schedule.status}")
+
+            # Vérifier que l'entretien n'est pas déjà passé
+            if schedule.scheduled_at <= datetime.utcnow():
+                raise ValueError("Impossible de confirmer un entretien déjà passé")
+
+            # Mettre à jour le statut
+            old_status = schedule.status
+            schedule.status = 'confirmed'
+            schedule.updated_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Enregistrer dans les logs
+            self.audit_service.log_action(
+                organization_id=schedule.organization_id,
+                user_id=None,  # Action du candidat
+                action='candidate_confirm',
+                entity_type='interview_schedule',
+                entity_id=schedule.id,
+                description=f"Entretien confirmé par le candidat {schedule.candidate_name}",
+                metadata={
+                    'previous_status': old_status,
+                    'new_status': 'confirmed',
+                    'candidate_email': schedule.candidate_email,
+                    'confirmed_via': 'email_response'
+                }
+            )
+
+            return True
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erreur lors de la confirmation par le candidat: {str(e)}")
+            return False
+
+    def cancel_by_candidate(self, schedule_id, reason="Annulé par le candidat"):
+        """
+        Annule un entretien suite à la réponse du candidat
+
+        Args:
+            schedule_id: ID de la planification
+            reason: Raison de l'annulation
+
+        Returns:
+            Boolean: True si l'annulation a réussi, False sinon
+        """
+        try:
+            schedule = InterviewSchedule.query.get(schedule_id)
+            if not schedule:
+                raise ValueError(f"Planification introuvable: {schedule_id}")
+
+            # Vérifier que l'entretien peut être annulé
+            if schedule.status not in ['scheduled', 'confirmed']:
+                raise ValueError(f"Impossible d'annuler un entretien avec le statut: {schedule.status}")
+
+            # Annuler le meeting Google Calendar si existant
+            if schedule.google_event_id:
+                try:
+                    self._cancel_meeting(schedule, reason)
+                except Exception as e:
+                    print(f"Erreur lors de l'annulation du meeting Google: {str(e)}")
+                    # Continue même si l'annulation Google échoue
+
+            # Mettre à jour le statut
+            old_status = schedule.status
+            schedule.status = 'canceled'
+            schedule.cancellation_reason = reason
+            schedule.updated_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Enregistrer dans les logs
+            self.audit_service.log_action(
+                organization_id=schedule.organization_id,
+                user_id=None,  # Action du candidat
+                action='candidate_cancel',
+                entity_type='interview_schedule',
+                entity_id=schedule.id,
+                description=f"Entretien annulé par le candidat {schedule.candidate_name}",
+                metadata={
+                    'previous_status': old_status,
+                    'new_status': 'canceled',
+                    'candidate_email': schedule.candidate_email,
+                    'reason': reason,
+                    'canceled_via': 'email_response'
+                }
+            )
+
+            return True
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erreur lors de l'annulation par le candidat: {str(e)}")
+            return False
+
+    def can_candidate_respond(self, schedule_id):
+        """
+        Vérifie si le candidat peut encore répondre à l'invitation
+
+        Args:
+            schedule_id: ID de la planification
+
+        Returns:
+            Dict: Statut et raison
+        """
+        try:
+            schedule = InterviewSchedule.query.get(schedule_id)
+            if not schedule:
+                return {
+                    'can_respond': False,
+                    'reason': 'Planification introuvable'
+                }
+
+            # Vérifier le statut
+            if schedule.status not in ['scheduled', 'confirmed']:
+                return {
+                    'can_respond': False,
+                    'reason': f'Entretien déjà {schedule.status}'
+                }
+
+            # Vérifier la date
+            if schedule.scheduled_at <= datetime.utcnow():
+                return {
+                    'can_respond': False,
+                    'reason': 'Entretien déjà passé'
+                }
+
+            # Vérifier s'il reste assez de temps (au moins 2 heures avant)
+            time_until_interview = schedule.scheduled_at - datetime.utcnow()
+            if time_until_interview.total_seconds() < 7200:  # 2 heures
+                return {
+                    'can_respond': False,
+                    'reason': 'Trop proche de l\'heure de l\'entretien'
+                }
+
+            return {
+                'can_respond': True,
+                'reason': None
+            }
+
+        except Exception as e:
+            print(f"Erreur lors de la vérification de réponse candidat: {str(e)}")
+            return {
+                'can_respond': False,
+                'reason': 'Erreur système'
+            }
+
+    # def get_candidate_response_history(self, schedule_id):
+    #     """
+    #     Récupère l'historique des réponses du candidat
+
+    #     Args:
+    #         schedule_id: ID de la planification
+
+    #     Returns:
+    #         List: Liste des actions du candidat
+    #     """
+    #     try:
+    #         # Récupérer les actions du candidat depuis les logs d'audit
+    #         candidate_actions = self.audit_service.get_entity_history(
+    #             entity_type='interview_schedule',
+    #             entity_id=schedule_id,
+    #             action_pattern='candidate_%'
+    #         )
+
+    #         return candidate_actions
+
+    #     except Exception as e:
+    #         print(f"Erreur lors de la récupération de l'historique candidat: {str(e)}")
+    #         return []
+
+    def resend_invitation_with_buttons(self, schedule_id, user_id):
+        """
+        Renvoie l'invitation avec boutons de réponse
+        
+        Args:
+            schedule_id: ID de la planification
+            user_id: ID de l'utilisateur qui fait la demande
+            
+        Returns:
+            Boolean: True si l'envoi a réussi
+        """
+        try:
+            schedule = self.get_schedule(schedule_id)
+            if not schedule:
+                raise ValueError(f"Planification introuvable: {schedule_id}")
+            
+            # Vérifier les permissions
+            if schedule.recruiter_id != user_id:
+                from ..models.organization import OrganizationMember
+                is_admin = OrganizationMember.query.filter_by(
+                    organization_id=schedule.organization_id,
+                    user_id=user_id,
+                    role='admin'
+                ).first() is not None
+                
+                if not is_admin:
+                    raise ValueError("Vous n'avez pas la permission de renvoyer cette invitation")
+            
+            # Vérifier que l'entretien peut encore recevoir des réponses
+            can_respond = self.can_candidate_respond(schedule_id)
+            if not can_respond['can_respond']:
+                raise ValueError(f"Impossible de renvoyer l'invitation: {can_respond['reason']}")
+            
+            # Renvoyer l'email avec boutons
+            email_sent = self.notification_service.send_interview_invitation_with_response_buttons(schedule)
+            
+            # Log de l'action
+            self.audit_service.log_action(
+                organization_id=schedule.organization_id,
+                user_id=user_id,
+                action='resend_invitation',
+                entity_type='interview_schedule',
+                entity_id=schedule.id,
+                description=f"Invitation renvoyée à {schedule.candidate_name}",
+                metadata={
+                    'email_sent': email_sent,
+                    'has_response_buttons': True,
+                    'candidate_email': schedule.candidate_email
+                }
+            )
+            
+            return email_sent
+            
+        except Exception as e:
+            print(f"Erreur lors du renvoi de l'invitation: {str(e)}")
+            return False
+    
+    def get_schedule_with_response_info(self, schedule_id):
+        """
+        Récupère une planification avec ses informations de réponse candidat
+        
+        Args:
+            schedule_id: ID de la planification
+            
+        Returns:
+            Dict: Informations complètes de la planification
+        """
+        try:
+            schedule = self.get_schedule(schedule_id)
+            if not schedule:
+                return None
+            
+            # Informations de base
+            schedule_dict = schedule.to_dict()
+            
+            # Ajouter les informations de réponse candidat
+            can_respond = self.can_candidate_respond(schedule_id)
+            # response_history = self.get_candidate_response_history(schedule_id)
+            
+            schedule_dict.update({
+                'can_candidate_respond': can_respond,
+                # 'response_history': response_history,
+                'was_confirmed_by_candidate': schedule.status == 'confirmed',
+                'was_canceled_by_candidate': schedule.status == 'canceled' and 'candidat' in (schedule.cancellation_reason or '').lower()
+            })
+            
+            return schedule_dict
+            
+        except Exception as e:
+            print(f"Erreur lors de la récupération des infos de réponse: {str(e)}")
+            return None
     
     

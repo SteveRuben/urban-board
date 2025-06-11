@@ -1,0 +1,33 @@
+Entretien reprogrammé - {{ interview_position }}
+
+Bonjour {{ candidate_name }},
+
+Votre entretien pour le poste de {{ interview_position }} a été reprogrammé.
+
+NOUVEAUX DÉTAILS :
+- Titre : {{ interview_title }}
+- Nouvelle date et heure : {{ scheduled_at.strftime('%A %d %B %Y à %H:%M') }} ({{ timezone }})
+- Durée : {{ duration_minutes }} minutes
+- Mode : {% if mode == 'autonomous' %}Entretien autonome avec assistant IA{% else %}Entretien collaboratif avec recruteur et assistant IA{% endif %}
+
+{% if meet_link %}
+LIEN DE VISIOCONFÉRENCE (MIS À JOUR) :
+{{ meet_link }}
+
+{% if calendar_link %}Mettre à jour votre calendrier : {{ calendar_link }}{% endif %}
+{% endif %}
+
+MERCI DE CONFIRMER LA NOUVELLE DATE :
+
+✅ Pour confirmer la nouvelle date :
+{{ confirm_url }}
+
+❌ Si vous n'êtes pas disponible :
+{{ cancel_url }}
+
+Nous nous excusons pour ce changement et vous remercions de votre compréhension.
+
+Pour toute question, n'hésitez pas à contacter {{ recruiter_name }}.
+
+Cordialement,
+L'équipe {{ organization_name }}

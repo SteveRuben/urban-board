@@ -8,7 +8,7 @@ import Link from "next/link"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import AIAssistantService from "@/services/ai-assistant-service"
 import { InterviewSchedulingService } from "@/services/interview-scheduling-service"
-import type { InterviewSchedule, InterviewScheduleFormData } from "@/types/interview-scheduling"
+import type { InterviewSchedule } from "@/types/interview-scheduling"
 import {
   Brain,
   RefreshCw,
@@ -18,29 +18,21 @@ import {
   Calendar,
   User,
   Briefcase,
-  ChevronRight,
-  ChevronLeft,
-  Trash2,
   Plus,
   Info,
   Star,
-  Video,
   MessageSquare,
   Users,
   Check,
   Save,
   X,
+  Settings,
+  Lock,
 } from "lucide-react"
 import { AIAssistant, AIAssistantCapabilities, normalizeAssistant } from "@/types/assistant"
 
-// Types
-interface FormDataType {
-  candidate_name: string
-  candidate_email: string
-  candidate_phone: string
-  title: string
-  description: string
-  position: string
+// Types pour les données modifiables uniquement
+interface LimitedFormData {
   scheduled_at: string
   duration_minutes: number
   timezone: string
@@ -80,13 +72,7 @@ const EditInterviewSchedulePage = () => {
   const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState<boolean>(false)
-  const [formData, setFormData] = useState<FormDataType>({
-    candidate_name: "",
-    candidate_email: "",
-    candidate_phone: "",
-    title: "",
-    description: "",
-    position: "",
+  const [formData, setFormData] = useState<LimitedFormData>({
     scheduled_at: "",
     duration_minutes: 30,
     timezone: "Europe/Paris",
@@ -114,14 +100,8 @@ const EditInterviewSchedulePage = () => {
           return
         }
 
-        // Pré-remplir le formulaire avec les données existantes
+        // Pré-remplir le formulaire avec SEULEMENT les données modifiables
         setFormData({
-          candidate_name: scheduleData.candidate_name || "",
-          candidate_email: scheduleData.candidate_email || "",
-          candidate_phone: scheduleData.candidate_phone || "",
-          title: scheduleData.title || "",
-          description: scheduleData.description || "",
-          position: scheduleData.position || "",
           scheduled_at: scheduleData.scheduled_at ? new Date(scheduleData.scheduled_at).toISOString().slice(0, 16) : "",
           duration_minutes: scheduleData.duration_minutes || 30,
           timezone: scheduleData.timezone || "Europe/Paris",
@@ -208,24 +188,6 @@ const EditInterviewSchedulePage = () => {
     setHasChanges(true)
   }
 
-  // Mapper les données du formulaire vers le format du service
-  const mapFormDataToServiceData = (data: FormDataType): Partial<InterviewScheduleFormData> => {
-    return {
-      candidate_name: data.candidate_name,
-      candidate_email: data.candidate_email,
-      candidate_phone: data.candidate_phone || undefined,
-      title: data.title,
-      description: data.description || undefined,
-      position: data.position,
-      scheduled_at: data.scheduled_at,
-      duration_minutes: data.duration_minutes,
-      timezone: data.timezone,
-      mode: data.mode,
-      ai_assistant_id: data.ai_assistant_id || undefined,
-      predefined_questions: data.predefined_questions.filter(q => q.trim() !== ''),
-    }
-  }
-
   // Soumettre le formulaire pour modifier l'entretien
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -236,20 +198,10 @@ const EditInterviewSchedulePage = () => {
     try {
       setIsSubmitting(true)
 
-      // Valider les données avant soumission
-      const serviceData = mapFormDataToServiceData(formData)
-      const validationErrors = InterviewSchedulingService.validateScheduleData(serviceData as InterviewScheduleFormData)
-      
-      if (Object.keys(validationErrors).length > 0) {
-        const firstError = Object.values(validationErrors)[0]
-        setSubmitError(firstError)
-        return
-      }
+      console.log("Modification limitée de la planification d'entretien avec les données:", formData)
 
-      console.log("Modification de la planification d'entretien avec les données:", serviceData)
-
-      // Appeler le service pour modifier la planification
-      const updatedSchedule = await InterviewSchedulingService.updateSchedule(schedule.id, serviceData)
+      // Appeler le service pour modifier la planification (version limitée)
+      const updatedSchedule = await InterviewSchedulingService.updateSchedule(schedule.id, formData)
       
       console.log("Planification modifiée avec succès:", updatedSchedule)
 
@@ -376,8 +328,8 @@ const EditInterviewSchedulePage = () => {
   return (
     <>
       <Head>
-        <title>Modifier l'entretien - {formData.candidate_name} - RecruteIA</title>
-        <meta name="description" content="Modifier la planification d'entretien" />
+        <title>Reprogrammer l'entretien - {schedule?.candidate_name} - RecruteIA</title>
+        <meta name="description" content="Reprogrammer l'entretien" />
       </Head>
 
       <div className="bg-gray-50 py-8 min-h-screen">
@@ -392,16 +344,16 @@ const EditInterviewSchedulePage = () => {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Retour aux détails
               </Link>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Modifier l'entretien</h1>
-              <div className="flex flex-wrap items-center gap-2 text-gray-600">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Reprogrammer l'entretien</h1>
+              <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-4">
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-1 text-gray-500" />
-                  <span className="font-medium">{formData.candidate_name}</span>
+                  <span className="font-medium">{schedule?.candidate_name}</span>
                 </div>
                 <span className="text-gray-400">•</span>
                 <div className="flex items-center">
                   <Briefcase className="h-4 w-4 mr-1 text-gray-500" />
-                  <span className="font-medium">{formData.position}</span>
+                  <span className="font-medium">{schedule?.position}</span>
                 </div>
                 {hasChanges && (
                   <>
@@ -411,6 +363,59 @@ const EditInterviewSchedulePage = () => {
                       <span className="text-sm font-medium">Modifications non sauvegardées</span>
                     </div>
                   </>
+                )}
+              </div>
+
+              {/* Information sur les champs modifiables */}
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <Settings className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-700">
+                      <strong>Mode reprogrammation :</strong> Seuls la date, l'heure, la durée, le fuseau horaire, le mode d'entretien, l'assistant IA et les questions personnalisées peuvent être modifiés.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Informations non modifiables */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 mb-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <Lock className="h-5 w-5 mr-2 text-gray-500" />
+                Informations de l'entretien (non modifiables)
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <span className="text-gray-600 block">Candidat :</span>
+                  <span className="font-medium">{schedule?.candidate_name}</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <span className="text-gray-600 block">Email :</span>
+                  <span className="font-medium">{schedule?.candidate_email}</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <span className="text-gray-600 block">Poste :</span>
+                  <span className="font-medium">{schedule?.position}</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <span className="text-gray-600 block">Titre :</span>
+                  <span className="font-medium">{schedule?.title}</span>
+                </div>
+                {schedule?.candidate_phone && (
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <span className="text-gray-600 block">Téléphone :</span>
+                    <span className="font-medium">{schedule.candidate_phone}</span>
+                  </div>
+                )}
+                {schedule?.description && (
+                  <div className="bg-gray-50 p-3 rounded-md md:col-span-2">
+                    <span className="text-gray-600 block">Description :</span>
+                    <span className="font-medium">{schedule.description}</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -429,120 +434,16 @@ const EditInterviewSchedulePage = () => {
               </div>
             )}
 
-            {/* Formulaire */}
+            {/* Formulaire de reprogrammation */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Section: Informations du candidat */}
-              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <User className="h-5 w-5 mr-2 text-primary-600" />
-                  Informations du candidat
-                </h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="candidate_name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nom du candidat <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="candidate_name"
-                      name="candidate_name"
-                      value={formData.candidate_name}
-                      onChange={handleChange}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Nom complet du candidat"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="candidate_email" className="block text-sm font-medium text-gray-700 mb-1">
-                      Email du candidat <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      id="candidate_email"
-                      name="candidate_email"
-                      value={formData.candidate_email}
-                      onChange={handleChange}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="email@exemple.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="candidate_phone" className="block text-sm font-medium text-gray-700 mb-1">
-                      Téléphone du candidat
-                    </label>
-                    <input
-                      type="tel"
-                      id="candidate_phone"
-                      name="candidate_phone"
-                      value={formData.candidate_phone}
-                      onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="+33 6 12 34 56 78"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
-                      Poste <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="position"
-                      name="position"
-                      value={formData.position}
-                      onChange={handleChange}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Intitulé du poste"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Détails de l'entretien */}
+              {/* Section: Planification */}
               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <Calendar className="h-5 w-5 mr-2 text-primary-600" />
-                  Détails de l'entretien
+                  Nouvelle planification
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                      Titre de l'entretien <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="title"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleChange}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Titre descriptif de l'entretien"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      rows={3}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Description optionnelle de l'entretien"
-                    />
-                  </div>
-
                   <div>
                     <label htmlFor="scheduled_at" className="block text-sm font-medium text-gray-700 mb-1">
                       Date et heure <span className="text-red-500">*</span>
@@ -788,7 +689,7 @@ const EditInterviewSchedulePage = () => {
                           className="ml-3 text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition-colors"
                           aria-label="Supprimer cette question"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <X className="h-5 w-5" />
                         </button>
                       </div>
                     ))}
@@ -845,12 +746,12 @@ const EditInterviewSchedulePage = () => {
                     {isSubmitting ? (
                       <>
                         <RefreshCw className="animate-spin h-5 w-5 mr-2 text-white" />
-                        <span>Sauvegarde en cours...</span>
+                        <span>Reprogrammation en cours...</span>
                       </>
                     ) : (
                       <>
                         <Save className="h-5 w-5 mr-2 text-white group-hover:scale-110 transition-transform duration-200" />
-                        <span>Sauvegarder les modifications</span>
+                        <span>Reprogrammer l'entretien</span>
                       </>
                     )}
                   </button>

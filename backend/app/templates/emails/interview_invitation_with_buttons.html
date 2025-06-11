@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitation à l'entretien</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f4f4f4; 
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            text-align: center; 
+            padding: 30px 20px; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: bold; 
+        }
+        .content { 
+            padding: 30px; 
+        }
+        .interview-details { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            border-left: 4px solid #667eea; 
+        }
+        .meeting-info { 
+            background: #e3f2fd; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 15px 0; 
+        }
+        .response-buttons { 
+            text-align: center; 
+            margin: 30px 0; 
+            padding: 20px; 
+            background: #f8f9fa; 
+            border-radius: 10px; 
+        }
+        .btn { 
+            display: inline-block; 
+            padding: 15px 30px; 
+            margin: 0 10px 10px 10px; 
+            text-decoration: none; 
+            border-radius: 25px; 
+            font-weight: bold; 
+            font-size: 16px; 
+            border: none; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-confirm { 
+            background: #22c55e; 
+            color: white; 
+        }
+        .btn-confirm:hover { 
+            background: #16a34a; 
+            transform: translateY(-2px); 
+        }
+        .btn-cancel { 
+            background: #ef4444; 
+            color: white; 
+        }
+        .btn-cancel:hover { 
+            background: #dc2626; 
+            transform: translateY(-2px); 
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #666; 
+            border-top: 1px solid #e9ecef; 
+        }
+        .access-link { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            text-align: center; 
+        }
+        @media (max-width: 600px) {
+            .btn {
+                display: block;
+                margin: 10px auto;
+                width: 80%;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Invitation à l'entretien</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">Nous serions ravis de vous rencontrer !</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 16px;">Bonjour <strong>{{ candidate_name }}</strong>,</p>
+            
+            <p>Nous avons le plaisir de vous inviter à un entretien pour le poste de <strong>{{ interview_position }}</strong> chez <strong>{{ organization_name }}</strong>.</p>
+            
+            <div class="interview-details">
+                <h3 style="color: #667eea; margin-top: 0;">📋 Détails de l'entretien</h3>
+                <p><strong>Titre :</strong> {{ interview_title }}</p>
+                <p><strong>Date et heure :</strong> {{ scheduled_at.strftime('%A %d %B %Y à %H:%M') }} ({{ timezone }})</p>
+                <p><strong>Durée :</strong> {{ duration_minutes }} minutes</p>
+                <p><strong>Mode :</strong> 
+                    {% if mode == 'autonomous' %}
+                        Entretien autonome avec assistant IA
+                    {% else %}
+                        Entretien collaboratif avec recruteur et assistant IA
+                    {% endif %}
+                </p>
+                {% if description %}
+                <p><strong>Description :</strong> {{ description }}</p>
+                {% endif %}
+            </div>
+            
+            {% if meet_link %}
+            <div class="meeting-info">
+                <h4 style="color: #1976d2; margin-top: 0;">🎥 Lien de visioconférence</h4>
+                <p><a href="{{ meet_link }}" style="color: #1976d2; word-break: break-all;">{{ meet_link }}</a></p>
+                {% if calendar_link %}
+                <p><a href="{{ calendar_link }}" style="color: #1976d2;">📅 Ajouter à votre calendrier</a></p>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <div class="response-buttons">
+                <h3 style="color: #333; margin-top: 0;">Merci de confirmer votre présence :</h3>
+                <p style="margin-bottom: 20px; color: #666;">Cliquez sur l'un des boutons ci-dessous pour nous faire part de votre réponse</p>
+                
+                <a href="{{ confirm_url }}" class="btn btn-confirm">
+                    ✅ Je confirme ma présence
+                </a>
+                <a href="{{ cancel_url }}" class="btn btn-cancel">
+                    ❌ Je ne peux pas participer
+                </a>
+            </div>
+            
+            <p style="margin-top: 30px;">Pour toute question, n'hésitez pas à contacter <strong>{{ recruiter_name }}</strong>.</p>
+            
+            <p>Nous avons hâte de vous rencontrer !</p>
+            
+            <p style="margin-top: 30px;">
+                Cordialement,<br>
+                <strong>L'équipe {{ organization_name }}</strong>
+            </p>
+            
+            <div class="access-link">
+                <p style="margin: 0; font-size: 14px;">
+                    💡 Vous pouvez également accéder aux détails de cet entretien en 
+                    <a href="{{ request.url_root }}interviews/access/{{ access_token }}" style="color: #d97706; text-decoration: underline;">cliquant ici</a>
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Cet email a été envoyé par {{ organization_name }}</p>
+            <p>Si vous avez des difficultés avec les boutons ci-dessus, copiez et collez les liens suivants dans votre navigateur :</p>
+            <p style="font-size: 12px; word-break: break-all;">
+                Confirmer : {{ confirm_url }}<br>
+                Annuler : {{ cancel_url }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

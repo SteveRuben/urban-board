@@ -1,0 +1,33 @@
+RAPPEL D'ENTRETIEN
+
+Bonjour {{ candidate_name }},
+
+Ceci est un rappel concernant votre entretien prévu demain.
+
+DÉTAILS DE L'ENTRETIEN :
+========================
+- Titre : {{ interview_title }}
+- Date et heure : {{ scheduled_at }}
+- Durée : {{ duration_minutes }} minutes
+- Fuseau horaire : {{ timezone }}
+- Recruteur : {{ recruiter_name }}
+
+DERNIÈRE CHANCE POUR CONFIRMER :
+================================
+Si vous n'avez pas encore confirmé votre présence :
+
+✅ Pour CONFIRMER :
+{{ confirm_url }}
+
+❌ Pour ANNULER :
+{{ cancel_url }}
+
+ACCÈS À L'ENTRETIEN :
+====================
+Pour rejoindre l'entretien demain, utilisez ce lien :
+{{ interview_url }}
+
+À demain !
+
+{{ recruiter_name }}
+Équipe RecruteIA

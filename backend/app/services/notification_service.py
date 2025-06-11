@@ -6,6 +6,7 @@ from datetime import datetime
 from flask import current_app
 from ..models.notification import Notification
 from ..models.notification_setting import NotificationSetting, NotificationPreference
+import hashlib
 
 class NotificationService:
     """
@@ -1161,7 +1162,6 @@ class NotificationService:
                 self.logger.error(f"Erreur création notification statut: {str(e)}")
             return None
         
-        
     def create_interview_scheduled_notification(self, recruiter_id, schedule_data):
         """Crée une notification d'entretien planifié pour le recruteur"""
         try:
@@ -1240,20 +1240,8 @@ class NotificationService:
     def send_interview_invitation_email(self, schedule):
         """Envoie une invitation d'entretien par email au candidat"""
         try:
-            if not self.email_service:
-                return False
-            return self.email_service.send_interview_invitation(
-                email=schedule.candidate_email,
-                candidate_name=schedule.candidate_name,
-                interview_title=schedule.title,
-                recruiter_name=schedule.recruiter_name ,
-                scheduled_at=schedule.scheduled_at,
-                duration_minutes=schedule.duration_minutes,
-                timezone=schedule.timezone,
-                access_token=schedule.access_token,
-                description=schedule.description
-            )
-            
+            return self.send_interview_invitation_with_response_buttons(schedule)
+
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Erreur envoi invitation entretien: {str(e)}")
@@ -1262,19 +1250,8 @@ class NotificationService:
     def send_interview_rescheduled_email(self, schedule):
         """Envoie un email de reprogrammation au candidat"""
         try:
-            if not self.email_service:
-                return False
+            return self.send_interview_rescheduled_with_response_buttons(schedule)
 
-            return self.email_service.send_interview_rescheduled(
-                email=schedule.candidate_email,
-                candidate_name=schedule.candidate_name,
-                interview_title=schedule.title,
-                recruiter_name=schedule.recruiter.name if schedule.recruiter else 'Le recruteur',
-                scheduled_at=schedule.scheduled_at,
-                duration_minutes=schedule.duration_minutes,
-                timezone=schedule.timezone,
-                access_token=schedule.access_token
-            )
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Erreur envoi reprogrammation entretien: {str(e)}")
@@ -1312,10 +1289,116 @@ class NotificationService:
                 scheduled_at=schedule.scheduled_at,
                 duration_minutes=schedule.duration_minutes,
                 timezone=schedule.timezone,
-                access_token=schedule.access_token
+                access_token=schedule.access_token,
+                meet_link=schedule.meet_link
             )
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Erreur envoi rappel entretien: {str(e)}")
             return False
+    
+    def send_interview_invitation_with_response_buttons(self, schedule):
+        """
+        Version simplifiée qui utilise directement EmailService
+        """
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_invitation(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token,
+                description=schedule.description,
+                meet_link=schedule.meet_link
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi invitation avec boutons: {str(e)}")
+            return False    
+
+    def send_interview_rescheduled_with_response_buttons(self, schedule):
+        """
+        Version simplifiée qui utilise directement EmailService
+        """
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_rescheduled(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi reprogrammation avec boutons: {str(e)}")
+            return False
+    
+    def create_candidate_response_notification(self, recruiter_id, schedule, action, reason=None):
+        """
+        Crée une notification pour informer le recruteur de la réponse du candidat
+
+        Args:
+            recruiter_id: ID du recruteur
+            schedule: Objet InterviewSchedule
+            action: 'confirmed' ou 'canceled'
+            reason: Raison de l'annulation (si applicable)
+
+        Returns:
+            Notification créée
+        """
+        try:
+            if action == 'confirmed':
+                title = f"Entretien confirmé - {schedule.candidate_name}"
+                message = f"Le candidat {schedule.candidate_name} a confirmé sa présence pour l'entretien du {schedule.scheduled_at.strftime('%d/%m/%Y à %H:%M')}"
+            else:  # canceled
+                title = f"Entretien annulé - {schedule.candidate_name}"
+                message = f"Le candidat {schedule.candidate_name} a annulé l'entretien du {schedule.scheduled_at.strftime('%d/%m/%Y à %H:%M')}"
+                if reason:
+                    message += f" - Raison: {reason}"
+
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='candidate_response',
+                reference_id=schedule.id,
+                link=f"/interviews/scheduled/{schedule.id}"
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification réponse candidat: {str(e)}")
+            return None
+
+    def generate_candidate_response_urls(self, access_token, base_url=None):
+        """Génère les URLs candidat (méthode d'instance)"""
         
+        if base_url is None:
+            base_url = current_app.config.get('APP_BASE_URL', 'https://votre-domaine.com')
+
+        def generate_action_hash(access_token, action):
+            secret_key = current_app.config.get('CANDIDATE_RESPONSE_SECRET', 'default_secret_key')
+            data = f"{access_token}:{action}:{secret_key}"
+            return hashlib.sha256(data.encode()).hexdigest()[:16]
+
+        confirm_hash = generate_action_hash(access_token, 'confirm')
+        cancel_hash = generate_action_hash(access_token, 'cancel')
+
+        return {
+            'confirm_url': f"{base_url}/api/candidate/interview/{access_token}/confirm/{confirm_hash}",
+            'cancel_url': f"{base_url}/api/candidate/interview/{access_token}/cancel/{cancel_hash}",
+        }

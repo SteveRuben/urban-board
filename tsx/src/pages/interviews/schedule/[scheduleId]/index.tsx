@@ -722,12 +722,14 @@ const InterviewScheduleDetailPage = () => {
                       <div className={`w-3 h-3 rounded-full mr-3 ${['confirmed', 'in_progress', 'completed'].includes(schedule.status) ? 'bg-green-600' : 'bg-gray-300'}`}></div>
                       <span className="text-sm">Confirmé</span>
                     </div>
-                    
+                    <div className={`flex items-center ${schedule.status === 'canceled' ? 'text-red-600' : 'text-gray-400'}`}>
+                      <div className={`w-3 h-3 rounded-full mr-3 ${schedule.status === 'canceled' ? 'bg-red-600' : 'bg-gray-300'}`}></div>
+                      <span className="text-sm">Annulé</span>
+                    </div>
                     <div className={`flex items-center ${['in_progress', 'completed'].includes(schedule.status) ? 'text-orange-600' : 'text-gray-400'}`}>
                       <div className={`w-3 h-3 rounded-full mr-3 ${['in_progress', 'completed'].includes(schedule.status) ? 'bg-orange-600' : 'bg-gray-300'}`}></div>
                       <span className="text-sm">En cours</span>
                     </div>
-                    
                     <div className={`flex items-center ${schedule.status === 'completed' ? 'text-green-700' : 'text-gray-400'}`}>
                       <div className={`w-3 h-3 rounded-full mr-3 ${schedule.status === 'completed' ? 'bg-green-700' : 'bg-gray-300'}`}></div>
                       <span className="text-sm">Terminé</span>
