@@ -304,7 +304,7 @@ const InterviewsIndexPage = () => {
                         <tr
                           key={schedule.id}
                           className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => router.push(`/interviews/scheduled/${schedule.id}`)}
+                          onClick={() => router.push(`/interviews/schedule/${schedule.id}`)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">

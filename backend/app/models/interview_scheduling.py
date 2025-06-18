@@ -82,7 +82,8 @@ class InterviewSchedule(db.Model):
     job_posting_id = db.Column(db.String(36), db.ForeignKey("job_postings.id"), nullable=True)
     job_posting = relationship("JobPosting", back_populates="interview_schedules")
     job_application = relationship("JobApplication", back_populates="interview_schedule", uselist=False)
-    
+    ai_session_active = db.Column(db.Boolean, default=False, nullable=False)
+
     
     def __repr__(self):
         return f"<InterviewSchedule {self.candidate_name} - {self.scheduled_at}>"
@@ -114,4 +115,5 @@ class InterviewSchedule(db.Model):
             'interview_id': self.interview_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'ai_session_active': self.ai_session_active
         }

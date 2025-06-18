@@ -3,6 +3,7 @@ import os
 import logging
 import stripe
 from logging.handlers import RotatingFileHandler
+from app.services.avatar_service import init_avatar_service
 from flask import Flask, request
 from flask_cors import CORS
 
@@ -13,6 +14,7 @@ from sqlalchemy import MetaData, inspect
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
+
 
 # Initialisez les extensions sans fournir l'application
 socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
@@ -66,7 +68,7 @@ def create_app(config_name='dev'):
     
     # Configurer la journalisation
     configure_logging(app)
-    
+
     # Activer CORS pour permettre les requêtes depuis le frontend
     CORS(app, resources={
         r"/api/*": {
@@ -161,7 +163,8 @@ def register_blueprints(app):
     from .routes.interview_scheduling_routes import scheduling_bp
     from .routes.challenge.challenge_route import challenge_bp
     from .routes.candidate_response_routes import candidate_response_bp
-
+    from .routes.avatar_routes import avatar_bp
+    
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
     app.register_blueprint(user_bp, url_prefix='/api/users')
@@ -171,7 +174,8 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
     app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
-    
+    app.register_blueprint(avatar_bp, url_prefix='/api/avatars')
+
     app.register_blueprint(organizations_bp, url_prefix='/api/organizations')
     app.register_blueprint(collab_bp, url_prefix='/api/collaboration')
     app.register_blueprint(scheduling_bp, url_prefix='/api/scheduling')
@@ -309,6 +313,7 @@ def initialize_services(app):
     websocket_service.init_app(app)
     
     initialize_email_template_service(app)
+    init_avatar_service(socketio)
     
     app.logger.info("✅ Services initialisés avec support système candidat")
     # Vous pouvez initialiser d'autres services ici

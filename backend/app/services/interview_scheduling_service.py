@@ -10,6 +10,8 @@ from ..services.audit_service import AuditService
 from ..services.subscription_service import SubscriptionService
 from ..services.meet_service import MeetService
 from app import db
+from ..services.avatar_service import get_avatar_service
+
 
 class InterviewSchedulingService:
     """Service pour gérer la planification des entretiens avec intégration Google Meet"""
@@ -231,7 +233,8 @@ class InterviewSchedulingService:
             predefined_questions=data.get('predefined_questions'),
             status='scheduled',
             calendar_sync_status='pending',
-            job_posting_id= data.get('job_id')
+            job_posting_id= data.get('job_id'),
+            ai_session_active=False
         )
         
         # Sauvegarder d'abord pour avoir un ID
@@ -243,6 +246,27 @@ class InterviewSchedulingService:
         
         # Commit final
         db.session.commit()
+        
+        avatar_scheduled = False
+        if schedule.mode in ['autonomous', 'collaborative']:
+            avatar_service = get_avatar_service()
+            if avatar_service:
+                interview_data = {
+                    'candidate_name': schedule.candidate_name,
+                    'position': schedule.position,
+                    'mode': schedule.mode,
+                    'meet_link': schedule.meet_link
+                }
+                
+                result = avatar_service.schedule_avatar_launch(
+                    schedule.id, 
+                    schedule.scheduled_at, 
+                    interview_data
+                )
+                
+                avatar_scheduled = result['success']
+                if avatar_scheduled:
+                    print(f"🤖 Avatar programmé automatiquement pour {schedule.id}")
         
         # Enregistrer dans les logs d'audit
         self.audit_service.log_action(
@@ -307,6 +331,28 @@ class InterviewSchedulingService:
             print(f"Erreur lors de l'envoi des notifications: {str(e)}")
         
         return schedule
+    
+    def _format_avatar_status_for_api(avatar_status, avatar_service):
+        """Formate le statut avatar pour l'API"""
+
+        if not avatar_status or avatar_status.get('status') == 'not_found':
+            return {
+                'available': True,
+                'status': 'not_scheduled',
+                'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
+                'browser_running': False,
+                'meeting_active': False
+            }
+
+        return {
+            'available': True,
+            'status': avatar_status.get('status', 'unknown'),
+            'mode': avatar_status.get('mode', 'simulation'),
+            'browser_running': avatar_status.get('browser_running', False),
+            'meeting_active': avatar_status.get('meeting_active', False),
+            'scheduled_launch': avatar_status.get('launch_time'),
+            'launch_time': avatar_status.get('data', {}).get('started_at')
+        }
     
     def update_schedule(self, schedule_id, recruiter_id, data):
         """
@@ -456,7 +502,6 @@ class InterviewSchedulingService:
 
         return schedule
 
-    
     def cancel_schedule(self, schedule_id, user_id, reason=None):
         """
         Annule une planification d'entretien et son meeting Google Calendar
@@ -1069,39 +1114,160 @@ class InterviewSchedulingService:
             print(f"Erreur lors du renvoi de l'invitation: {str(e)}")
             return False
     
+
     def get_schedule_with_response_info(self, schedule_id):
         """
-        Récupère une planification avec ses informations de réponse candidat
-        
-        Args:
-            schedule_id: ID de la planification
-            
-        Returns:
-            Dict: Informations complètes de la planification
+        Récupère une planification avec toutes les infos (email + avatar)
         """
         try:
-            schedule = self.get_schedule(schedule_id)
+            schedule = InterviewSchedule.query.get(schedule_id)
             if not schedule:
                 return None
             
-            # Informations de base
-            schedule_dict = schedule.to_dict()
+            # Données de base
+            schedule_data = schedule.to_dict()
             
-            # Ajouter les informations de réponse candidat
+            # 🆕 AJOUTER LES INFOS AVATAR AUTOMATIQUEMENT
+            if schedule.mode in ['autonomous', 'collaborative']:
+                try:
+                    from ..services.avatar_service import get_avatar_service
+                    avatar_service = get_avatar_service()
+                    
+                    if avatar_service:
+                        print(f"🔍 Récupération avatar status pour {schedule_id}")
+                        avatar_status = avatar_service.get_avatar_status(schedule_id)
+                        
+                        # Formater les infos avatar
+                        if avatar_status and avatar_status.get('status') != 'not_found':
+                            avatar_info = {
+                                'available': True,
+                                'status': avatar_status.get('status', 'scheduled'),
+                                'mode': avatar_status.get('mode', 'simulation'),
+                                'browser_running': avatar_status.get('browser_running', False),
+                                'meeting_active': avatar_status.get('meeting_active', False),
+                                'scheduled_launch': avatar_status.get('launch_time'),
+                                'launch_time': avatar_status.get('data', {}).get('started_at')
+                            }
+                            
+                            # Ajouter infos questions si avatar actif
+                            questions_info = avatar_status.get('questions_info', {})
+                            if questions_info:
+                                avatar_info['questions'] = {
+                                    'total': questions_info.get('total_questions', 0),
+                                    'asked': questions_info.get('asked_questions', 0),
+                                    'next_in_seconds': questions_info.get('next_question_in')
+                                }
+                        else:
+                            # 🎯 AVATAR PROGRAMMÉ MAIS PAS ENCORE VISIBLE
+                            avatar_info = {
+                                'available': True,
+                                'status': 'scheduled',
+                                'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
+                                'browser_running': False,
+                                'meeting_active': False,
+                                'scheduled_launch': (schedule.scheduled_at - timedelta(minutes=2)).isoformat(),
+                                'note': 'Avatar programmé automatiquement'
+                            }
+                            
+                        schedule_data['avatar'] = avatar_info
+                        print(f"✅ Avatar info ajoutée: {avatar_info['status']}")
+                        
+                    else:
+                        # Service non disponible
+                        schedule_data['avatar'] = {
+                            'available': False,
+                            'status': 'service_unavailable',
+                            'error': 'Service avatar non disponible'
+                        }
+                        print("⚠️ Service avatar non disponible")
+                        
+                except Exception as e:
+                    print(f"❌ Erreur récupération avatar: {e}")
+                    schedule_data['avatar'] = {
+                        'available': False,
+                        'status': 'error',
+                        'error': str(e)
+                    }
             can_respond = self.can_candidate_respond(schedule_id)
             # response_history = self.get_candidate_response_history(schedule_id)
             
-            schedule_dict.update({
+            schedule_data.update({
                 'can_candidate_respond': can_respond,
                 # 'response_history': response_history,
                 'was_confirmed_by_candidate': schedule.status == 'confirmed',
                 'was_canceled_by_candidate': schedule.status == 'canceled' and 'candidat' in (schedule.cancellation_reason or '').lower()
             })
-            
-            return schedule_dict
+           
+            return schedule_data
             
         except Exception as e:
-            print(f"Erreur lors de la récupération des infos de réponse: {str(e)}")
+            print(f"❌ Erreur get_schedule_with_response_info: {e}")
             return None
     
+    def get_schedule_by_id(self, schedule_id, include_avatar=True):
+        """
+        Récupère une planification par ID avec option avatar
+        """
+        try:
+            schedule = InterviewSchedule.query.get(schedule_id)
+            if not schedule:
+                return None
+            
+            schedule_data = schedule.to_dict()
+            
+            # 🆕 INCLURE AVATAR SI DEMANDÉ
+            if include_avatar and schedule.mode in ['autonomous', 'collaborative']:
+                try:
+                    from services.avatar_service import get_avatar_service
+                    avatar_service = get_avatar_service()
+                    
+                    if avatar_service:
+                        avatar_status = avatar_service.get_avatar_status(schedule_id)
+                        schedule_data['avatar'] = self._format_avatar_status(avatar_status, avatar_service)
+                        
+                except Exception as e:
+                    print(f"❌ Erreur avatar dans get_schedule_by_id: {e}")
+            
+            return schedule_data
+            
+        except Exception as e:
+            print(f"❌ Erreur get_schedule_by_id: {e}")
+            return None
     
+    def _format_avatar_status(self, avatar_status, avatar_service):
+        """Formate le statut avatar pour l'API"""
+        
+        if not avatar_status or avatar_status.get('status') == 'not_found':
+            return {
+                'available': True,
+                'status': 'not_scheduled',
+                'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
+                'browser_running': False,
+                'meeting_active': False
+            }
+        
+        formatted = {
+            'available': True,
+            'status': avatar_status.get('status', 'unknown'),
+            'mode': avatar_status.get('mode', 'simulation'),
+            'browser_running': avatar_status.get('browser_running', False),
+            'meeting_active': avatar_status.get('meeting_active', False)
+        }
+        
+        # Ajouter les timings si disponibles
+        if avatar_status.get('launch_time'):
+            formatted['scheduled_launch'] = avatar_status.get('launch_time')
+        
+        if avatar_status.get('data', {}).get('started_at'):
+            formatted['launch_time'] = avatar_status.get('data', {}).get('started_at')
+        
+        # Ajouter les infos questions
+        questions_info = avatar_status.get('questions_info', {})
+        if questions_info:
+            formatted['questions'] = {
+                'total': questions_info.get('total_questions', 0),
+                'asked': questions_info.get('asked_questions', 0),
+                'next_in_seconds': questions_info.get('next_question_in')
+            }
+        
+        return formatted

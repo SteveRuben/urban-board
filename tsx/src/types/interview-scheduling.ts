@@ -1,5 +1,7 @@
 // frontend/types/interview-scheduling.ts
 
+import { AvatarStatus } from "./avatar";
+
 // Types pour les statuts d'entretien
 export type ScheduleStatus = 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'canceled' | 'no_show';
 
@@ -52,6 +54,9 @@ export interface InterviewSchedule {
     id: string;
     name: string;
   };
+
+  avatar?: AvatarStatus;
+
 }
 
 export interface CandidateResponseCapability {

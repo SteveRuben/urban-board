@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Avatar IA</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #667eea;
+            transition: transform 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .status-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .status-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .controls-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+        }
+
+        .avatars-list {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .avatar-item {
+            background: #f8f9fb;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .avatar-item.active {
+            border-left-color: #2ecc71;
+            background: #f0f9f4;
+        }
+
+        .avatar-item.scheduled {
+            border-left-color: #f39c12;
+            background: #fef9e7;
+        }
+
+        .avatar-item.failed {
+            border-left-color: #e74c3c;
+            background: #fdf2f2;
+        }
+
+        .avatar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .avatar-id {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .avatar-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .status-scheduled {
+            background: #f39c12;
+            color: white;
+        }
+
+        .status-failed {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .logs {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-success {
+            color: #2ecc71;
+        }
+
+        .log-error {
+            color: #e74c3c;
+        }
+
+        .log-info {
+            color: #3498db;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #2ecc71;
+        }
+
+        .notification.error {
+            background: #e74c3c;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Dashboard Avatar IA</h1>
+        
+        <!-- Statuts du service -->
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>Mode Service</h3>
+                <div class="status-value" id="serviceMode">🔄</div>
+            </div>
+            <div class="status-card">
+                <h3>Avatars Actifs</h3>
+                <div class="status-value" id="activeCount">0</div>
+            </div>
+            <div class="status-card">
+                <h3>Avatars Programmés</h3>
+                <div class="status-value" id="scheduledCount">0</div>
+            </div>
+            <div class="status-card">
+                <h3>Sessions Navigateur</h3>
+                <div class="status-value" id="browserCount">0</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- Contrôles -->
+            <div class="controls-section">
+                <h2>🎮 Contrôles Avatar</h2>
+                
+                <div class="form-group">
+                    <label for="interviewId">ID Entretien:</label>
+                    <input type="text" id="interviewId" placeholder="ex: interview_123">
+                </div>
+
+                <div class="form-group">
+                    <label for="meetLink">Lien Google Meet:</label>
+                    <input type="url" id="meetLink" placeholder="https://meet.google.com/abc-defg-hij">
+                </div>
+
+                <div class="form-group">
+                    <label for="candidateName">Nom du Candidat:</label>
+                    <input type="text" id="candidateName" placeholder="Jean Dupont">
+                </div>
+
+                <div class="form-group">
+                    <label for="position">Poste:</label>
+                    <select id="position" onchange="previewQuestions()">
+                        <option value="">Sélectionner un type de poste...</option>
+                        <option value="développeur">Développeur</option>
+                        <option value="commercial">Commercial</option>
+                        <option value="manager">Manager</option>
+                        <option value="rh">Ressources Humaines</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="finance">Finance</option>
+                        <option value="autre">Autre (questions génériques)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="questionsPreview" style="display: none;">
+                    <label>Aperçu des questions (Mode Simulation):</label>
+                    <div id="questionsList" style="max-height: 200px; overflow-y: auto; border: 1px solid #e1e8ed; border-radius: 5px; padding: 10px; background: #f8f9fb;">
+                        <!-- Les questions seront affichées ici -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="scheduledAt">Date/Heure Programmée:</label>
+                    <input type="datetime-local" id="scheduledAt">
+                </div>
+
+                <div class="form-group">
+                    <button class="btn" onclick="testMeetAccess()">🔗 Tester Lien Meet</button>
+                    <button class="btn btn-success" onclick="launchNow()">🚀 Lancer Immédiatement</button>
+                    <button class="btn" onclick="scheduleAvatar()">⏰ Programmer Avatar</button>
+                </div>
+
+                <div class="form-group">
+                    <button class="btn" onclick="refreshStatus()">🔄 Actualiser</button>
+                    <button class="btn" onclick="viewQuestions()">📋 Voir Questions</button>
+                    <button class="btn" onclick="forceQuestion()">⚡ Forcer Question</button>
+                    <button class="btn btn-danger" onclick="stopAvatar()">🛑 Arrêter Avatar</button>
+                </div>
+            </div>
+
+            <!-- Liste des avatars -->
+            <div class="avatars-list">
+                <h2>📋 Avatars</h2>
+                <div id="avatarsList">
+                    <p style="text-align: center; color: #7f8c8d;">Aucun avatar trouvé</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="logs" id="logs">
+            <div class="log-entry log-info">[INFO] Dashboard initialisé</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/avatars';
+        const socket = io();
+        
+        // Configuration de base
+        const authToken = localStorage.getItem('authToken') || 'your-auth-token-here';
+
+        // Connexion WebSocket
+        socket.on('connect', () => {
+            addLog('🔌 Connecté au serveur WebSocket', 'success');
+        });
+
+        socket.on('avatar_launched', (data) => {
+            addLog(`🚀 Avatar lancé: ${data.interview_id}`, 'success');
+            showNotification('Avatar lancé avec succès!', 'success');
+            refreshStatus();
+        });
+
+        socket.on('avatar_ended', (data) => {
+            addLog(`🔚 Avatar terminé: ${data.interview_id}`, 'info');
+            showNotification('Avatar terminé', 'success');
+            refreshStatus();
+        });
+
+        socket.on('avatar_question_asked', (data) => {
+            addLog(`💬 Question posée (${data.interview_id}): ${data.question.substring(0, 50)}...`, 'info');
+            showNotification(`Question posée: ${data.question.substring(0, 30)}...`, 'success');
+        });
+
+        socket.on('avatar_question_forced', (data) => {
+            addLog(`⚡ Question forcée (${data.interview_id}): ${data.question.substring(0, 50)}...`, 'info');
+            showNotification('Question forcée avec succès!', 'success');
+            refreshStatus();
+        });
+
+        // Fonctions API
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(API_BASE + endpoint, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Erreur API');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Erreur API:', error);
+                throw error;
+            }
+        }
+
+        // Fonctions de contrôle
+        async function testMeetAccess() {
+            const meetLink = document.getElementById('meetLink').value;
+            if (!meetLink) {
+                showNotification('Veuillez saisir un lien Meet', 'error');
+                return;
+            }
+
+            try {
+                addLog(`🔗 Test d'accès: ${meetLink}`, 'info');
+                const result = await apiCall('/test-meet-access', 'POST', { meet_link: meetLink });
+                
+                if (result.accessible) {
+                    addLog('✅ Lien Meet accessible', 'success');
+                    showNotification('Lien Meet accessible', 'success');
+                } else {
+                    addLog('⚠️ Lien Meet peut nécessiter une authentification', 'info');
+                    showNotification('Lien peut nécessiter une authentification', 'error');
+                }
+            } catch (error) {
+                addLog(`❌ Erreur test Meet: ${error.message}`, 'error');
+                showNotification('Erreur lors du test', 'error');
+            }
+        }
+
+        async function launchNow() {
+            const data = collectFormData();
+            if (!data) return;
+
+            try {
+                addLog(`🚀 Lancement immédiat: ${data.interview_id}`, 'info');
+                const result = await apiCall('/launch-now', 'POST', data);
+                
+                addLog('✅ Avatar lancé immédiatement', 'success');
+                showNotification('Avatar lancé!', 'success');
+                setTimeout(refreshStatus, 2000);
+            } catch (error) {
+                addLog(`❌ Erreur lancement: ${error.message}`, 'error');
+                showNotification('Erreur lors du lancement', 'error');
+            }
+        }
+
+        async function scheduleAvatar() {
+            const data = collectFormData();
+            if (!data || !data.scheduled_at) {
+                showNotification('Veuillez saisir une date/heure', 'error');
+                return;
+            }
+
+            try {
+                addLog(`⏰ Programmation: ${data.interview_id} pour ${data.scheduled_at}`, 'info');
+                const result = await apiCall('/schedule', 'POST', data);
+                
+                addLog(`✅ Avatar programmé pour ${result.launch_time}`, 'success');
+                showNotification('Avatar programmé!', 'success');
+                setTimeout(refreshStatus, 1000);
+            } catch (error) {
+                addLog(`❌ Erreur programmation: ${error.message}`, 'error');
+                showNotification('Erreur lors de la programmation', 'error');
+            }
+        }
+
+        async function stopAvatar() {
+            const interviewId = document.getElementById('interviewId').value;
+            if (!interviewId) {
+                showNotification('Veuillez saisir un ID d\'entretien', 'error');
+                return;
+            }
+
+            try {
+                addLog(`🛑 Arrêt avatar: ${interviewId}`, 'info');
+                const result = await apiCall(`/stop/${interviewId}`, 'POST');
+                
+                addLog('✅ Avatar arrêté', 'success');
+                showNotification('Avatar arrêté!', 'success');
+                setTimeout(refreshStatus, 1000);
+            } catch (error) {
+                addLog(`❌ Erreur arrêt: ${error.message}`, 'error');
+                showNotification('Erreur lors de l\'arrêt', 'error');
+            }
+        }
+
+        async function previewQuestions() {
+            const position = document.getElementById('position').value;
+            if (!position || position === 'autre') {
+                document.getElementById('questionsPreview').style.display = 'none';
+                return;
+            }
+
+            try {
+                const result = await apiCall('/preview-questions', 'POST', { position: position });
+                
+                const questionsList = document.getElementById('questionsList');
+                const preview = document.getElementById('questionsPreview');
+                
+                let html = `<strong>Mode:</strong> ${result.mode}<br>`;
+                html += `<strong>Introduction:</strong> ${result.introduction}<br><br>`;
+                html += '<strong>Questions programmées:</strong><br>';
+                
+                result.questions.forEach((q, index) => {
+                    html += `<div style="margin: 5px 0; padding: 5px; background: white; border-radius: 5px;">`;
+                    html += `<strong>${index + 1}. (${q.timing_minutes}min)</strong> ${q.question}`;
+                    html += `</div>`;
+                });
+                
+                questionsList.innerHTML = html;
+                preview.style.display = 'block';
+                
+            } catch (error) {
+                addLog(`❌ Erreur prévisualisation: ${error.message}`, 'error');
+            }
+        }
+
+        async function viewQuestions() {
+            const interviewId = document.getElementById('interviewId').value;
+            if (!interviewId) {
+                showNotification('Veuillez saisir un ID d\'entretien', 'error');
+                return;
+            }
+
+            try {
+                const result = await apiCall(`/questions-status/${interviewId}`);
+                
+                let message = `Mode: ${result.data.mode}\n`;
+                message += `Temps écoulé: ${Math.floor(result.data.elapsed_seconds / 60)}min\n\n`;
+                message += 'Questions:\n';
+                
+                result.data.questions.forEach((q, index) => {
+                    const status = q.is_asked ? '✅' : q.is_due ? '⏰' : '⏳';
+                    message += `${status} ${index + 1}. (${Math.floor(q.timing / 60)}min) ${q.question.substring(0, 50)}...\n`;
+                });
+                
+                alert(message);
+                
+            } catch (error) {
+                addLog(`❌ Erreur récupération questions: ${error.message}`, 'error');
+                showNotification('Erreur lors de la récupération', 'error');
+            }
+        }
+
+        async function forceQuestion() {
+            const interviewId = document.getElementById('interviewId').value;
+            if (!interviewId) {
+                showNotification('Veuillez saisir un ID d\'entretien', 'error');
+                return;
+            }
+
+            try {
+                addLog(`⚡ Force prochaine question: ${interviewId}`, 'info');
+                const result = await apiCall(`/force-question/${interviewId}`, 'POST');
+                
+                addLog(`✅ Question forcée: ${result.question.substring(0, 50)}...`, 'success');
+                showNotification('Question forcée avec succès!', 'success');
+                
+            } catch (error) {
+                addLog(`❌ Erreur force question: ${error.message}`, 'error');
+                showNotification('Erreur lors du forçage', 'error');
+            }
+        }
+            try {
+                // Info du service
+                const serviceInfo = await apiCall('/service-info');
+                document.getElementById('serviceStatus').textContent = serviceInfo.service_running ? '✅' : '❌';
+                document.getElementById('activeCount').textContent = serviceInfo.active_count;
+                document.getElementById('scheduledCount').textContent = serviceInfo.scheduled_count;
+                document.getElementById('browserCount').textContent = serviceInfo.browser_sessions;
+
+                // Avatars actifs
+                const activeAvatars = await apiCall('/list-active');
+                
+                // Avatars programmés
+                const scheduledAvatars = await apiCall('/list-scheduled');
+
+                // Afficher la liste
+                displayAvatars([...activeAvatars.active_avatars, ...scheduledAvatars.scheduled_avatars]);
+
+            } catch (error) {
+                addLog(`❌ Erreur actualisation: ${error.message}`, 'error');
+            }
+        }
+
+        // Fonctions utilitaires
+        function collectFormData() {
+            const interviewId = document.getElementById('interviewId').value;
+            const meetLink = document.getElementById('meetLink').value;
+
+            if (!interviewId || !meetLink) {
+                showNotification('Veuillez saisir l\'ID et le lien Meet', 'error');
+                return null;
+            }
+
+            const positionSelect = document.getElementById('position');
+            const selectedPosition = positionSelect.value || 'autre';
+            const positionText = positionSelect.options[positionSelect.selectedIndex].text;
+
+            return {
+                interview_id: interviewId,
+                meet_link: meetLink,
+                candidate_name: document.getElementById('candidateName').value || 'Test Candidat',
+                position: selectedPosition === 'autre' ? 'Position Générique' : positionText,
+                scheduled_at: document.getElementById('scheduledAt').value
+            };
+        }
+
+        function displayAvatars(avatars) {
+            const container = document.getElementById('avatarsList');
+            
+            if (avatars.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #7f8c8d;">Aucun avatar trouvé</p>';
+                return;
+            }
+
+            container.innerHTML = avatars.map(avatar => {
+                const isActive = avatar.status?.status === 'active';
+                const isScheduled = avatar.status === 'scheduled' || avatar.status?.status === 'scheduled';
+                
+                let statusClass = 'status-scheduled';
+                let itemClass = 'scheduled';
+                let statusText = 'Programmé';
+
+                if (isActive) {
+                    statusClass = 'status-active';
+                    itemClass = 'active';
+                    statusText = 'Actif';
+                }
+
+                // Informations sur les questions (mode simulation)
+                let questionsInfo = '';
+                if (isActive && avatar.status?.questions_info) {
+                    const qInfo = avatar.status.questions_info;
+                    questionsInfo = `<br><strong>Questions:</strong> ${qInfo.asked_questions}/${qInfo.total_questions}`;
+                    if (qInfo.next_question_in && qInfo.next_question_in > 0) {
+                        questionsInfo += ` (prochaine dans ${Math.floor(qInfo.next_question_in / 60)}min)`;
+                    }
+                }
+
+                // Mode de l'avatar
+                const mode = avatar.status?.mode || 'unknown';
+                const modeIcon = mode === 'simulation' ? '🤖' : '🧠';
+                const modeText = mode === 'simulation' ? 'Simulation' : 'IA';
+
+                return `
+                    <div class="avatar-item ${itemClass}">
+                        <div class="avatar-header">
+                            <span class="avatar-id">${avatar.interview_id}</span>
+                            <div>
+                                <span class="avatar-status ${statusClass}">${statusText}</span>
+                                <span style="margin-left: 10px; padding: 3px 8px; background: #ecf0f1; border-radius: 12px; font-size: 11px;">
+                                    ${modeIcon} ${modeText}
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Candidat:</strong> ${avatar.candidate_name || avatar.status?.data?.config?.candidate_name || 'N/A'}<br>
+                            <strong>Poste:</strong> ${avatar.position || avatar.status?.data?.config?.position || 'N/A'}<br>
+                            ${avatar.launch_time ? `<strong>Lancement:</strong> ${new Date(avatar.launch_time).toLocaleString()}` : ''}
+                            ${isActive ? '<br><strong>🟢 Navigateur actif</strong>' : ''}
+                            ${questionsInfo}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+
+        // Initialisation
+        document.getElementById('scheduledAt').value = new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16);
+        refreshStatus();
+        setInterval(refreshStatus, 30000); // Actualisation automatique toutes les 30s
+    </script>
+</body>
+</html>
