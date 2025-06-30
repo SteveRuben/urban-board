@@ -102,7 +102,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ userRole = 'recruiter', s
     },
     {
       name: "Codingame",
-      href: "/codingame",
+      href: "/coding-admin",
       icon: Code2,
       access: true,
     },

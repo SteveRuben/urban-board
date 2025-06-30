@@ -1781,7 +1781,7 @@ class AvatarService:
         """🔑 VERSION ROBUSTE de l'authentification Google"""
         
         BOT_EMAIL = "tia42164@gmail.com"
-        BOT_PASSWORD = "MYPASS"
+        BOT_PASSWORD = "Azerty@1245Uy"
         
         try:
             log_step("Auth Bot Google", True, f"Connexion robuste avec {BOT_EMAIL}...")

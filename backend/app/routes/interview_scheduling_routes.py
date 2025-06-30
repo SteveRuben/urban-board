@@ -9,6 +9,9 @@ from ..services.organization_service import OrganizationService
 from ..services.audit_service import AuditService
 from datetime import datetime, timedelta
 from app import db
+from ..services.interview_exercise_service import InterviewExerciseService
+from ..models.coding_platform import UserChallenge, UserChallengeProgress
+from ..models.coding_platform import Exercise
 
 scheduling_bp = Blueprint('scheduling', __name__, url_prefix='/api/scheduling')
 
@@ -21,7 +24,7 @@ UPDATABLE_FIELDS = [
     'predefined_questions'
 ]
 
-
+exercise_service = InterviewExerciseService()
 scheduling_service = InterviewSchedulingService()
 organization_service = OrganizationService()
 audit_service = AuditService()
@@ -145,26 +148,17 @@ def create_schedule():
     organization = g.current_user.current_organization_id
     
     try:
+        print('debut programmtion...................1')
         # Créer la planification avec le service modifié
         schedule = scheduling_service.create_schedule(
             organization_id=organization,
             recruiter_id=user_id,
             data=data
         )
-        
+        print('debut programmtion...................2')
         # Récupérer les infos complètes avec statut d'email
         schedule_info = scheduling_service.get_schedule_with_response_info(schedule.id)
-        from ..services.avatar_service import get_avatar_service
-        avatar_service = get_avatar_service()
         
-        if schedule.mode in ['autonomous', 'collaborative'] and avatar_service:
-            schedule_info['avatar'] = {
-                'available': True,
-                'status': 'scheduled',
-                'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
-                'scheduled_launch': (schedule.scheduled_at - timedelta(minutes=2)).isoformat()
-            }
-            print(f"✅ Avatar ajouté à la réponse pour {schedule.id}")
         return jsonify({
             'status': 'success',
             'message': 'Entretien planifié avec succès. Email d\'invitation envoyé au candidat.',
@@ -181,87 +175,6 @@ def create_schedule():
             'status': 'error',
             'message': f'Une erreur est survenue: {str(e)}'
         }), 500
-
-# @scheduling_bp.route('/schedules/<schedule_id>', methods=['GET'])
-# @token_required
-# def get_schedule(schedule_id):
-#     """Récupère les détails d'une planification"""
-#     user_id = get_current_user_id()
-    
-#     if not schedule_id:
-#         return jsonify({
-#             'status': 'error',
-#             'message': 'ID de planification requis'
-#         }), 400
-    
-#     schedule = scheduling_service.get_schedule(schedule_id)
-#     if not schedule:
-#         return jsonify({
-#             'status': 'error',
-#             'message': 'Planification introuvable'
-#         }), 404
-    
-#     # Vérifier que l'utilisateur a le droit d'accéder à cette planification
-#     if schedule.recruiter_id != user_id:
-#         # Vérifier si l'utilisateur est membre de l'organisation
-#         from ..models.organization import OrganizationMember
-#         is_member = OrganizationMember.query.filter_by(
-#             organization_id=schedule.organization_id,
-#             user_id=user_id
-#         ).first() is not None
-        
-#         if not is_member:
-#             return jsonify({
-#                 'status': 'error',
-#                 'message': 'Accès non autorisé'
-#             }), 403
-    
-#     return jsonify({
-#         'status': 'success',
-#         'data': schedule.to_dict()
-#     }), 200
-
-@scheduling_bp.route('/schedules/<schedule_id>', methods=['GET'])
-@token_required
-def get_schedule(schedule_id):
-    """Récupère les détails d'une planification AVEC infos avatar"""
-    user_id = get_current_user_id()
-    
-    if not schedule_id:
-        return jsonify({
-            'status': 'error',
-            'message': 'ID de planification requis'
-        }), 400
-    
-    schedule = scheduling_service.get_schedule(schedule_id)
-    if not schedule:
-        return jsonify({
-            'status': 'error',
-            'message': 'Planification introuvable'
-        }), 404
-    
-    # Vérifier que l'utilisateur a le droit d'accéder à cette planification
-    if schedule.recruiter_id != user_id:
-        from ..models.organization import OrganizationMember
-        is_member = OrganizationMember.query.filter_by(
-            organization_id=schedule.organization_id,
-            user_id=user_id
-        ).first() is not None
-        
-        if not is_member:
-            return jsonify({
-                'status': 'error',
-                'message': 'Accès non autorisé'
-            }), 403
-    
-    # NOUVEAU : Ajouter les infos avatar
-    schedule_dict = schedule.to_dict()
-    schedule_dict = add_avatar_info_to_schedule(schedule_dict)
-    
-    return jsonify({
-        'status': 'success',
-        'data': schedule_dict
-    }), 200
 
 def filter_updatable_data(data):
     """Filtre les données pour ne garder que les champs modifiables"""
@@ -415,7 +328,6 @@ def get_my_schedules():
     schedules_with_avatar = []
     for schedule in schedules:
         schedule_dict = schedule.to_dict()
-        schedule_dict = add_avatar_info_to_schedule(schedule_dict)
         schedules_with_avatar.append(schedule_dict)
     
     
@@ -487,7 +399,6 @@ def get_organization_schedules():
     schedules_with_avatar = []
     for schedule in schedules:
         schedule_dict = schedule.to_dict()
-        schedule_dict = add_avatar_info_to_schedule(schedule_dict)
         schedules_with_avatar.append(schedule_dict)
     
     return jsonify({
@@ -849,23 +760,6 @@ def get_candidate_meeting_info(access_token):
         }
     }), 200
 
-def _get_meeting_instructions(schedule):
-    """Génère les instructions pour le candidat"""
-    if not schedule.has_valid_meeting():
-        return {
-            'message': 'Le lien de réunion sera disponible prochainement.',
-            'fallback': 'Veuillez contacter le recruteur si vous ne recevez pas le lien.'
-        }
-    
-    return {
-        'message': 'Cliquez sur le lien Meet ci-dessous pour rejoindre l\'entretien.',
-        'recommendations': [
-            'Testez votre connexion internet et votre caméra avant l\'entretien',
-            'Trouvez un endroit calme et bien éclairé',
-            'Préparez vos documents (CV, portfolio, etc.)',
-            'Connectez-vous 5 minutes avant l\'heure prévue'
-        ]
-    }
 
 @scheduling_bp.route('/organization/meeting-stats', methods=['GET'])
 @token_required
@@ -1140,175 +1034,6 @@ def get_response_status(schedule_id):
             'message': f'Erreur: {str(e)}'
         }), 500
         
-
-def add_avatar_info_to_schedule(schedule_dict):
-    """Ajoute les infos avatar à un objet schedule"""
-    try:
-        from ..services.avatar_service import get_avatar_service
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            schedule_dict['avatar'] = {
-                'available': False,
-                'status': 'service_unavailable'
-            }
-            return schedule_dict
-        
-        schedule_id = schedule_dict.get('id')
-        if not schedule_id:
-            schedule_dict['avatar'] = {'available': False, 'status': 'no_id'}
-            return schedule_dict
-        
-        # Récupérer le statut de l'avatar pour cet entretien
-        avatar_status = avatar_service.get_avatar_status(schedule_id)
-        
-        schedule_dict['avatar'] = {
-            'available': True,
-            'status': avatar_status.get('status', 'not_scheduled'),
-            'mode': schedule_dict.get('mode', 'unknown'),
-            'browser_running': avatar_status.get('browser_running', False),
-            'meeting_active': avatar_status.get('meeting_active', False),
-            'scheduled_launch': avatar_status.get('scheduled_launch'),
-            'launch_time': avatar_status.get('launch_time')
-        }
-        
-        # Si actif, ajouter les infos de questions
-        if avatar_status.get('status') == 'active' and 'questions_info' in avatar_status:
-            q_info = avatar_status['questions_info']
-            schedule_dict['avatar']['questions'] = {
-                'total': q_info.get('total_questions', 0),
-                'asked': q_info.get('asked_questions', 0),
-                'current_question': q_info.get('current_question'),
-                'next_in_seconds': q_info.get('next_question_in', None)
-            }
-        
-        return schedule_dict
-        
-    except Exception as e:
-        schedule_dict['avatar'] = {
-            'available': False,
-            'status': 'error',
-            'error': str(e)
-        }
-        return schedule_dict
-    
-@scheduling_bp.route('/schedules/<schedule_id>/avatar/status', methods=['GET'])
-@token_required
-def get_avatar_status(schedule_id):
-    """Récupère le statut détaillé de l'avatar pour cet entretien"""
-    try:
-        from app.services.avatar_service import get_avatar_service
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 503
-        
-        status = avatar_service.get_avatar_status(schedule_id)
-        
-        return jsonify({
-            'success': True,
-            'schedule_id': schedule_id,
-            'avatar_status': status,
-            
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@scheduling_bp.route('/schedules/<schedule_id>/avatar/force-question', methods=['POST'])
-@token_required
-def force_avatar_question(schedule_id):
-    """Force la prochaine question de l'avatar"""
-    try:
-        from app.services.avatar_service import get_avatar_service
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 503
-        
-        result = avatar_service.force_next_question(schedule_id)
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@scheduling_bp.route('/schedules/<schedule_id>/avatar/stop', methods=['POST'])
-@token_required
-def stop_interview_avatar(schedule_id):
-    """Arrête l'avatar d'un entretien"""
-    try:
-        from app.services.avatar_service import get_avatar_service
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 503
-        
-        result = avatar_service.stop_avatar(schedule_id)
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@scheduling_bp.route('/schedules/<schedule_id>/avatar/force-launch', methods=['POST'])
-@token_required
-def force_launch_avatar(schedule_id):
-    """Lance immédiatement l'avatar pour cet entretien (debug/test)"""
-    try:
-        from app.services.avatar_service import get_avatar_service
-        
-        # Récupérer l'entretien
-        schedule = scheduling_service.get_schedule(schedule_id)
-        if not schedule:
-            return jsonify({
-                'success': False,
-                'error': 'Entretien introuvable'
-            }), 404
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 503
-        
-        # Préparer les données
-        interview_data = {
-            'candidate_name': schedule.candidate_name,
-            'position': schedule.position,
-            'mode': schedule.mode,
-            'meet_link': schedule.meet_link or 'https://meet.google.com/test-link'
-        }
-        
-        result = avatar_service.force_avatar_launch(schedule_id, interview_data)
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 @scheduling_bp.route('/interview-questions/preview', methods=['POST'])
 @token_required
 def preview_interview_questions():
@@ -1347,654 +1072,291 @@ def preview_interview_questions():
             'success': False,
             'error': str(e)
         }), 500
-        
-@scheduling_bp.route('/avatar/debug/launch/<interview_id>', methods=['POST'])
+    
+@scheduling_bp.route('/exercises/suggestions', methods=['POST'])
 @token_required
-def force_avatar_launch_debug(interview_id):
-    """🚀 LANCE UN AVATAR IMMÉDIATEMENT AVEC DEBUG COMPLET"""
+def get_exercise_suggestions():
+    """
+    Récupère les exercices suggérés pour un poste donné
     
-    data = request.get_json() or {}
-    
-    # Données d'entretien de test
-    interview_data = {
-        'candidate_name': data.get('candidate_name', 'Test Avatar'),
-        'position': data.get('position', 'développeur'),
-        'mode': data.get('mode', 'autonomous'),
-        'meet_link': data.get('meet_link')  # OBLIGATOIRE
-    }
-    
-    if not interview_data['meet_link']:
-        return jsonify({
-            'success': False,
-            'error': 'meet_link obligatoire pour le test'
-        }), 400
-    
-    try:
+    Body:
+        position: Titre du poste
+        description: Description du poste (optionnel)
+        difficulty: Niveau de difficulté (optionnel)
         
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 500
-        
-        print(f"🚀 LANCEMENT AVATAR DEBUG pour {interview_id}")
-        
-        # Forcer le lancement immédiat
-        result = avatar_service.force_avatar_launch(interview_id, interview_data)
-        
-        # Attendre 10 secondes pour les logs
-        import time
-        time.sleep(10)
-        
-        # Récupérer les logs de lancement
-        logs = avatar_service.get_avatar_launch_logs(interview_id)
-        
-        # Statut actuel
-        status = avatar_service.get_avatar_status(interview_id)
-        
-        return jsonify({
-            'success': True,
-            'launch_result': result,
-            'logs': logs,
-            'current_status': status,
-            'debug_info': {
-                'undetected_available': avatar_service.__dict__.get('UNDETECTED_AVAILABLE', False),
-                'simulation_mode': avatar_service.simulation_mode,
-                'active_avatars': len(avatar_service.active_avatars),
-                'scheduled_launches': len(avatar_service.scheduled_launches)
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'debug': f'Erreur dans force_avatar_launch_debug: {e}'
-        }), 500
-
-@scheduling_bp.route('/avatar/debug/status/<interview_id>', methods=['GET'])
-@token_required
-def get_detailed_avatar_status(interview_id):
-    """🔍 STATUT AVATAR ULTRA-DÉTAILLÉ"""
-    
-    try:
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 500
-        
-        # Statut de base
-        status = avatar_service.get_avatar_status(interview_id)
-        
-        # Logs de lancement si disponibles
-        logs = avatar_service.get_avatar_launch_logs(interview_id)
-        
-        # Infos service
-        service_info = avatar_service.get_service_info()
-        
-        # Vérification driver actif
-        driver_active = interview_id in avatar_service.avatar_drivers
-        meeting_url = None
-        
-        if driver_active:
-            try:
-                driver = avatar_service.avatar_drivers[interview_id]
-                meeting_url = driver.current_url
-                page_title = driver.title
-            except:
-                meeting_url = "Erreur récupération URL"
-                page_title = "Erreur récupération titre"
-        
-        return jsonify({
-            'success': True,
-            'interview_id': interview_id,
-            'avatar_status': status,
-            'launch_logs': logs,
-            'service_info': service_info,
-            'driver_details': {
-                'active': driver_active,
-                'current_url': meeting_url,
-                'page_title': page_title if driver_active else None
-            },
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@scheduling_bp.route('/avatar/debug/service', methods=['GET'])
-@token_required
-def get_avatar_service_debug():
-    """📊 DEBUG COMPLET DU SERVICE AVATAR"""
-    
-    try:
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 500
-        
-        # Informations détaillées
-        debug_info = {
-            'service_running': avatar_service.running,
-            'simulation_mode': avatar_service.simulation_mode,
-            'ai_api_available': bool(avatar_service.ai_api_key),
-            'active_avatars_count': len(avatar_service.active_avatars),
-            'scheduled_launches_count': len(avatar_service.scheduled_launches),
-            'browser_sessions_count': len(avatar_service.avatar_drivers),
-            'avatar_timers_count': len(avatar_service.avatar_timers),
-            
-            # Détail des avatars actifs
-            'active_avatars': list(avatar_service.active_avatars.keys()),
-            'scheduled_interviews': list(avatar_service.scheduled_launches.keys()),
-            'browser_sessions': list(avatar_service.avatar_drivers.keys()),
-            
-            # Prochains lancements
-            'next_launches': []
-        }
-        
-        # Calculer les prochains lancements
-        now = datetime.utcnow()
-        for interview_id, data in avatar_service.scheduled_launches.items():
-            launch_time = data['launch_time']
-            time_until = (launch_time - now).total_seconds()
-            
-            debug_info['next_launches'].append({
-                'interview_id': interview_id,
-                'launch_time': launch_time.isoformat(),
-                'seconds_until': int(time_until),
-                'status': data['status']
-            })
-        
-        # Trier par proximité
-        debug_info['next_launches'].sort(key=lambda x: x['seconds_until'])
-        
-        return jsonify({
-            'success': True,
-            'debug_info': debug_info,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@scheduling_bp.route('/avatar/debug/test-meet', methods=['POST'])
-@token_required  
-def test_meet_access():
-    """🧪 TESTE L'ACCÈS À GOOGLE MEET SANS AVATAR"""
-    
+    Returns:
+        Liste des exercices pertinents
+    """
+    user_id = get_current_user_id()
     data = request.get_json()
-    meet_link = data.get('meet_link')
     
-    if not meet_link:
+    if not data or not data.get('position'):
         return jsonify({
-            'success': False,
-            'error': 'meet_link requis'
+            'status': 'error',
+            'message': 'Le poste est requis'
         }), 400
     
     try:
-        avatar_service = get_avatar_service()
-        
-        # Test d'accès basique
-        import requests
-        response = requests.get(meet_link, timeout=10)
-        
-        test_results = {
-            'meet_link': meet_link,
-            'http_status': response.status_code,
-            'accessible': response.status_code == 200,
-            'content_length': len(response.text),
-            'has_meet_content': 'meet.google.com' in response.text,
-            'service_available': avatar_service is not None,
-            'undetected_available': getattr(avatar_service, 'UNDETECTED_AVAILABLE', False) if avatar_service else False
-        }
-        
-        # Test rapide avec driver si possible
-        try:
-            driver = avatar_service._create_undetected_chrome_driver()
-            if driver:
-                driver.get(meet_link)
-                current_url = driver.current_url
-                page_title = driver.title
-                
-                test_results['driver_test'] = {
-                    'success': True,
-                    'final_url': current_url,
-                    'page_title': page_title,
-                    'blocked': 'not allowed' in page_title.lower() or 'non autorisé' in page_title.lower()
-                }
-                
-                driver.quit()
-            else:
-                test_results['driver_test'] = {
-                    'success': False,
-                    'error': 'Driver non créé'
-                }
-                
-        except Exception as e:
-            test_results['driver_test'] = {
-                'success': False,
-                'error': str(e)
-            }
+        suggestions = scheduling_service.get_available_exercises_for_position(
+            position=data['position'],
+            description=data.get('description', ''),
+            difficulty= data.get('difficulty','any')
+        )
         
         return jsonify({
-            'success': True,
-            'test_results': test_results,
-            'timestamp': datetime.utcnow().isoformat()
-        })
+            'status': 'success',
+            'data': suggestions
+        }), 200
         
     except Exception as e:
+        print(f"Erreur lors de la récupération des suggestions d'exercices: {e}")
         return jsonify({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': 'Une erreur inattendue est survenue'
         }), 500
 
-@scheduling_bp.route('/avatar/debug/cleanup/<interview_id>', methods=['DELETE'])
+#  Récupérer les détails d'un entretien avec exercices
+@scheduling_bp.route('/schedules/<schedule_id>', methods=['GET'])
 @token_required
-def cleanup_avatar_debug(interview_id):
-    """🧹 NETTOIE UN AVATAR EN FORCE"""
+def get_schedule_details(schedule_id):
+    """
+    Récupère les détails complets d'un entretien avec les exercices assignés
+    
+    Args:
+        schedule_id: ID de l'entretien
+        
+    Returns:
+        Détails complets de l'entretien
+    """
+    user_id = get_current_user_id()
     
     try:
-        avatar_service = get_avatar_service()
-        if not avatar_service:
+        schedule_info = scheduling_service.get_schedule_with_response_info(schedule_id)
+        
+        # Vérifier les permissions (l'utilisateur doit être le créateur ou de la même organisation)
+        schedule = InterviewSchedule.query.get(schedule_id)
+        if not schedule:
             return jsonify({
-                'success': False,
-                'error': 'Service avatar non disponible'
-            }), 500
+                'status': 'error',
+                'message': 'Entretien non trouvé'
+            }), 404
         
-        # Nettoyage forcé
-        avatar_service._cleanup_avatar(interview_id)
+        organization = g.current_user.current_organization_id
+        if schedule.organization_id != organization:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
         
         return jsonify({
-            'success': True,
-            'message': f'Avatar {interview_id} nettoyé',
-            'timestamp': datetime.utcnow().isoformat()
-        })
+            'status': 'success',
+            'data': schedule_info
+        }), 200
         
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 404
     except Exception as e:
+        print(f"Erreur lors de la récupération des détails d'entretien: {e}")
         return jsonify({
-            'success': False,
-            'error': str(e)
+            'status': 'error',
+            'message': 'Une erreur inattendue est survenue'
         }), 500
-        
-@scheduling_bp.route('/avatar/debug/js/<interview_id>', methods=['GET'])
-def debug_avatar_javascript(interview_id):
-    """🔍 DEBUG JAVASCRIPT EN TEMPS RÉEL"""
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service:
-        return jsonify({'error': 'Service non disponible'}), 500
-    
-    # Utiliser la fonction debug du service
-    result = avatar_service.debug_avatar_javascript(interview_id)
-    
-    return jsonify(result)
 
-@scheduling_bp.route('/avatar/test/manual-message/<interview_id>', methods=['POST'])
+#  Assigner manuellement des exercices à un entretien
+@scheduling_bp.route('/schedules/<schedule_id>/exercises', methods=['POST'])
 @token_required
-def test_manual_message(interview_id):
-    """🧪 TEST ENVOI MANUEL DANS MEET"""
+def assign_exercises_to_interview(schedule_id):
+    """
+    Assigne manuellement des exercices à un entretien existant
     
-    data = request.get_json() or {}
-    test_message = data.get('message', '🤖 Test manuel ' + str(int(time.time())))
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service:
-        return jsonify({'error': 'Service non disponible'}), 500
+    Body:
+        exercise_ids: Liste des IDs d'exercices à assigner
+        time_limit_minutes: Temps limite en minutes (optionnel)
         
-    result = avatar_service.test_manual_message_send(interview_id, test_message)
+    Returns:
+        Session d'exercices créée
+    """
+    user_id = get_current_user_id()
+    data = request.get_json()
     
-    return jsonify(result)
-
-@scheduling_bp.route('/avatar/debug/screenshot/<interview_id>', methods=['GET'])
-def take_debug_screenshot(interview_id):
-    """📸 CAPTURE D'ÉCRAN DEBUG"""
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
+    if not data or not data.get('exercise_ids'):
+        return jsonify({
+            'status': 'error',
+            'message': 'La liste d\'exercices est requise'
+        }), 400
     
     try:
-        page = avatar_service.avatar_pages[interview_id]
+        # Vérifier que l'entretien existe et appartient à l'utilisateur
+        schedule = InterviewSchedule.query.get(schedule_id)
+        if not schedule:
+            return jsonify({
+                'status': 'error',
+                'message': 'Entretien non trouvé'
+            }), 404
         
-        # Prendre une capture d'écran
-        screenshot = page.screenshot()
+        organization = g.current_user.current_organization_id
+        if schedule.organization_id != organization:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
         
-        # Encoder en base64 pour le JSON
-        import base64
-        screenshot_b64 = base64.b64encode(screenshot).decode('utf-8')
+        # Vérifier s'il y a déjà des exercices assignés
+        from ..models.user_exercise import UserExercise
+        existing_exercise = UserExercise.query.filter_by(
+            interview_schedule_id=schedule_id
+        ).first()
         
-        # Info de debug
-        url = page.url
-        title = page.title()
+        if existing_exercise:
+            return jsonify({
+                'status': 'error',
+                'message': 'Des exercices sont déjà assignés à cet entretien'
+            }), 400
+        
+        # Créer la session d'exercices
+        user_exercise = exercise_service.create_user_exercise_session(
+            interview_schedule_id=schedule_id,
+            candidate_email=schedule.candidate_email,
+            candidate_name=schedule.candidate_name,
+            position=schedule.position,
+            scheduled_at=schedule.scheduled_at,
+            description=schedule.description,
+            custom_exercise_ids=data['exercise_ids'],
+            time_limit_minutes=data.get('time_limit_minutes', 120)
+        )
+        
+        # Envoyer un email avec le lien vers les exercices
+        try:
+            from flask import current_app
+            base_url = current_app.config.get('FRONTEND_URL', 'https://recruteai.com')
+            coding_link = f"{base_url}/candidate/coding/{user_exercise.access_token}"
+            
+            # Envoyer l'email de rappel des exercices
+            scheduling_service.notification_service.email_service.send_coding_exercises_reminder(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                coding_link=coding_link,
+                coding_exercises_count=len(user_exercise.exercise_ids),
+                scheduled_at=schedule.scheduled_at
+            )
+        except Exception as e:
+            print(f"Erreur lors de l'envoi de l'email d'exercices: {e}")
         
         return jsonify({
-            'success': True,
-            'url': url,
-            'title': title,
-            'screenshot_b64': f"data:image/png;base64,{screenshot_b64}",
-            'timestamp': datetime.utcnow().isoformat()
-        })
+            'status': 'success',
+            'message': f'{len(data["exercise_ids"])} exercices assignés avec succès',
+            'data': user_exercise.to_dict(include_token=True)
+        }), 201
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
+        print(f"Erreur lors de l'assignation d'exercices: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Une erreur inattendue est survenue'
+        }), 500
 
-@scheduling_bp.route('/avatar/test/force-join/<interview_id>', methods=['POST'])
+#  Voir les résultats des exercices d'un candidat
+@scheduling_bp.route('/schedules/<schedule_id>/exercises/results', methods=['GET'])
 @token_required
-def force_join_test(interview_id):
-    """🎯 FORCE LE JOIN MEET MANUELLEMENT"""
+def get_candidate_exercise_results(schedule_id):
+    """
+    Récupère les résultats des exercices d'un candidat pour un entretien
     
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
+    Args:
+        schedule_id: ID de l'entretien
+        
+    Returns:
+        Résultats détaillés des exercices
+    """
+    user_id = get_current_user_id()
     
     try:
-        page = avatar_service.avatar_pages[interview_id]
+        # Vérifier que l'entretien existe et appartient à l'utilisateur
         
-        # Fonction de log simple
-        def log_step(step, success, details):
-            print(f"{'✅' if success else '❌'} {step}: {details}")
+        schedule = InterviewSchedule.query.get(schedule_id)
+        print(schedule)
+        if not schedule:
+            return jsonify({
+                'status': 'error',
+                'message': 'Entretien non trouvé'
+            }), 404
         
-        # Screenshot avant
-        page.screenshot(path=f'/tmp/before_force_join_{interview_id}.png')
+        organization = g.current_user.current_organization_id
         
-        # Forcer le join
-        join_success = avatar_service._force_join_meet_multiple_strategies(page, log_step)
+        if schedule.organization_id != organization:
+            return jsonify({
+                'status': 'error',
+                'message': 'Accès non autorisé'
+            }), 403
         
-        # Screenshot après
-        page.wait_for_timeout(3000)
-        page.screenshot(path=f'/tmp/after_force_join_{interview_id}.png')
+        # Récupérer les exercices assignés
+        from ..models.user_exercise import UserExercise
+        user_exercise = UserExercise.query.filter_by(
+            interview_schedule_id=schedule_id
+        ).first()
         
-        # Test chat si join réussi
-        chat_success = False
-        if join_success:
-            chat_success = avatar_service._force_open_chat_and_test(page, log_step)
+        if not user_exercise:
+            return jsonify({
+                'status': 'error',
+                'message': 'Aucun exercice assigné à cet entretien'
+            }), 404
+
+        detailed_results = []
+        for exercise_id in user_exercise.exercise_ids:
+            # Récupérer l'exercice
+            print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.55555',schedule_id)
+
+            exercise = Exercise.query.get(exercise_id)
+            if not exercise:
+                print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.11')
+                continue
+            
+            print(exercise)
+            exercise_result = {
+                'exercise': exercise.to_dict(),
+                'challenges_results': []
+            }
+            
+            # Récupérer les résultats pour chaque challenge
+            for challenge in exercise.challenges:
+                user_challenge = UserChallenge.query.filter_by(
+                    challenge_id=challenge.id
+                ).filter(
+                    UserChallenge.session_token.like(f'%{user_exercise.candidate_email}%')
+                ).first()
+                print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.12')
+                print(user_challenge)
+                if user_challenge:
+                    # Récupérer le progrès détaillé
+                    progress_entries = UserChallengeProgress.query.filter_by(
+                        user_challenge_id=user_challenge.id
+                    ).all()
+                    
+                    challenge_result = {
+                        'challenge': challenge.to_dict(),
+                        'user_challenge': user_challenge.to_dict(),
+                        'steps_progress': [p.to_dict() for p in progress_entries]
+                    }
+                    exercise_result['challenges_results'].append(challenge_result)
+                    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.13')
+                    print(challenge_result)
+            detailed_results.append(exercise_result)
         
         return jsonify({
-            'success': True,
-            'join_success': join_success,
-            'chat_success': chat_success,
-            'is_in_meeting': avatar_service._is_in_meeting(page),
-            'current_url': page.url,
-            'timestamp': datetime.utcnow().isoformat()
-        })
+            'status': 'success',
+            'data': {
+                'user_exercise': user_exercise.to_dict(include_detailed_progress=True),
+                'detailed_results': detailed_results
+            }
+        }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/test/send-message/<interview_id>', methods=['POST'])
-@token_required  
-def test_send_now(interview_id):
-    """📨 TESTE L'ENVOI D'UN MESSAGE MAINTENANT"""
-    
-    data = request.get_json() or {}
-    message = data.get('message', f'🤖 Test immédiat {int(time.time())}')
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
-    
-    try:
-        page = avatar_service.avatar_pages[interview_id]
-        
-        def log_step(step, success, details):
-            print(f"{'✅' if success else '❌'} {step}: {details}")
-        
-        # Essayer d'envoyer le message
-        success = avatar_service._test_send_message(page, message, log_step)
-        
+        print(f"Erreur lors de la récupération des résultats: {e}")
         return jsonify({
-            'success': success,
-            'message': message,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/diagnose/<interview_id>', methods=['GET'])
-@token_required
-def diagnose_meet_page(interview_id):
-    """🔍 DIAGNOSTIC COMPLET DE LA PAGE MEET"""
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
-    
-    try:
-        page = avatar_service.avatar_pages[interview_id]
-        
-        def log_step(step, success, details):
-            print(f"{'✅' if success else '❌'} {step}: {details}")
-        
-        # Faire un diagnostic complet
-        diagnosis = avatar_service._diagnose_meet_page(page, log_step)
-        
-        # Prendre une capture d'écran actuelle
-        screenshot_path = f'/tmp/meet_diagnosis_{interview_id}_{int(time.time())}.png'
-        page.screenshot(path=screenshot_path)
-        
-        # Ajouter infos techniques
-        diagnosis.update({
-            'screenshot_path': screenshot_path,
-            'current_url': page.url,
-            'page_title': page.title(),
-            'viewport': page.viewport_size,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-        return jsonify({
-            'success': True,
-            'diagnosis': diagnosis
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/page-content/<interview_id>', methods=['GET'])
-@token_required
-def get_page_content(interview_id):
-    """📄 RÉCUPÈRE LE CONTENU HTML DE LA PAGE"""
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
-    
-    try:
-        page = avatar_service.avatar_pages[interview_id]
-        
-        # Récupérer le HTML complet
-        html_content = page.content()
-        
-        # Aussi récupérer juste le texte visible
-        visible_text = page.evaluate('() => document.body.innerText')
-        
-        return jsonify({
-            'success': True,
-            'url': page.url,
-            'title': page.title(),
-            'html_length': len(html_content),
-            'html_content': html_content[:5000],  # Premiers 5000 caractères
-            'visible_text': visible_text[:2000],   # Premiers 2000 caractères
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-
-@scheduling_bp.route('/avatar/screenshot/<interview_id>', methods=['POST'])
-@token_required
-def take_screenshot(interview_id):
-    """📸 PREND UNE CAPTURE D'ÉCRAN IMMÉDIATE"""
-    
-    avatar_service = get_avatar_service()
-    if not avatar_service or interview_id not in avatar_service.avatar_pages:
-        return jsonify({'error': 'Page non trouvée'}), 404
-    
-    try:
-        page = avatar_service.avatar_pages[interview_id]
-        
-        # Nom unique pour la capture
-        timestamp = int(time.time())
-        screenshot_path = f'/tmp/meet_manual_{interview_id}_{timestamp}.png'
-        
-        # Prendre la capture
-        page.screenshot(path=screenshot_path)
-        
-        # Retourner les infos
-        return jsonify({
-            'success': True,
-            'screenshot_path': screenshot_path,
-            'url': page.url,
-            'title': page.title(),
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/view-screenshot/<filename>', methods=['GET'])
-@token_required
-def serve_screenshot(filename):
-    """🖼️ SERT LES CAPTURES D'ÉCRAN"""
-    
-    import os
-    from flask import send_file
-    
-    # Sécurité : vérifier que c'est bien nos fichiers
-    if not filename.startswith('meet_') or '..' in filename:
-        return jsonify({'error': 'Fichier non autorisé'}), 403
-    
-    file_path = f'/tmp/{filename}'
-    
-    if os.path.exists(file_path):
-        return send_file(file_path, mimetype='image/png')
-    else:
-        return jsonify({'error': 'Fichier non trouvé'}), 404
-
-@scheduling_bp.route('/avatar/create-test-meet', methods=['POST'])
-@token_required
-def create_test_meet():
-    """🏗️ CRÉE UN LIEN MEET DE TEST VALIDE"""
-    
-    try:
-        # Générer un ID de réunion unique
-        import random
-        import string
-        
-        # Format Google Meet : abc-def-ghi (3 groupes de 3 lettres/chiffres)
-        def generate_meet_id():
-            chars = string.ascii_lowercase + string.digits
-            return '-'.join([''.join(random.choices(chars, k=3)) for _ in range(3)])
-        
-        meet_id = generate_meet_id()
-        meet_link = f"https://meet.google.com/{meet_id}"
-        
-        return jsonify({
-            'success': True,
-            'meet_id': meet_id,
-            'meet_link': meet_link,
-            'created_at': datetime.utcnow().isoformat(),
-            'note': 'Lien Meet généré - peut nécessiter une authentification Google pour être accessible'
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/test-with-real-meet', methods=['POST'])
-@token_required
-def test_with_real_meet():
-    """🧪 TEST COMPLET AVEC UN VRAI LIEN MEET"""
-    
-    try:
-        # Créer un nouveau lien Meet
-        import random
-        import string
-        
-        chars = string.ascii_lowercase + string.digits
-        meet_id = '-'.join([''.join(random.choices(chars, k=3)) for _ in range(3)])
-        meet_link = f"https://meet.google.com/{meet_id}"
-        
-        # Lancer l'avatar avec ce lien
-        interview_id = f"test-real-meet-{int(time.time())}"
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({'error': 'Service avatar non disponible'}), 503
-        
-        interview_data = {
-            'meet_link': meet_link,
-            'candidate_name': 'Test Real Meet',
-            'position': 'Test Position',
-            'mode': 'autonomous'
-        }
-        
-        # Programmer le lancement immédiat
-        launch_time = datetime.utcnow()
-        result = avatar_service.schedule_avatar_launch(interview_id, launch_time, interview_data)
-        
-        return jsonify({
-            'success': True,
-            'interview_id': interview_id,
-            'meet_link': meet_link,
-            'meet_id': meet_id,
-            'launch_result': result,
-            'timestamp': datetime.utcnow().isoformat(),
-            'note': 'Test lancé avec un nouveau lien Meet - surveillez les logs pour le diagnostic'
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@scheduling_bp.route('/avatar/test-instant/<meet_code>', methods=['POST'])
-@token_required
-def test_instant_meet(meet_code):
-    """⚡ TEST INSTANTANÉ AVEC UN CODE MEET DONNÉ"""
-    
-    try:
-        # Valider le format du code Meet
-        if not meet_code or len(meet_code.split('-')) != 3:
-            return jsonify({'error': 'Format code Meet invalide (doit être abc-def-ghi)'}), 400
-        
-        meet_link = f"https://meet.google.com/{meet_code}"
-        interview_id = f"instant-{meet_code}-{int(time.time())}"
-        
-        avatar_service = get_avatar_service()
-        if not avatar_service:
-            return jsonify({'error': 'Service avatar non disponible'}), 503
-        
-        interview_data = {
-            'meet_link': meet_link,
-            'candidate_name': f'Test Instant {meet_code}',
-            'position': 'Test Position',
-            'mode': 'autonomous'
-        }
-        
-        # Lancement immédiat
-        result = avatar_service.force_avatar_launch(interview_id, interview_data)
-        
-        return jsonify({
-            'success': True,
-            'interview_id': interview_id,
-            'meet_link': meet_link,
-            'meet_code': meet_code,
-            'launch_result': result,
-            'diagnostic_url': f'/api/scheduling/avatar/diagnose/{interview_id}',
-            'screenshot_url': f'/api/scheduling/avatar/screenshot/{interview_id}',
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            'status': 'error',
+            'message': 'Une erreur inattendue est survenue'
+        }), 500

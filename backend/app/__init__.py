@@ -65,7 +65,9 @@ def create_app(config_name='dev'):
     jwt.init_app(app)
     # Initialiser Stripe
     stripe.api_key = app.config['STRIPE_SECRET_KEY']
-    
+    app.config['JUDGE0_API_URL'] = os.getenv('JUDGE0_API_URL', 'https://judge0-ce.p.rapidapi.com')
+    app.config['JUDGE0_API_KEY'] = os.getenv('JUDGE0_API_KEY', 'your-rapidapi-key')
+
     # Configurer la journalisation
     configure_logging(app)
 
@@ -161,10 +163,11 @@ def register_blueprints(app):
     from .routes.biometric_routes import biometric_bp
     from .routes.ai_collaboration_routes import ai_collab_bp
     from .routes.interview_scheduling_routes import scheduling_bp
-    from .routes.challenge.challenge_route import challenge_bp
     from .routes.candidate_response_routes import candidate_response_bp
     from .routes.avatar_routes import avatar_bp
-    
+    from .routes.coding_platform_routes import coding_platform_bp
+    from .routes.candidate_exercise_routes import candidate_exercise_bp
+
     app.register_blueprint(interview_bp, url_prefix='/api/interviews')
     app.register_blueprint(resume_bp, url_prefix='/api/resumes')
     app.register_blueprint(user_bp, url_prefix='/api/users')
@@ -173,7 +176,6 @@ def register_blueprints(app):
     app.register_blueprint(subscription_bp, url_prefix='/api/subscriptions')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(integration_bp, url_prefix='/api/integrations')
-    app.register_blueprint(challenge_bp, url_prefix='/api/challenges')
     app.register_blueprint(avatar_bp, url_prefix='/api/avatars')
 
     app.register_blueprint(organizations_bp, url_prefix='/api/organizations')
@@ -184,7 +186,9 @@ def register_blueprints(app):
     app.register_blueprint(biometric_bp, url_prefix='/api/biometric')
     app.register_blueprint(ai_collab_bp, url_prefix='/api/ai-collaboration')
     app.register_blueprint(job_postings_bp, url_prefix='/api/job-postings')
+    app.register_blueprint(coding_platform_bp, url_prefix='/api/coding')
     app.register_blueprint(candidate_response_bp)
+    app.register_blueprint(candidate_exercise_bp)
 
     
 

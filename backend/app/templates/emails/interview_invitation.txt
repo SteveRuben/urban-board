@@ -25,6 +25,23 @@ Merci de cliquer sur l'un des liens suivants :
 ❌ Pour ANNULER :
 {{ cancel_url }}
 
+{% if has_coding_exercises %}
+EXERCICES DE CODING PRÉPARATOIRES
+=================================
+En préparation de votre entretien, nous avons préparé {{ coding_exercises_count }} exercice{% if coding_exercises_count > 1 %}s{% endif %} de coding spécialement sélectionné{% if coding_exercises_count > 1 %}s{% endif %} pour évaluer vos compétences techniques.
+
+Informations importantes :
+- Accès : {{ coding_available_info.available_before_interview }}
+- Expiration : {{ coding_available_info.expires_after_interview }}
+- Temps limite : {{ coding_available_info.time_limit }}
+- Format : Exercices interactifs en ligne avec tests automatisés
+
+Accéder aux exercices : {{ coding_link }}
+
+Conseil : Nous vous recommandons de compléter ces exercices avant l'entretien pour optimiser notre temps ensemble.
+
+{% endif %}
+
 ACCÈS À L'ENTRETIEN :
 ====================
 Le jour de l'entretien, utilisez ce lien pour rejoindre la salle virtuelle :

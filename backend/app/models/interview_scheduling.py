@@ -115,5 +115,6 @@ class InterviewSchedule(db.Model):
             'interview_id': self.interview_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'ai_session_active': self.ai_session_active
+            'ai_session_active': self.ai_session_active,
+            'meet_link': self.meet_link
         }

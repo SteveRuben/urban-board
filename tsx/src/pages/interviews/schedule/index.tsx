@@ -9,7 +9,7 @@ import Link from "next/link"
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import AIAssistantService from "@/services/ai-assistant-service"
 import { InterviewSchedulingService } from "@/services/interview-scheduling-service"
-import type { ErrorDetails, InterviewScheduleFormData } from "@/types/interview-scheduling"
+import type { ErrorDetails, ExerciseSuggestion, InterviewScheduleFormData, InterviewScheduleFormDataWithExercises } from "@/types/interview-scheduling"
 import {
   Brain,
   RefreshCw,
@@ -30,8 +30,11 @@ import {
   Users,
   Check,
   X,
+  Code,
+  CheckCircle,
 } from "lucide-react"
 import { AIAssistant, AIAssistantCapabilities, normalizeAssistant } from "@/types/assistant"
+import { CodingPlatformService } from '@/services/coding-platform-service';
 
 // Types
 interface FormDataType {
@@ -51,7 +54,12 @@ interface FormDataType {
   application_id: string
   job_id: string
   timezone: string
-  mode: "autonomous" | "collaborative"
+  mode: "autonomous" | "collaborative",
+  exercise_ids: string[];
+  auto_select_exercises: boolean;
+  coding_difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  coding_time_limit: number;
+  exercise_count: number;
 }
 
 const getAssistantCapabilities = (assistant: AIAssistant): string[] => {
@@ -78,7 +86,7 @@ const getAssistantCapabilities = (assistant: AIAssistant): string[] => {
 
 const ScheduleInterviewPage = () => {
   const router = useRouter()
-  const { applicationId, jobId, candidateName, candidateEmail, jobTitle, jobDesc, cv_file_path } = router.query
+  const { applicationId, jobId, candidateName, candidateEmail, jobTitle, jobDesc, cv_file_path, candidateTel } = router.query
 
   const [step, setStep] = useState<number>(2) // Commencer à l'étape 2
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
@@ -87,6 +95,11 @@ const ScheduleInterviewPage = () => {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<ExerciseSuggestion[]>([]);
+  const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [exerciseKeywords, setExerciseKeywords] = useState<string[]>([]);
+  const [showExerciseSelection, setShowExerciseSelection] = useState<boolean>(false);
+
   const analyzeError = (error: any): ErrorDetails => {
     console.error('Analyse de l\'erreur:', error);
   
@@ -203,6 +216,11 @@ const ScheduleInterviewPage = () => {
     job_id: "",
     timezone: "Europe/Paris",
     mode: "autonomous",
+    exercise_ids: [],
+    auto_select_exercises: true,
+    coding_difficulty: 'intermediate',
+    coding_time_limit: 120,
+    exercise_count: 4
   })
 
   // Pré-remplir le formulaire avec les paramètres d'URL
@@ -228,7 +246,10 @@ const ScheduleInterviewPage = () => {
     if (cv_file_path && typeof cv_file_path === "string") {
       setFormData((prev) => ({ ...prev, cv_file_path: cv_file_path }))
     }
-  }, [candidateName, candidateEmail, jobTitle, applicationId, jobId, jobDesc, cv_file_path])
+    if (candidateTel && typeof candidateTel === "string") {
+      setFormData((prev) => ({ ...prev, candidate_phone: candidateTel }))
+    }
+  }, [candidateName, candidateEmail, jobTitle, applicationId, jobId, jobDesc, cv_file_path, candidateTel])
 
   // Charger les assistants IA disponibles
   useEffect(() => {
@@ -247,6 +268,69 @@ const ScheduleInterviewPage = () => {
     fetchAssistants()
   }, [])
 
+  useEffect(() => {
+    if (formData.job_role && step >= 2) {
+      loadExerciseSuggestions();
+    }
+  }, [formData.job_role, step]);
+
+  // NOUVELLE FONCTION: Charger les suggestions d'exercices
+  const loadExerciseSuggestions = async () => {
+    if (!formData.job_role.trim()) return;
+
+    try {
+      setLoadingExercises(true);
+      const suggestions = await InterviewSchedulingService.getExerciseSuggestions({
+        position: formData.job_role,
+        description: formData.job_description, 
+        difficulty: formData.coding_difficulty
+      });
+      
+      setExerciseSuggestions(suggestions.exercises);
+      setExerciseKeywords(suggestions.keywords_extracted);
+      
+      // Sélectionner automatiquement les meilleurs exercices si l'auto-sélection est activée
+      if (formData.auto_select_exercises && suggestions.exercises.length > 0) {
+        const topExercises = suggestions.exercises
+          .slice(0, formData.exercise_count)
+          .map(ex => ex.id);
+        setFormData(prev => ({ ...prev, exercise_ids: topExercises }));
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des exercices:', error);
+    } finally {
+      setLoadingExercises(false);
+    }
+  };
+
+  const toggleExerciseSelection = (exerciseId: string) => {
+    setFormData(prev => {
+      const currentIds = prev.exercise_ids || [];
+      if (currentIds.includes(exerciseId)) {
+        return {
+          ...prev,
+          exercise_ids: currentIds.filter(id => id !== exerciseId)
+        };
+      } else {
+        return {
+          ...prev,
+          exercise_ids: [...currentIds, exerciseId]
+        };
+      }
+    });
+  };
+
+  const handleExerciseSelectionModeChange = (autoSelect: boolean) => {
+    setFormData(prev => ({ ...prev, auto_select_exercises: autoSelect }));
+    
+    if (autoSelect && exerciseSuggestions.length > 0) {
+      const topExercises = exerciseSuggestions
+        .slice(0, formData.exercise_count)
+        .map(ex => ex.id);
+      setFormData(prev => ({ ...prev, exercise_ids: topExercises }));
+    }
+  };
+
   // Gérer les changements de champs du formulaire
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -257,6 +341,24 @@ const ScheduleInterviewPage = () => {
       [name]: type === "checkbox" ? checked : value,
     }))
   }
+
+  const handleChangeExperience = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
+
+    if(value=='debutant'){
+      setFormData((prev) => ({ ...prev, coding_difficulty: "beginner" }))}
+    else if(value=='intermediaire') {
+      setFormData((prev) => ({ ...prev, coding_difficulty: "intermediate" }))
+    } else if(value=='experimente') {
+      setFormData((prev) => ({ ...prev, coding_difficulty: "expert" }))
+    } else {setFormData((prev) => ({ ...prev, coding_difficulty: "expert" }))}
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }))
+  }
+
 
   // Ajouter une question personnalisée
   const addCustomQuestion = () => {
@@ -304,7 +406,7 @@ const ScheduleInterviewPage = () => {
   }
 
   // Mapper les données du formulaire vers le format du service
-  const mapFormDataToServiceData = (data: FormDataType): InterviewScheduleFormData => {
+  const mapFormDataToServiceData = (data: FormDataType): InterviewScheduleFormDataWithExercises => {
     return {
       candidate_name: data.candidate_name,
       candidate_email: data.candidate_email,
@@ -319,6 +421,10 @@ const ScheduleInterviewPage = () => {
       ai_assistant_id: data.ai_assistants.length > 0 ? data.ai_assistants[0] : undefined,
       predefined_questions: data.custom_questions.filter(q => q.trim() !== ''),
       job_id: data.job_id,
+      exercise_ids: formData.auto_select_exercises ? undefined : formData.exercise_ids,
+      coding_difficulty: formData.coding_difficulty,
+      coding_time_limit: formData.coding_time_limit,
+      exercise_count: formData.exercise_count
     }
   }
 
@@ -461,29 +567,7 @@ const ScheduleInterviewPage = () => {
                   </div>
                 )}
   
-                {/* Actions spécifiques pour les doublons */}
-                {errorDetails.type === 'duplicate' && (
-                  <div className="flex flex-col gap-2 mb-4">
-                    <button
-                      onClick={() => {
-                        // Logique pour voir l'entretien existant
-                        router.push(`/interviews?candidate=${encodeURIComponent(formData.candidate_email)}`);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                    >
-                      Voir l'entretien existant
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Logique pour contacter le candidat
-                        window.location.href = `mailto:${formData.candidate_email}?subject=Concernant votre entretien`;
-                      }}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
-                    >
-                      Contacter le candidat
-                    </button>
-                  </div>
-                )}
+                
               </div>
             </div>
           </div>
@@ -536,6 +620,19 @@ const ScheduleInterviewPage = () => {
         return
       }
       setStep(3)
+    } else if (step === 3) {
+      // Valider les exercices si nécessaire
+      if (exerciseSuggestions.length === 0) {
+        setSubmitError("Aucun exercice disponible pour ce poste. Veuillez créer des exercices avec le niveau de difficulté spécifié pour l'offre avant de continuer.");
+        return;
+      }
+      
+      // Valider les exercices si nécessaire
+      if (!formData.auto_select_exercises && formData.exercise_ids.length === 0) {
+        setSubmitError('Veuillez sélectionner au moins un exercice ou activer la sélection automatique.');
+        return;
+      }
+      setStep(4);
     }
   }
 
@@ -690,13 +787,17 @@ const ScheduleInterviewPage = () => {
                 </div>
                 <div className={`h-0.5 flex-1 mx-4 ${step > 2 ? "bg-primary-600" : "bg-gray-200"}`}></div>
                 <div className="flex items-center">
-                  <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                      step >= 3 ? "bg-primary-600 text-white" : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    3
-                  </div>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                    step >= 3 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
+                  }`}>3</div>
+                  <div className="ml-2 text-sm font-medium">Exercices de coding</div>
+                </div>
+                <div className={`h-0.5 flex-1 mx-4 ${step > 3 ? 'bg-primary-600' : 'bg-gray-200'}`}></div>
+                
+                <div className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                    step >= 4 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
+                  }`}>4</div>
                   <div className="ml-2 text-sm font-medium">Confirmation</div>
                 </div>
               </div>
@@ -790,21 +891,6 @@ const ScheduleInterviewPage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label htmlFor="candidate_phone" className="block text-sm font-medium text-gray-700 mb-1">
-                          Téléphone du candidat
-                        </label>
-                        <input
-                          type="tel"
-                          id="candidate_phone"
-                          name="candidate_phone"
-                          value={formData.candidate_phone}
-                          onChange={handleChange}
-                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                          placeholder="+33 6 12 34 56 78"
-                        />
-                      </div>
-
-                      <div>
                         <label htmlFor="experience_level" className="block text-sm font-medium text-gray-700 mb-1">
                           Niveau d'expérience requis <span className="text-red-500">*</span>
                         </label>
@@ -812,7 +898,7 @@ const ScheduleInterviewPage = () => {
                           id="experience_level"
                           name="experience_level"
                           value={formData.experience_level}
-                          onChange={handleChange}
+                          onChange={handleChangeExperience}
                           required
                           className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
                         >
@@ -894,7 +980,7 @@ const ScheduleInterviewPage = () => {
                         Assistants IA
                       </h2>
                       <Link
-                        href="/ai-assistants/create"
+                        href="/ai-assistants/new"
                         target="_blank"
                         className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center bg-primary-50 px-3 py-1.5 rounded-md transition-colors"
                       >
@@ -1059,8 +1145,269 @@ const ScheduleInterviewPage = () => {
                 </div>
               )}
 
-              {/* Étape 3 : Confirmation */}
               {step === 3 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-6">Exercices de coding</h2>
+                  
+                  <div className="space-y-6">
+                    {/* Mode de sélection des exercices */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Mode de sélection des exercices
+                      </label>
+                      <div className="space-y-4">
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            formData.auto_select_exercises 
+                              ? 'border-primary-600 bg-primary-50' 
+                              : 'border-gray-300 hover:border-primary-300'
+                          }`}
+                          onClick={() => handleExerciseSelectionModeChange(true)}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="auto_select"
+                              name="exercise_selection_mode"
+                              value="auto"
+                              checked={formData.auto_select_exercises}
+                              onChange={() => handleExerciseSelectionModeChange(true)}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                            />
+                            <label htmlFor="auto_select" className="ml-3 font-medium text-gray-800">
+                              Sélection automatique
+                            </label>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-600 ml-7">
+                            L'IA sélectionne automatiquement les exercices les plus pertinents selon le poste
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            !formData.auto_select_exercises 
+                              ? 'border-primary-600 bg-primary-50' 
+                              : 'border-gray-300 hover:border-primary-300'
+                          }`}
+                          onClick={() => handleExerciseSelectionModeChange(false)}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="manual_select"
+                              name="exercise_selection_mode"
+                              value="manual"
+                              checked={!formData.auto_select_exercises}
+                              onChange={() => handleExerciseSelectionModeChange(false)}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                            />
+                            <label htmlFor="manual_select" className="ml-3 font-medium text-gray-800">
+                              Sélection manuelle
+                            </label>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-600 ml-7">
+                            Choisissez manuellement les exercices spécifiques que vous souhaitez assigner
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Paramètres de sélection automatique */}
+                    {formData.auto_select_exercises && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <label htmlFor="exercise_count" className="block text-sm font-medium text-gray-700 mb-1">
+                            Nombre d'exercices
+                          </label>
+                          <select
+                            id="exercise_count"
+                            name="exercise_count"
+                            value={formData.exercise_count}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              exercise_count: parseInt(e.target.value) 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="2">2 exercices</option>
+                            <option value="3">3 exercices</option>
+                            <option value="4">4 exercices</option>
+                            <option value="5">5 exercices</option>
+                          </select>
+                        </div>
+                        
+                        {/* <div>
+                          <label htmlFor="coding_difficulty" className="block text-sm font-medium text-gray-700 mb-1">
+                            Niveau de difficulté
+                          </label>
+                          <select
+                            id="coding_difficulty"
+                            name="coding_difficulty"
+                            value={formData.coding_difficulty}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              coding_difficulty: e.target.value as any 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="beginner">Débutant</option>
+                            <option value="intermediate">Intermédiaire</option>
+                            <option value="advanced">Avancé</option>
+                            <option value="expert">Expert</option>
+                          </select>
+                        </div> */}
+                        
+                        <div>
+                          <label htmlFor="coding_time_limit" className="block text-sm font-medium text-gray-700 mb-1">
+                            Temps limite (minutes)
+                          </label>
+                          <select
+                            id="coding_time_limit"
+                            name="coding_time_limit"
+                            value={formData.coding_time_limit}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              coding_time_limit: parseInt(e.target.value) 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="60">1 heure</option>
+                            <option value="90">1h30</option>
+                            <option value="120">2 heures</option>
+                            <option value="180">3 heures</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Affichage des mots-clés détectés */}
+                    {exerciseKeywords.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-blue-900 mb-2">
+                          Compétences détectées pour "{formData.job_role}"
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {exerciseKeywords.map((keyword, index) => (
+                            <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Liste des exercices suggérés */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {formData.auto_select_exercises ? 'Exercices sélectionnés automatiquement' : 'Exercices disponibles'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={loadExerciseSuggestions}
+                          disabled={loadingExercises}
+                          className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                          {loadingExercises ? 'Chargement...' : 'Actualiser'}
+                        </button>
+                      </div>
+                      
+                      {loadingExercises ? (
+                        <div className="flex justify-center items-center p-8 border border-dashed border-gray-300 rounded-md">
+                          <RefreshCw className="h-6 w-6 animate-spin text-primary-600 mr-2" />
+                          <span className="text-gray-500">Recherche d'exercices pertinents...</span>
+                        </div>
+                      ) : exerciseSuggestions.length === 0 ? (
+                        <div className="text-center p-6 border border-dashed border-red-300 rounded-md bg-red-50">
+                          <Code className="h-10 w-10 mx-auto text-red-400 mb-3" />
+                          <p className="text-red-700 font-medium mb-2">Aucun exercice disponible pour ce poste</p>
+                          <p className="text-sm text-red-600 mb-4">
+                            Il faut créer des exercices correspondant aux compétences requises avant de pouvoir programmer l'entretien.
+                          </p>
+                          
+                          {/* Affichage des mots-clés détectés pour guider la création */}
+                          {exerciseKeywords.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-sm text-red-600 mb-2">Compétences à couvrir :</p>
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {exerciseKeywords.map((keyword, index) => (
+                                  <span key={index} className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    {keyword}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          <Link
+                            href="/coding-admin/exercises/new"
+                            target="_blank"
+                            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Créer des exercices
+                          </Link>
+                          
+                          <p className="text-xs text-red-500 mt-3">
+                            Après avoir créé les exercices, revenez et actualisez cette page.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-md p-3">
+                          {exerciseSuggestions.map((exercise) => (
+                            <div 
+                              key={exercise.id}
+                              className={`rounded-lg p-4 cursor-pointer transition-colors ${
+                                formData.exercise_ids.includes(exercise.id) 
+                                  ? 'bg-primary-50 border-2 border-primary-300' 
+                                  : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+                              } ${formData.auto_select_exercises ? 'pointer-events-none opacity-75' : ''}`}
+                              onClick={() => !formData.auto_select_exercises && toggleExerciseSelection(exercise.id)}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-medium text-gray-900">{exercise.title}</h4>
+                                    {exercise.relevance_score && (
+                                      <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">
+                                        {Math.round(exercise.relevance_score * 10)}% pertinent
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 mb-2">{exercise.description}</p>
+                                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{exercise.language}</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{exercise.difficulty}</span>
+                                    <span>{exercise.challenge_count} challenge{exercise.challenge_count > 1 ? 's' : ''}</span>
+                                  </div>
+                                </div>
+                                {!formData.auto_select_exercises && (
+                                  <div className="ml-2">
+                                    {formData.exercise_ids.includes(exercise.id) ? (
+                                      <CheckCircle className="h-5 w-5 text-primary-600" />
+                                    ) : (
+                                      <div className="h-5 w-5 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {!formData.auto_select_exercises && exerciseSuggestions.length > 0 && (
+                        <p className="mt-2 text-xs text-gray-500">
+                          {formData.exercise_ids.length} exercice{formData.exercise_ids.length > 1 ? 's' : ''} sélectionné{formData.exercise_ids.length > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Étape 3 : Confirmation */}
+              {step === 4 && (
                 <div className="space-y-6">
                   {/* Section: Résumé des informations */}
                   <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
@@ -1128,7 +1475,62 @@ const ScheduleInterviewPage = () => {
                         )}
                       </div>
                     </div>
-
+                    <div className="mt-6 pt-6 border-t">
+                      <h3 className="text-sm text-gray-500 mb-3">Exercices de coding</h3>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                          <div>
+                            <span className="text-sm text-gray-600">Mode de sélection:</span>
+                            <p className="font-medium">
+                              {formData.auto_select_exercises ? 'Automatique' : 'Manuel'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-600">Nombre d'exercices:</span>
+                            <p className="font-medium">
+                              {formData.auto_select_exercises 
+                                ? formData.exercise_count 
+                                : formData.exercise_ids.length
+                              }
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-600">Temps limite:</span>
+                            <p className="font-medium">{formData.coding_time_limit} minutes</p>
+                          </div>
+                        </div>
+                        
+                        {!formData.auto_select_exercises && formData.exercise_ids.length > 0 && (
+                          <div>
+                            <span className="text-sm text-gray-600 block mb-2">Exercices sélectionnés:</span>
+                            <div className="space-y-1">
+                              {formData.exercise_ids.map(exerciseId => {
+                                const exercise = exerciseSuggestions.find(ex => ex.id === exerciseId);
+                                return exercise ? (
+                                  <div key={exerciseId} className="text-sm bg-white rounded px-3 py-2 border">
+                                    <span className="font-medium">{exercise.title}</span>
+                                    <span className="text-gray-500 ml-2">({exercise.language}, {exercise.difficulty})</span>
+                                  </div>
+                                ) : null;
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {exerciseKeywords.length > 0 && (
+                          <div className="mt-3">
+                            <span className="text-sm text-gray-600 block mb-2">Compétences ciblées:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {exerciseKeywords.map((keyword, index) => (
+                                <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     {/* Affichage des assistants IA sélectionnés */}
                     {formData.ai_assistants.length > 0 && (
                       <div className="mt-6 pt-6 border-t border-gray-200">
@@ -1201,7 +1603,7 @@ const ScheduleInterviewPage = () => {
                 </div>
               )}
 
-              {/* Boutons de navigation améliorés */}
+              {/* Boutons de navigation  */}
               <div className="mt-8 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                   <button
@@ -1210,14 +1612,14 @@ const ScheduleInterviewPage = () => {
                     className="group px-6 py-3 bg-white border-2 border-gray-400 rounded-lg text-gray-800 hover:border-gray-600 hover:bg-gray-100 transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium"
                   >
                     <ChevronLeft className="h-5 w-5 mr-2 text-gray-600 group-hover:-translate-x-1 transition-transform duration-200" />
-                    <span>{step === 2 ? "Retour aux candidatures" : "Étape précédente"}</span>
+                    <span>{step === 3 ? "Retour aux candidatures" : "Étape précédente"}</span>
                   </button>
 
                   {/* Indicateur de progression */}
                   <div className="flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-full">
-                    <div className="text-sm font-medium text-gray-700">Étape {step} sur 3</div>
+                    <div className="text-sm font-medium text-gray-700">Étape {step} sur 4</div>
                     <div className="flex space-x-1">
-                      {[2, 3].map((stepNumber) => (
+                      {[2, 4].map((stepNumber) => (
                         <div
                           key={stepNumber}
                           className={`w-3 h-3 rounded-full transition-colors duration-200 ${
@@ -1228,15 +1630,20 @@ const ScheduleInterviewPage = () => {
                     </div>
                   </div>
 
-                  {step < 3 ? (
+                  {step < 4 ? (
                     <button
-                      type="button"
-                      onClick={validateAndProceed}
-                      className="group px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium border border-blue-600"
-                    >
-                      <span>Continuer</span>
-                      <ChevronRight className="h-5 w-5 ml-2 text-white group-hover:translate-x-1 transition-transform duration-200" />
-                    </button>
+                    type="button"
+                    onClick={validateAndProceed}
+                    disabled={step === 3 && exerciseSuggestions.length === 0}
+                    className={`group px-8 py-3 rounded-lg transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-medium border ${
+                      step === 3 && exerciseSuggestions.length === 0
+                        ? 'bg-gray-400 text-gray-600 border-gray-400 cursor-not-allowed transform-none'
+                        : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    <span>Continuer</span>
+                    <ChevronRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                  </button>
                   ) : (
                     <button
                       type="submit"
@@ -1264,7 +1671,7 @@ const ScheduleInterviewPage = () => {
                 <div className="mt-6 w-full bg-gray-300 rounded-full h-3 shadow-inner">
                   <div
                     className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
-                    style={{ width: `${((step - 1) / 2) * 100}%` }}
+                    style={{ width: `${((step - 1) / 3) * 100}%` }}
                   ></div>
                 </div>
 

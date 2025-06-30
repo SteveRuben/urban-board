@@ -1,4 +1,4 @@
-import { CandidateResponseInfo, CandidateResponseStatusResponse, EmailPreviewResponse, InterviewSchedule, InterviewScheduleFilter, InterviewScheduleFormData, InterviewScheduleUpdateData, PublicScheduleData, ResendInvitationResponse, ScheduleFilters } from '@/types/interview-scheduling';
+import { AssignExercisesRequest, CandidateResponseInfo, CandidateResponseStatusResponse, EmailPreviewResponse, ExerciseSuggestionsRequest, ExerciseSuggestionsResponse, InterviewSchedule, InterviewScheduleFilter, InterviewScheduleFormData, InterviewScheduleFormDataWithExercises, InterviewScheduleUpdateData, InterviewScheduleWithExercises, PublicScheduleData, ResendInvitationResponse, ScheduleFilters, UserExerciseSession } from '@/types/interview-scheduling';
 import { api } from './user-service'; 
 import axios from 'axios'; 
 
@@ -99,13 +99,15 @@ export class InterviewSchedulingService {
   /**
    * Crée une nouvelle planification d'entretien (NÉCESSITE AUTHENTIFICATION)
    */
-  static async createSchedule(data: InterviewScheduleFormData): Promise<InterviewSchedule> {
+  static async createSchedule(data: InterviewScheduleFormDataWithExercises): Promise<InterviewSchedule> {
     try {
       console.log("InterviewSchedulingService: Préparation de la création de planification", {
         candidate_name: data.candidate_name,
         title: data.title,
         scheduled_at: data.scheduled_at,
-        mode: data.mode
+        mode: data.mode,
+        exercise_ids: data.exercise_ids,
+        auto_select_exercises: data.auto_select_exercises
       });
       console.log('...........1.',data)
       const response = await api.post('/scheduling/schedules', data);
@@ -206,8 +208,8 @@ export class InterviewSchedulingService {
         ...(reason && { reason })
       };
 
-      const response = await api.post(`/api/scheduling/schedules/${scheduleId}/cancel`, requestData);
-
+      const response = await api.post(`/scheduling/schedules/${scheduleId}/cancel`, requestData);
+      
       console.log("InterviewSchedulingService: Réponse reçue", response.status);
 
       if (response.data.status === 'error') {
@@ -620,7 +622,7 @@ export class InterviewSchedulingService {
   /**
    * Récupère une planification avec informations avatar enrichies
    */
-  static async getScheduleWithAvatar(scheduleId: string): Promise<InterviewSchedule> {
+  static async getScheduleWithAvatar(scheduleId: string): Promise<InterviewScheduleWithExercises> {
     try {
       console.log("InterviewSchedulingService: Récupération avec avatar", { scheduleId });
 
@@ -749,6 +751,78 @@ export class InterviewSchedulingService {
     }
   }
 
+
+   /**
+   * NOUVELLE MÉTHODE: Récupère les suggestions d'exercices pour un poste
+   */
+   static async getExerciseSuggestions(data: ExerciseSuggestionsRequest): Promise<ExerciseSuggestionsResponse> {
+    try {
+      console.log("InterviewSchedulingService: Récupération des suggestions d'exercices", data);
+
+      const response = await api.post('/scheduling/exercises/suggestions', data);
+
+      console.log("InterviewSchedulingService: Suggestions d'exercices reçues", response.status);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des suggestions d\'exercices:', error);
+      throw new Error('Une erreur est survenue lors de la recherche d\'exercices');
+    }
+  }
+
+  /**
+   * NOUVELLE MÉTHODE: Récupère les détails d'un entretien avec exercices
+   */
+  static async getScheduleDetails(scheduleId: string): Promise<InterviewScheduleWithExercises> {
+    try {
+      console.log("InterviewSchedulingService: Récupération des détails d'entretien", { scheduleId });
+
+      const response = await api.get(`/scheduling/schedules/${scheduleId}`);
+
+      console.log("InterviewSchedulingService: Détails d'entretien reçus", response.status);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des détails d\'entretien:', error);
+      throw new Error('Une erreur est survenue lors de la récupération des détails');
+    }
+  }
+
+  /**
+   * NOUVELLE MÉTHODE: Assigne des exercices à un entretien existant
+   */
+  static async assignExercisesToInterview(scheduleId: string, data: AssignExercisesRequest): Promise<UserExerciseSession> {
+    try {
+      console.log("InterviewSchedulingService: Assignation d'exercices", { scheduleId, data });
+
+      const response = await api.post(`/scheduling/schedules/${scheduleId}/exercises`, data);
+
+      console.log("InterviewSchedulingService: Exercices assignés", response.status);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erreur lors de l\'assignation d\'exercices:', error);
+      
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error('Une erreur est survenue lors de l\'assignation des exercices');
+    }
+  }
+
+  /**
+   * NOUVELLE MÉTHODE: Récupère les résultats des exercices d'un candidat
+   */
+  static async getCandidateExerciseResults(scheduleId: string): Promise<CodingResults> {
+    try {
+      console.log("InterviewSchedulingService: Récupération des résultats d'exercices", { scheduleId });
+
+      const response = await api.get(`/scheduling/schedules/${scheduleId}/exercises/results`);
+
+      console.log("InterviewSchedulingService: Résultats d'exercices reçus", response.status);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des résultats d\'exercices:', error);
+      throw new Error('Une erreur est survenue lors de la récupération des résultats');
+    }
+  }
 
   // ====================================================================
   // MÉTHODES UTILITAIRES (SANS APPELS API)
@@ -910,6 +984,7 @@ export class InterviewSchedulingService {
    * Vérifie si un entretien peut encore être modifié
    */
   static canBeModified(schedule: InterviewSchedule): boolean {
+    
     const nonModifiableStatuses = ['in_progress', 'completed', 'canceled', 'no_show'];
     return !nonModifiableStatuses.includes(schedule.status);
   }
@@ -921,7 +996,7 @@ export class InterviewSchedulingService {
     const startableStatuses = ['scheduled', 'confirmed'];
     const now = new Date();
     const scheduledTime = new Date(schedule.scheduled_at);
-    const startTime = new Date(scheduledTime.getTime() - 15 * 60 * 1000); // 15 minutes avant
+    const startTime = new Date(scheduledTime.getTime() + 30 * 60 * 1000); // 15 minutes avant
     
     return startableStatuses.includes(schedule.status) && now >= startTime;
   }
@@ -1015,138 +1090,5 @@ export class InterviewSchedulingService {
     };
   }
 
-  /**
-   * Vérifie si l'avatar est disponible pour un entretien
-   */
-  static avatarIsAvailable(schedule: InterviewSchedule): boolean {
-    return schedule.avatar?.available === true;
-  }
-
-  /**
-   * Vérifie si l'avatar est actif pour un entretien
-   */
-  static avatarIsActive(schedule: InterviewSchedule): boolean {
-    return schedule.avatar?.status === 'active';
-  }
-
-  /**
-   * Vérifie si l'avatar a besoin d'attention
-   */
-  static avatarNeedsAttention(schedule: InterviewSchedule): boolean {
-    if (!schedule.avatar?.available) return false;
-    
-    return schedule.avatar.status === 'error' || 
-           (schedule.avatar.status === 'active' && !schedule.avatar.browser_running) ||
-           (schedule.avatar.status === 'active' && !schedule.avatar.meeting_active);
-  }
-
-  /**
-   * Obtient un badge de statut avatar pour l'affichage
-   */
-  static getAvatarStatusBadge(schedule: InterviewSchedule): {
-    label: string;
-    color: 'success' | 'warning' | 'error' | 'info' | 'default';
-    icon: string;
-  } {
-    if (!schedule.avatar?.available) {
-      return {
-        label: 'Non disponible',
-        color: 'default',
-        icon: 'bot-off'
-      };
-    }
-
-    switch (schedule.avatar.status) {
-      case 'not_scheduled':
-        return {
-          label: 'Non programmé',
-          color: 'default',
-          icon: 'clock'
-        };
-      case 'scheduled':
-        return {
-          label: 'Programmé',
-          color: 'info',
-          icon: 'calendar'
-        };
-      case 'launching':
-        return {
-          label: 'Démarrage...',
-          color: 'warning',
-          icon: 'loader'
-        };
-      case 'active':
-        if (!schedule.avatar.browser_running || !schedule.avatar.meeting_active) {
-          return {
-            label: 'Problème',
-            color: 'warning',
-            icon: 'alert-triangle'
-          };
-        }
-        return {
-          label: 'Actif',
-          color: 'success',
-          icon: 'check-circle'
-        };
-      case 'stopping':
-        return {
-          label: 'Arrêt...',
-          color: 'warning',
-          icon: 'square'
-        };
-      case 'stopped':
-        return {
-          label: 'Arrêté',
-          color: 'default',
-          icon: 'square'
-        };
-      case 'error':
-        return {
-          label: 'Erreur',
-          color: 'error',
-          icon: 'x-circle'
-        };
-      default:
-        return {
-          label: 'Inconnu',
-          color: 'default',
-          icon: 'help-circle'
-        };
-    }
-  }
-
-  /**
-   * Calcule le résumé avatar pour l'affichage dans les listes
-   */
-  static getAvatarSummary(schedule: InterviewSchedule): string {
-    if (!schedule.avatar?.available) {
-      return 'Avatar non disponible';
-    }
-
-    const status = schedule.avatar.status;
-    
-    switch (status) {
-      case 'not_scheduled':
-        return 'Avatar non programmé';
-      case 'scheduled':
-        return `Programmé pour ${schedule.avatar.scheduled_launch ? new Date(schedule.avatar.scheduled_launch).toLocaleTimeString('fr-FR') : 'bientôt'}`;
-      case 'launching':
-        return 'Avatar en cours de démarrage';
-      case 'active':
-        if (schedule.avatar.questions) {
-          const { asked, total } = schedule.avatar.questions;
-          return `Actif - Question ${asked + 1}/${total}`;
-        }
-        return 'Avatar actif';
-      case 'stopping':
-        return 'Avatar en cours d\'arrêt';
-      case 'stopped':
-        return 'Avatar arrêté';
-      case 'error':
-        return `Erreur: ${schedule.avatar.error || 'Problème technique'}`;
-      default:
-        return 'Statut inconnu';
-    }
-  }
-
+  
 }

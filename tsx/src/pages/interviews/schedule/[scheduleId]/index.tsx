@@ -1,5 +1,3 @@
-// frontend/pages/interviews/schedule/[scheduleId].tsx - VERSION AVEC AVATAR
-
 "use client"
 
 import type React from "react"
@@ -8,14 +6,11 @@ import { useRouter } from "next/router"
 import Head from "next/head"
 import Link from "next/link"
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { AvatarStatusCard } from "@/components/avatar/AvatarStatusCard"
 import { InterviewSchedulingService } from "@/services/interview-scheduling-service"
 import AIAssistantService from "@/services/ai-assistant-service"
-import type { InterviewSchedule } from "@/types/interview-scheduling"
-import type { AvatarStatusResponse } from "@/types/avatar"
-import { AIAssistant, normalizeAssistant } from "@/types/assistant"
+import type { InterviewSchedule, InterviewScheduleWithExercises } from "@/types/interview-scheduling"
+import type { AIAssistant } from "@/types/assistant"
 import {
-  Brain,
   RefreshCw,
   AlertTriangle,
   ArrowLeft,
@@ -23,15 +18,6 @@ import {
   Calendar,
   User,
   Briefcase,
-  ChevronRight,
-  Trash2,
-  Plus,
-  Info,
-  Star,
-  Video,
-  MessageSquare,
-  Users,
-  Check,
   CheckCircle,
   XCircle,
   Edit3,
@@ -39,28 +25,32 @@ import {
   UserX,
   Phone,
   Mail,
-  MapPin,
   FileText,
-  Settings,
   ExternalLink,
   Copy,
-  Eye,
   Bot,
-  Activity
+  Users,
+  Check,
+  Timer,
+  Code,
+  BookOpen,
+  Target,
+  Activity,
+  Globe,
+  Building,
+  UserCheck,
 } from "lucide-react"
 
 const InterviewScheduleDetailPage = () => {
   const router = useRouter()
   const { scheduleId, created } = router.query
 
-  const [schedule, setSchedule] = useState<InterviewSchedule | null>(null)
+  const [schedule, setSchedule] = useState<InterviewScheduleWithExercises | null>(null)
   const [assistants, setAssistants] = useState<AIAssistant[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false)
-  const [avatarNeedsAttention, setAvatarNeedsAttention] = useState<boolean>(false)
-  const [showAdvancedControls, setShowAdvancedControls] = useState<boolean>(false)
 
   // Charger les données de la planification
   useEffect(() => {
@@ -71,19 +61,11 @@ const InterviewScheduleDetailPage = () => {
         setLoading(true)
         setError(null)
 
-        // Récupérer la planification AVEC les infos avatar
         const scheduleData = await InterviewSchedulingService.getSchedule(scheduleId)
         setSchedule(scheduleData)
 
-        // Vérifier si l'avatar a besoin d'attention
-        if (InterviewSchedulingService.avatarNeedsAttention(scheduleData)) {
-          setAvatarNeedsAttention(true)
-        }
-
-        // Récupérer les assistants IA pour afficher leurs détails
         const allAssistants = await AIAssistantService.getAllAssistants()
         setAssistants(allAssistants)
-
       } catch (err: any) {
         console.error("Erreur lors du chargement de la planification:", err)
         setError(err.message || "Impossible de charger la planification")
@@ -99,7 +81,6 @@ const InterviewScheduleDetailPage = () => {
   useEffect(() => {
     if (created === "true") {
       setShowSuccessMessage(true)
-      // Masquer le message après 5 secondes
       const timer = setTimeout(() => {
         setShowSuccessMessage(false)
       }, 5000)
@@ -107,23 +88,7 @@ const InterviewScheduleDetailPage = () => {
     }
   }, [created])
 
-  // Gestionnaire de mise à jour du statut avatar
-  const handleAvatarStatusChange = (avatarStatus: AvatarStatusResponse) => {
-    if (schedule && avatarStatus.success) {
-      const updatedSchedule = {
-        ...schedule,
-        avatar: avatarStatus.avatar_status
-      }
-      setSchedule(updatedSchedule)
-      
-      // Mettre à jour l'indicateur d'attention
-      setAvatarNeedsAttention(
-        InterviewSchedulingService.avatarNeedsAttention(updatedSchedule)
-      )
-    }
-  }
-
-  // Actions sur la planification (vos méthodes existantes restent identiques)
+  // Actions sur la planification
   const handleConfirmSchedule = async () => {
     if (!schedule) return
 
@@ -142,7 +107,7 @@ const InterviewScheduleDetailPage = () => {
     if (!schedule) return
 
     const reason = prompt("Raison de l'annulation (optionnel):")
-    if (reason === null) return // Utilisateur a annulé
+    if (reason === null) return
 
     try {
       setActionLoading("cancel")
@@ -176,14 +141,11 @@ const InterviewScheduleDetailPage = () => {
 
     try {
       setActionLoading("start")
-      // Ici vous devriez probablement créer un nouvel entretien et récupérer son ID
-      // Pour l'exemple, je génère un ID temporaire
       const interviewId = `interview_${Date.now()}`
       const updatedSchedule = await InterviewSchedulingService.startInterview(schedule.id, interviewId)
       setSchedule(updatedSchedule)
-      
-      // Rediriger vers la page d'entretien
-      router.push(`/interviews/${interviewId}`)
+      console.log(schedule.meet_link)
+      // router.push(`/interviews/${interviewId}`)
     } catch (err: any) {
       setError(err.message || "Erreur lors du démarrage de l'entretien")
     } finally {
@@ -194,53 +156,50 @@ const InterviewScheduleDetailPage = () => {
   const copyAccessLink = () => {
     if (!schedule?.access_token) return
 
-    const accessLink = `${window.location.origin}/interview/access/${schedule.access_token}`
+    const accessLink = `${window.location.origin}/candidate/coding/${schedule.coding_exercises!.access_token}`
     navigator.clipboard.writeText(accessLink)
     alert("Lien d'accès copié dans le presse-papier")
   }
 
-  // Obtenir les détails d'un assistant IA
   const getAssistantDetails = (assistantId: string) => {
-    return assistants.find(a => a.id === assistantId)
+    return assistants.find((a) => a.id === assistantId)
   }
 
-  // Obtenir l'icône du statut
-  const getStatusIcon = (status: InterviewSchedule['status']) => {
+  const getStatusIcon = (status: InterviewSchedule["status"]) => {
     switch (status) {
-      case 'scheduled':
+      case "scheduled":
         return <Clock className="h-5 w-5 text-blue-600" />
-      case 'confirmed':
+      case "confirmed":
         return <CheckCircle className="h-5 w-5 text-green-600" />
-      case 'in_progress':
+      case "in_progress":
         return <Play className="h-5 w-5 text-orange-600" />
-      case 'completed':
+      case "completed":
         return <Check className="h-5 w-5 text-green-700" />
-      case 'canceled':
+      case "canceled":
         return <XCircle className="h-5 w-5 text-red-600" />
-      case 'no_show':
+      case "no_show":
         return <UserX className="h-5 w-5 text-gray-600" />
       default:
         return <Clock className="h-5 w-5 text-gray-600" />
     }
   }
 
-  // Obtenir la couleur de badge du statut
-  const getStatusBadgeColor = (status: InterviewSchedule['status']) => {
+  const getStatusBadgeColor = (status: InterviewSchedule["status"]) => {
     switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800'
-      case 'confirmed':
-        return 'bg-green-100 text-green-800'
-      case 'in_progress':
-        return 'bg-orange-100 text-orange-800'
-      case 'completed':
-        return 'bg-green-200 text-green-900'
-      case 'canceled':
-        return 'bg-red-100 text-red-800'
-      case 'no_show':
-        return 'bg-gray-100 text-gray-800'
+      case "scheduled":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "confirmed":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "in_progress":
+        return "bg-orange-100 text-orange-800 border-orange-200"
+      case "completed":
+        return "bg-green-200 text-green-900 border-green-300"
+      case "canceled":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "no_show":
+        return "bg-gray-100 text-gray-800 border-gray-200"
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
@@ -252,9 +211,9 @@ const InterviewScheduleDetailPage = () => {
         </Head>
         <div className="bg-gray-50 py-8 min-h-screen">
           <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-6xl mx-auto">
               <div className="flex justify-center items-center p-20">
-                <RefreshCw className="h-8 w-8 animate-spin text-primary-600 mr-3" />
+                <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mr-3" />
                 <span className="text-lg text-gray-600">Chargement de la planification...</span>
               </div>
             </div>
@@ -272,12 +231,10 @@ const InterviewScheduleDetailPage = () => {
         </Head>
         <div className="bg-gray-50 py-8 min-h-screen">
           <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-md">
+            <div className="max-w-6xl mx-auto">
+              <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
                 <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-6 w-6 text-red-400" />
-                  </div>
+                  <AlertTriangle className="h-6 w-6 text-red-400 flex-shrink-0" />
                   <div className="ml-3">
                     <h3 className="text-lg font-medium text-red-800">Erreur</h3>
                     <p className="text-red-700">{error || "Planification introuvable"}</p>
@@ -300,7 +257,7 @@ const InterviewScheduleDetailPage = () => {
   }
 
   const timeInfo = InterviewSchedulingService.getTimeUntilInterview(schedule.scheduled_at)
-  const avatarBadge = InterviewSchedulingService.getAvatarStatusBadge(schedule)
+  const assistantDetails = schedule.ai_assistant_id ? getAssistantDetails(schedule.ai_assistant_id) : null
 
   return (
     <>
@@ -311,250 +268,235 @@ const InterviewScheduleDetailPage = () => {
 
       <div className="bg-gray-50 py-8 min-h-screen">
         <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             {/* Message de succès */}
             {showSuccessMessage && (
-              <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-md animate-fade-in">
+              <div className="mb-6 bg-green-50 border border-green-200 p-4 rounded-lg">
                 <div className="flex">
-                  <div className="flex-shrink-0">
-                    <CheckCircle className="h-5 w-5 text-green-400" />
-                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
                   <div className="ml-3">
                     <p className="text-sm text-green-700">
                       L'entretien a été programmé avec succès ! Le candidat recevra une notification par email.
-                      {InterviewSchedulingService.avatarIsAvailable(schedule) && (
-                        <span className="block mt-1 font-medium">
-                          🤖 Avatar automatiquement programmé pour cet entretien.
-                        </span>
-                      )}
                     </p>
                   </div>
-                  <div className="ml-auto pl-3">
-                    <button
-                      onClick={() => setShowSuccessMessage(false)}
-                      className="text-green-400 hover:text-green-600"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowSuccessMessage(false)}
+                    className="ml-auto text-green-400 hover:text-green-600"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Alerte avatar si problème */}
-            {avatarNeedsAttention && (
-              <div className="mb-6 bg-orange-50 border-l-4 border-orange-500 p-4 rounded-md">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-orange-400" />
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-orange-800">
-                      Avatar nécessite votre attention
-                    </h3>
-                    <p className="text-sm text-orange-700">
-                      {InterviewSchedulingService.getAvatarSummary(schedule)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* En-tête */}
+            {/* Header */}
             <div className="mb-8">
               <Link
                 href="/interviews"
-                className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 bg-white px-3 py-1.5 rounded-full shadow-sm transition-colors"
+                className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 bg-white px-3 py-1.5 rounded-lg shadow-sm transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Retour aux entretiens
               </Link>
-              
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Entretien programmé</h1>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1 text-gray-500" />
-                      <span className="font-medium">{schedule.candidate_name}</span>
-                    </div>
-                    <span className="text-gray-400">•</span>
-                    <div className="flex items-center">
-                      <Briefcase className="h-4 w-4 mr-1 text-gray-500" />
-                      <span className="font-medium">{schedule.position}</span>
-                    </div>
-                    <span className="text-gray-400">•</span>
-                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(schedule.status)}`}>
-                      {getStatusIcon(schedule.status)}
-                      <span className="ml-1">{InterviewSchedulingService.getScheduleStatusLabel(schedule.status)}</span>
-                    </div>
-                    
-                    {/* NOUVEAU : Badge avatar */}
-                    {InterviewSchedulingService.avatarIsAvailable(schedule) && (
-                      <>
-                        <span className="text-gray-400">•</span>
-                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          avatarBadge.color === 'success' ? 'bg-green-100 text-green-800' :
-                          avatarBadge.color === 'warning' ? 'bg-orange-100 text-orange-800' :
-                          avatarBadge.color === 'error' ? 'bg-red-100 text-red-800' :
-                          avatarBadge.color === 'info' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          <Bot className="h-3 w-3 mr-1" />
-                          {avatarBadge.label}
+
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h1 className="text-2xl font-bold text-gray-900">{schedule.title}</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeColor(
+                              schedule.status,
+                            )}`}
+                          >
+                            {getStatusIcon(schedule.status)}
+                            <span className="ml-1">
+                              {InterviewSchedulingService.getScheduleStatusLabel(schedule.status)}
+                            </span>
+                          </span>
                         </div>
-                      </>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-3">
+                        <User className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Candidat</p>
+                          <p className="font-medium text-gray-900">{schedule.candidate_name}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Briefcase className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Poste</p>
+                          <p className="font-medium text-gray-900">{schedule.position}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Durée</p>
+                          <p className="font-medium text-gray-900">
+                            {InterviewSchedulingService.formatDuration(schedule.duration_minutes)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {InterviewSchedulingService.canBeModified(schedule) && (
+                      <Link
+                        href={`/interviews/schedule/${schedule.id}/edit`}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Modifier
+                      </Link>
+                    )}
+
+                    
+
+                    {(schedule.status === "completed" ||
+                      (schedule.coding_exercises &&
+                        schedule.coding_exercises.assigned &&
+                        schedule.coding_exercises.progress &&
+                        schedule.coding_exercises.progress.completed > 0)) && (
+                      <Link
+                        href={`/interviews/schedule/${schedule.id}/coding-results`}
+                        className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Résultats
+                      </Link>
                     )}
                   </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {/* Bouton contrôles avancés */}
-                  {InterviewSchedulingService.avatarIsAvailable(schedule) && (
-                    <button
-                      onClick={() => setShowAdvancedControls(!showAdvancedControls)}
-                      className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
-                    >
-                      <Settings className="h-4 w-4 mr-1" />
-                      {showAdvancedControls ? 'Masquer' : 'Avancé'}
-                    </button>
-                  )}
-                  
-                  {InterviewSchedulingService.canBeModified(schedule) && (
-                    <Link
-                      href={`/interviews/schedule/${schedule.id}/edit`}
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                      <Edit3 className="h-4 w-4 mr-2" />
-                      Modifier
-                    </Link>
-                  )}
-                  
-                  {InterviewSchedulingService.canBeStarted(schedule) && timeInfo.canStart && (
-                    <button
-                      onClick={handleStartInterview}
-                      disabled={actionLoading === "start"}
-                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
-                    >
-                      {actionLoading === "start" ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Play className="h-4 w-4 mr-2" />
-                      )}
-                      Démarrer l'entretien
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Affichage des erreurs d'action */}
+            {/* Erreur d'action */}
             {error && (
-              <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+              <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-lg">
                 <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
-                  </div>
+                  <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
                   <div className="ml-3">
                     <p className="text-sm text-red-700">{error}</p>
                   </div>
-                  <div className="ml-auto">
-                    <button
-                      onClick={() => setError(null)}
-                      className="text-red-400 hover:text-red-600"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                    <XCircle className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Colonne principale */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* TOUTES VOS SECTIONS EXISTANTES RESTENT IDENTIQUES */}
-                {/* Informations de l'entretien, du candidat, assistants IA, questions, etc. */}
-                
+              <div className="lg:col-span-2 space-y-8">
                 {/* Informations de l'entretien */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-primary-600" />
-                    Détails de l'entretien
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                    <Calendar className="h-5 w-5 mr-3 text-blue-600" />
+                    Planification de l'entretien
                   </h2>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-1">Date et heure</h3>
-                        <p className="font-medium text-gray-900">
-                          {InterviewSchedulingService.formatScheduledDateTime(schedule.scheduled_at, schedule.timezone)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {!timeInfo.isPast ? `Dans ${timeInfo.timeUntil}` : 'Passé'}
-                          {timeInfo.canStart && (
-                            <span className="ml-2 text-green-600 font-medium">• Peut être démarré</span>
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-1">Durée prévue</h3>
-                        <p className="font-medium text-gray-900">
-                          {InterviewSchedulingService.formatDuration(schedule.duration_minutes)}
-                        </p>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-1">Mode d'entretien</h3>
-                        <div className="flex items-center">
-                          {schedule.mode === 'autonomous' ? (
-                            <Brain className="h-4 w-4 mr-2 text-blue-600" />
-                          ) : (
-                            <Users className="h-4 w-4 mr-2 text-green-600" />
-                          )}
-                          <span className="font-medium text-gray-900">
-                            {InterviewSchedulingService.getInterviewModeLabel(schedule.mode)}
-                          </span>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">Date et heure</h3>
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {InterviewSchedulingService.formatScheduledDateTime(
+                                schedule.scheduled_at,
+                                schedule.timezone,
+                              )}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {!timeInfo.isPast ? `Dans ${timeInfo.timeUntil}` : "Passé"}
+                              {timeInfo.canStart && (
+                                <span className="ml-2 text-green-600 font-medium">• Peut être démarré</span>
+                              )}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {InterviewSchedulingService.getInterviewModeDescription(schedule.mode)}
-                        </p>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">Fuseau horaire</h3>
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-5 w-5 text-gray-400" />
+                          <p className="font-medium text-gray-900">{schedule.timezone}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">Mode d'entretien</h3>
+                        <div className="flex items-center gap-3">
+                          {schedule.mode === "autonomous" ? (
+                            <Bot className="h-5 w-5 text-purple-600" />
+                          ) : (
+                            <Users className="h-5 w-5 text-blue-600" />
+                          )}
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {InterviewSchedulingService.getInterviewModeLabel(schedule.mode)}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {InterviewSchedulingService.getInterviewModeDescription(schedule.mode)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-1">Fuseau horaire</h3>
-                        <p className="font-medium text-gray-900">{schedule.timezone}</p>
-                      </div>
-
+                    <div className="space-y-6">
                       {schedule.description && (
                         <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-1">Description</h3>
-                          <p className="text-gray-900">{schedule.description}</p>
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
+                          <div className="flex items-start gap-3">
+                            <FileText className="h-5 w-5 text-gray-400 mt-0.5" />
+                            <p className="text-gray-900">{schedule.description}</p>
+                          </div>
                         </div>
                       )}
 
-                      {schedule.access_token && (
+                      {schedule.access_token && schedule.status == 'scheduled' && (
                         <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-1">Lien d'accès candidat</h3>
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">Accès candidat</h3>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={copyAccessLink}
-                              className="flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-sm transition-colors"
+                              className="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
                             >
-                              <Copy className="h-4 w-4 mr-1" />
+                              <Copy className="h-4 w-4 mr-2" />
                               Copier le lien
                             </button>
                             <Link
-                              href={`/interview/access/${schedule.access_token}`}
+                              href={`/candidate/coding/${schedule.coding_exercises!.access_token}`}
                               target="_blank"
-                              className="flex items-center px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-sm transition-colors"
+                              className="flex items-center px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm transition-colors"
                             >
-                              <ExternalLink className="h-4 w-4 mr-1" />
+                              <ExternalLink className="h-4 w-4 mr-2" />
                               Aperçu
                             </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {schedule.organization && (
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">Organisation</h3>
+                          <div className="flex items-center gap-3">
+                            <Building className="h-5 w-5 text-gray-400" />
+                            <p className="font-medium text-gray-900">{schedule.organization.name}</p>
                           </div>
                         </div>
                       )}
@@ -562,34 +504,228 @@ const InterviewScheduleDetailPage = () => {
                   </div>
                 </div>
 
-                {/* ... VOS AUTRES SECTIONS EXISTANTES ... */}
-                {/* Candidat, Assistant IA, Questions, etc. */}
+                {/* Informations du candidat */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                    <User className="h-5 w-5 mr-3 text-green-600" />
+                    Informations du candidat
+                  </h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <User className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Nom complet</p>
+                          <p className="font-medium text-gray-900">{schedule.candidate_name}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Email</p>
+                          <p className="font-medium text-gray-900">{schedule.candidate_email}</p>
+                        </div>
+                      </div>
+
+                      {schedule.candidate_phone && (
+                        <div className="flex items-center gap-3">
+                          <Phone className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-500">Téléphone</p>
+                            <p className="font-medium text-gray-900">{schedule.candidate_phone}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Briefcase className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Poste visé</p>
+                          <p className="font-medium text-gray-900">{schedule.position}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <UserCheck className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Statut de réponse</p>
+                          <p className="font-medium text-gray-900">
+                            {schedule.was_confirmed_by_candidate
+                              ? "Confirmé par le candidat"
+                              : schedule.was_canceled_by_candidate
+                                ? "Annulé par le candidat"
+                                : "En attente de réponse"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {schedule.candidate_response_date && (
+                        <div className="flex items-center gap-3">
+                          <Clock className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-500">Date de réponse</p>
+                            <p className="font-medium text-gray-900">
+                              {new Date(schedule.candidate_response_date).toLocaleDateString("fr-FR", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assistant IA */}
+                {assistantDetails && (
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                      <Bot className="h-5 w-5 mr-3 text-purple-600" />
+                      Assistant IA assigné
+                    </h2>
+
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <Bot className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-2">{assistantDetails.name}</h3>
+                        {assistantDetails.description && (
+                          <p className="text-gray-600 mb-4">{assistantDetails.description}</p>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Spécialisation</p>
+                            <p className="font-medium text-gray-900">{assistantDetails.assistantType || "Général"}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Modèle</p>
+                            <p className="font-medium text-gray-900">{assistantDetails.model || "Non spécifié"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions prédéfinies */}
+                {schedule.predefined_questions && schedule.predefined_questions.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                      <BookOpen className="h-5 w-5 mr-3 text-orange-600" />
+                      Questions prédéfinies
+                    </h2>
+
+                    <div className="space-y-3">
+                      {schedule.predefined_questions.map((question, index) => (
+                        <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                          <span className="flex items-center justify-center w-6 h-6 bg-orange-100 text-orange-600 rounded-full text-sm font-medium">
+                            {index + 1}
+                          </span>
+                          <p className="text-gray-900">{question}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Exercices de codage */}
+                {schedule.coding_exercises && schedule.coding_exercises.assigned && (
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                      <Code className="h-5 w-5 mr-3 text-indigo-600" />
+                      Exercices de codage
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Target className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-500">Nombre d'exercices</p>
+                            <p className="font-medium text-gray-900">{schedule.coding_exercises.exercise_count}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Timer className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-500">Temps limite</p>
+                            <p className="font-medium text-gray-900">
+                              {schedule.coding_exercises.time_limit_minutes} minutes
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Activity className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-500">Statut</p>
+                            <p className="font-medium text-gray-900">{schedule.coding_exercises.status}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {schedule.coding_exercises.progress && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm text-gray-500">Progression</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {schedule.coding_exercises.progress.percentage}%
+                              </p>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${schedule.coding_exercises.progress.percentage}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {schedule.coding_exercises.progress.completed} sur{" "}
+                              {schedule.coding_exercises.progress.total} exercices complétés
+                            </p>
+                          </div>
+                        )}
+
+                        {schedule.coding_exercises.access_token && (
+                          <div>
+                            <Link
+                              href={`/candidate/coding/${schedule.coding_exercises.access_token}`}
+                              target="_blank"
+                              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Accéder aux exercices
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Colonne latérale */}
               <div className="space-y-6">
-                {/* NOUVEAU : Composant Avatar Status */}
-                {(schedule.mode === 'autonomous' || schedule.mode === 'collaborative') && (
-                  <AvatarStatusCard
-                    scheduleId={schedule.id}
-                    scheduleStatus={schedule.status}
-                    interviewMode={schedule.mode}
-                    onStatusChange={handleAvatarStatusChange}
-                    showAdvancedControls={showAdvancedControls}
-                    autoRefresh={true}
-                  />
-                )}
+                {/* Actions */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
 
-                {/* Actions (vos actions existantes) */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Actions</h3>
-                  
                   <div className="space-y-3">
-                    {schedule.status === 'scheduled' && (
+                    {schedule.status === "scheduled" && (
                       <button
                         onClick={handleConfirmSchedule}
                         disabled={actionLoading === "confirm"}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                       >
                         {actionLoading === "confirm" ? (
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -600,11 +736,13 @@ const InterviewScheduleDetailPage = () => {
                       </button>
                     )}
 
-                    {InterviewSchedulingService.canBeStarted(schedule) && timeInfo.canStart && (
+                    {
+                    InterviewSchedulingService.canBeStarted(schedule) && timeInfo.canStart && 
+                    (
                       <button
-                        onClick={handleStartInterview}
+                        onClick={()=>{handleStartInterview(),(window.location.href = `${schedule.meet_link}`)}}
                         disabled={actionLoading === "start"}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                       >
                         {actionLoading === "start" ? (
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -615,11 +753,33 @@ const InterviewScheduleDetailPage = () => {
                       </button>
                     )}
 
+                    {schedule.status === "completed" && (
+                      <Link
+                        href={`/interviews/scheduled/${schedule.id}/coding-results`}
+                        className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Voir les résultats
+                      </Link>
+                    )}
+
+                    {schedule.coding_exercises &&
+                      schedule.coding_exercises.assigned &&
+                      schedule.coding_exercises.progress  && (
+                        <Link
+                          href={`/interviews/schedule/${schedule.id}/coding-results`}
+                          className="w-full flex items-center justify-center px-4 py-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                        >
+                          <Code className="h-4 w-4 mr-2" />
+                          Résultats de codage
+                        </Link>
+                      )}
+
                     {InterviewSchedulingService.canBeModified(schedule) && (
                       <>
                         <Link
-                          href={`/interviews/scheduled/${schedule.id}/edit`}
-                          className="w-full flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                          href={`/interviews/schedule/${schedule.id}/edit`}
+                          className="w-full flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                         >
                           <Edit3 className="h-4 w-4 mr-2" />
                           Modifier
@@ -628,7 +788,7 @@ const InterviewScheduleDetailPage = () => {
                         <button
                           onClick={handleMarkAsNoShow}
                           disabled={actionLoading === "no_show"}
-                          className="w-full flex items-center justify-center px-4 py-2 bg-orange-100 text-orange-700 rounded-md hover:bg-orange-200 transition-colors disabled:opacity-50"
+                          className="w-full flex items-center justify-center px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors disabled:opacity-50"
                         >
                           {actionLoading === "no_show" ? (
                             <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -641,7 +801,7 @@ const InterviewScheduleDetailPage = () => {
                         <button
                           onClick={handleCancelSchedule}
                           disabled={actionLoading === "cancel"}
-                          className="w-full flex items-center justify-center px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors disabled:opacity-50"
+                          className="w-full flex items-center justify-center px-4 py-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
                         >
                           {actionLoading === "cancel" ? (
                             <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -655,8 +815,51 @@ const InterviewScheduleDetailPage = () => {
                   </div>
                 </div>
 
-                {/* ... VOS AUTRES SECTIONS EXISTANTES ... */}
-                {/* Informations système, Statut d'avancement, etc. */}
+                {/* Informations système */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations système</h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-gray-500">ID de planification</p>
+                      <p className="font-mono text-sm text-gray-900">{schedule.id}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Créé le</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(schedule.created_at).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Dernière modification</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(schedule.updated_at).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+
+                    {schedule.recruiter && (
+                      <div>
+                        <p className="text-sm text-gray-500">Recruteur</p>
+                        <p className="text-sm text-gray-900">{schedule.recruiter.name}</p>
+                        <p className="text-xs text-gray-600">{schedule.recruiter.email}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

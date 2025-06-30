@@ -18,7 +18,8 @@ import {
   ExternalLink,
   Clock,
   Award,
-  Brain
+  Brain,
+  Video
 } from 'lucide-react';
 import { JobService } from '@/services/jobs-service';
 import { ApplicationCVAnalysisService } from '@/services/application-cv-analysis-service';
@@ -454,7 +455,15 @@ export default function ApplicationDetailPage() {
                         </button>
                       </>
                     )}
-
+                    {(application.status == "hired" || application.status == "new" &&
+                      <Link
+                         href={`/interviews/schedule?applicationId=${application.id}&jobId=${jobId}&candidateName=${encodeURIComponent(application.candidate_name)}&candidateEmail=${encodeURIComponent(application.candidate_email)}&jobTitle=${encodeURIComponent(application.job_posting.title || '')}&jobDesc=${encodeURIComponent(application.job_posting?.description || '')}&cv_file_path=${encodeURIComponent(application?.resume_url || '')}&candidateTel=${encodeURIComponent(application.candidate_phone || '')}`}
+                         className="flex items-center justify-center w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700"
+                       >
+                         <Video className="h-4 w-4 mr-2" />
+                         Programmer l'entretien
+                       </Link>
+                        )}
                     <Link
                       href={`/jobs/${application.job_posting.id}`}
                       className="flex items-center justify-center w-full px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700"
@@ -510,7 +519,8 @@ export default function ApplicationDetailPage() {
                           placeholder="Ajouter des notes sur cette candidature..."
                         />
                       </div>
-
+                      {/* Programmer l'entretien */}
+                      
                       <div className="flex space-x-2">
                         <button
                           onClick={handleStatusUpdate}

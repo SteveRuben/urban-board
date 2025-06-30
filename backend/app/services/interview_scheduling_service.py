@@ -1,7 +1,8 @@
 # backend/services/interview_scheduling_service.py
 from datetime import datetime, timedelta
 import uuid
-
+from ..models.user_exercise import UserExercise
+from flask import current_app
 from ..services.teams_service import TeamsService
 from ..models.interview_scheduling import InterviewSchedule
 from ..services.notification_service import NotificationService
@@ -11,6 +12,7 @@ from ..services.subscription_service import SubscriptionService
 from ..services.meet_service import MeetService
 from app import db
 from ..services.avatar_service import get_avatar_service
+from ..services.interview_exercise_service import InterviewExerciseService
 
 
 class InterviewSchedulingService:
@@ -30,6 +32,7 @@ class InterviewSchedulingService:
         self.subscription_service = SubscriptionService()
         self.meet_service = MeetService()
         self.teams_service = TeamsService()
+        self.exercise_service = InterviewExerciseService()
 
     
     def _validate_mode(self, mode):
@@ -240,13 +243,69 @@ class InterviewSchedulingService:
         # Sauvegarder d'abord pour avoir un ID
         db.session.add(schedule)
         db.session.flush()  # Pour obtenir l'ID sans commit complet
-        
+        print('debut programmtion...................10')
         # Créer le meeting Google Calendar
         meeting_success = self._create_or_update_meeting(schedule, is_update=False)
+        user_exercise = None
+        exercises_created = False
+        exercise_creation_error = None
+        print('debut programmtion...................11')
+        try:
+            # Vérifier si des exercices spécifiques sont demandés
+            custom_exercise_ids = data.get('exercise_ids', [])
+            
+            if custom_exercise_ids:
+                # Utiliser les exercices spécifiés
+                user_exercise = self.exercise_service.create_user_exercise_session(
+                    interview_schedule_id=schedule.id,
+                    candidate_email=schedule.candidate_email,
+                    candidate_name=schedule.candidate_name,
+                    position=schedule.position,
+                    scheduled_at=schedule.scheduled_at,
+                    description=schedule.description,
+                    custom_exercise_ids=custom_exercise_ids,
+                    time_limit_minutes=data.get('coding_time_limit', 120)
+                )
+                print('debut programmtion...................13')
+                exercises_created = True
+            else:
+                # Sélection automatique d'exercices basée sur le poste
+                selected_exercises, keywords = self.exercise_service.select_exercises_for_interview(
+                    position=schedule.position,
+                    description=schedule.description,
+                    difficulty=data.get('coding_difficulty', 'intermediate'),
+                    count=data.get('exercise_count', 4)
+                )
+                print('debut programmtion...................14')
+                if selected_exercises:
+                    # Créer la session d'exercices
+                    user_exercise = self.exercise_service.create_user_exercise_session(
+                        interview_schedule_id=schedule.id,
+                        candidate_email=schedule.candidate_email,
+                        candidate_name=schedule.candidate_name,
+                        position=schedule.position,
+                        scheduled_at=schedule.scheduled_at,
+                        description=schedule.description,
+                        custom_exercise_ids=[ex.id for ex in selected_exercises],
+                        time_limit_minutes=data.get('coding_time_limit', 120)
+                    )
+                    print('debut programmtion...................15')
+                    exercises_created = True
+                    
+                    print(f"✅ {len(selected_exercises)} exercices sélectionnés automatiquement pour {schedule.candidate_name}")
+                    print(f"   Mots-clés utilisés: {', '.join(keywords)}")
+                    print(f"   Exercices: {[ex.title for ex in selected_exercises]}")
+                else:
+                    print(f"⚠️ Aucun exercice trouvé pour le poste: {schedule.position}")
+                    exercise_creation_error = f"Aucun exercice disponible pour le poste '{schedule.position}'. Veuillez créer des exercices appropriés."
+                print('debut programmtion...................16')            
+        except Exception as e:
+            print(f"❌ Erreur lors de la création des exercices: {str(e)}")
+            exercise_creation_error = str(e)
         
         # Commit final
         db.session.commit()
-        
+        print('debut programmtion...................17')
         avatar_scheduled = False
         if schedule.mode in ['autonomous', 'collaborative']:
             avatar_service = get_avatar_service()
@@ -267,16 +326,28 @@ class InterviewSchedulingService:
                 avatar_scheduled = result['success']
                 if avatar_scheduled:
                     print(f"🤖 Avatar programmé automatiquement pour {schedule.id}")
-        
+        print('debut programmtion...................18')
         # Enregistrer dans les logs d'audit
+        audit_description = f"Entretien {mode} planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}"
+        if meeting_success:
+            audit_description += f" - Meeting créé: {schedule.meet_link}"
+        if exercises_created:
+            audit_description += f" - {len(user_exercise.exercise_ids)} exercices de coding assignés"
+        elif exercise_creation_error:
+            audit_description += f" - Erreur exercices: {exercise_creation_error}"
+            
         self.audit_service.log_action(
             organization_id=organization_id,
             user_id=recruiter_id,
             action='create',
             entity_type='interview_schedule',
             entity_id=schedule.id,
-            description=f"Entretien {mode} planifié avec {schedule.candidate_name} pour le {schedule.scheduled_at}" +
-                        (f" - Meeting créé: {schedule.meet_link}" if meeting_success else " - Erreur création meeting")
+            description=audit_description,
+            metadata={
+                'exercises_created': exercises_created,
+                'exercise_count': len(user_exercise.exercise_ids) if user_exercise else 0,
+                'exercise_creation_error': exercise_creation_error
+            }
         )
         
         print(f"Schedule créé avec access_token: {schedule.access_token}")
@@ -286,6 +357,7 @@ class InterviewSchedulingService:
         # Envoyer les notifications
         try:
             # Notification au recruteur
+            print('debut programmtion...................20')
             self.notification_service.create_interview_scheduled_notification(
                 recruiter_id=recruiter_id,
                 schedule_data={
@@ -293,12 +365,18 @@ class InterviewSchedulingService:
                     'scheduled_at': schedule.scheduled_at.strftime("%d/%m/%Y à %H:%M"),
                     'schedule_id': schedule.id,
                     'mode': mode,
-                    'meet_link': schedule.meet_link
+                    'meet_link': schedule.meet_link,
+                    'exercises_created': exercises_created,
+                    'exercise_count': len(user_exercise.exercise_ids) if user_exercise else 0
                 }
             )
             meeting_link = schedule.meet_link if schedule.meet_link else None
-
-            
+            print('debut programmtion...................21')
+            if user_exercise:
+                # Générer le lien vers les exercices de coding
+                base_url = current_app.config.get('FRONTEND_URL', 'https://recruteai.com')
+                coding_link = f"{base_url}/candidate/coding/{user_exercise.access_token}"
+            print('debut programmtion...................22')
             email_sent = self.notification_service.email_service.send_interview_invitation(
                 email=schedule.candidate_email,
                 candidate_name=schedule.candidate_name,
@@ -309,8 +387,11 @@ class InterviewSchedulingService:
                 timezone=schedule.timezone,
                 access_token=schedule.access_token,
                 description=schedule.description,
-                meet_link=meeting_link
+                meet_link=meeting_link,
+                coding_link=coding_link,  # NOUVEAU
+                coding_exercises_count=len(user_exercise.exercise_ids) if user_exercise else 0  
             )
+            print('debut programmtion...................23')
         
             # Log de l'envoi d'email
             self.audit_service.log_action(
@@ -323,7 +404,9 @@ class InterviewSchedulingService:
                 metadata={
                     'email_sent': email_sent,
                     'has_response_buttons': True,
-                    'candidate_email': schedule.candidate_email
+                    'candidate_email': schedule.candidate_email,
+                    'includes_coding_link': coding_link is not None,
+                    'exercise_count': len(user_exercise.exercise_ids) if user_exercise else 0
                 }
             )
             
@@ -352,6 +435,78 @@ class InterviewSchedulingService:
             'meeting_active': avatar_status.get('meeting_active', False),
             'scheduled_launch': avatar_status.get('launch_time'),
             'launch_time': avatar_status.get('data', {}).get('started_at')
+        }
+    
+    def get_schedule_with_response_info(self, schedule_id):
+        """
+        NOUVELLE MÉTHODE: Récupère les informations complètes d'un entretien avec les exercices
+        
+        Args:
+            schedule_id: ID de l'entretien
+            
+        Returns:
+            Dictionnaire avec toutes les informations de l'entretien
+        """
+        schedule = InterviewSchedule.query.get(schedule_id)
+        if not schedule:
+            raise ValueError("Entretien non trouvé")
+        
+        # Récupérer les informations de base
+        schedule_data = schedule.to_dict()
+        print('debut programmtion...................5')
+        # Récupérer les exercices associés
+        user_exercises = UserExercise.query.filter_by(
+            interview_schedule_id=schedule_id
+        ).all()
+        print('debut programmtion...................6')
+        if user_exercises:
+            user_exercise = user_exercises[0] 
+            schedule_data['coding_exercises'] = {
+                'assigned': True,
+                'access_token': user_exercise.access_token,
+                'exercise_count': len(user_exercise.exercise_ids),
+                'status': user_exercise.status,
+                'available_from': user_exercise.available_from.isoformat(),
+                'expires_at': user_exercise.expires_at.isoformat(),
+                'time_limit_minutes': user_exercise.time_limit_minutes,
+                'progress': {
+                    'completed': user_exercise.exercises_completed,
+                    'total': user_exercise.total_exercises,
+                    'percentage': user_exercise.calculate_progress_percentage()
+                }
+            }
+        else:
+            schedule_data['coding_exercises'] = {
+                'assigned': False,
+                'reason': 'Aucun exercice assigné pour cet entretien'
+            }
+        
+        return schedule_data
+    
+    def get_available_exercises_for_position(self, position: str,  difficulty: str, description: str = None):
+        """
+        NOUVELLE MÉTHODE: Récupère les exercices disponibles pour un poste donné
+        
+        Args:
+            position: Titre du poste
+            description: Description du poste
+            
+        Returns:
+            Liste des exercices disponibles avec scores de pertinence
+        """
+        keywords = self.exercise_service.extract_job_keywords(position, description)
+        exercises = self.exercise_service.find_suitable_exercises(keywords, difficulty, 20)
+        
+        return {
+            'keywords_extracted': keywords,
+            'exercises': [
+                {
+                    **ex.to_dict(),
+                    'relevance_score': self.exercise_service._calculate_exercise_relevance(ex, keywords)
+                }
+                for ex in exercises
+            ],
+            'total_found': len(exercises)
         }
     
     def update_schedule(self, schedule_id, recruiter_id, data):
@@ -1115,94 +1270,94 @@ class InterviewSchedulingService:
             return False
     
 
-    def get_schedule_with_response_info(self, schedule_id):
-        """
-        Récupère une planification avec toutes les infos (email + avatar)
-        """
-        try:
-            schedule = InterviewSchedule.query.get(schedule_id)
-            if not schedule:
-                return None
+    # def get_schedule_with_response_info(self, schedule_id):
+    #     """
+    #     Récupère une planification avec toutes les infos (email + avatar)
+    #     """
+    #     try:
+    #         schedule = InterviewSchedule.query.get(schedule_id)
+    #         if not schedule:
+    #             return None
             
-            # Données de base
-            schedule_data = schedule.to_dict()
+    #         # Données de base
+    #         schedule_data = schedule.to_dict()
             
-            # 🆕 AJOUTER LES INFOS AVATAR AUTOMATIQUEMENT
-            if schedule.mode in ['autonomous', 'collaborative']:
-                try:
-                    from ..services.avatar_service import get_avatar_service
-                    avatar_service = get_avatar_service()
+    #         # 🆕 AJOUTER LES INFOS AVATAR AUTOMATIQUEMENT
+    #         if schedule.mode in ['autonomous', 'collaborative']:
+    #             try:
+    #                 from ..services.avatar_service import get_avatar_service
+    #                 avatar_service = get_avatar_service()
                     
-                    if avatar_service:
-                        print(f"🔍 Récupération avatar status pour {schedule_id}")
-                        avatar_status = avatar_service.get_avatar_status(schedule_id)
+    #                 if avatar_service:
+    #                     print(f"🔍 Récupération avatar status pour {schedule_id}")
+    #                     avatar_status = avatar_service.get_avatar_status(schedule_id)
                         
-                        # Formater les infos avatar
-                        if avatar_status and avatar_status.get('status') != 'not_found':
-                            avatar_info = {
-                                'available': True,
-                                'status': avatar_status.get('status', 'scheduled'),
-                                'mode': avatar_status.get('mode', 'simulation'),
-                                'browser_running': avatar_status.get('browser_running', False),
-                                'meeting_active': avatar_status.get('meeting_active', False),
-                                'scheduled_launch': avatar_status.get('launch_time'),
-                                'launch_time': avatar_status.get('data', {}).get('started_at')
-                            }
+    #                     # Formater les infos avatar
+    #                     if avatar_status and avatar_status.get('status') != 'not_found':
+    #                         avatar_info = {
+    #                             'available': True,
+    #                             'status': avatar_status.get('status', 'scheduled'),
+    #                             'mode': avatar_status.get('mode', 'simulation'),
+    #                             'browser_running': avatar_status.get('browser_running', False),
+    #                             'meeting_active': avatar_status.get('meeting_active', False),
+    #                             'scheduled_launch': avatar_status.get('launch_time'),
+    #                             'launch_time': avatar_status.get('data', {}).get('started_at')
+    #                         }
                             
-                            # Ajouter infos questions si avatar actif
-                            questions_info = avatar_status.get('questions_info', {})
-                            if questions_info:
-                                avatar_info['questions'] = {
-                                    'total': questions_info.get('total_questions', 0),
-                                    'asked': questions_info.get('asked_questions', 0),
-                                    'next_in_seconds': questions_info.get('next_question_in')
-                                }
-                        else:
-                            # 🎯 AVATAR PROGRAMMÉ MAIS PAS ENCORE VISIBLE
-                            avatar_info = {
-                                'available': True,
-                                'status': 'scheduled',
-                                'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
-                                'browser_running': False,
-                                'meeting_active': False,
-                                'scheduled_launch': (schedule.scheduled_at - timedelta(minutes=2)).isoformat(),
-                                'note': 'Avatar programmé automatiquement'
-                            }
+    #                         # Ajouter infos questions si avatar actif
+    #                         questions_info = avatar_status.get('questions_info', {})
+    #                         if questions_info:
+    #                             avatar_info['questions'] = {
+    #                                 'total': questions_info.get('total_questions', 0),
+    #                                 'asked': questions_info.get('asked_questions', 0),
+    #                                 'next_in_seconds': questions_info.get('next_question_in')
+    #                             }
+    #                     else:
+    #                         # 🎯 AVATAR PROGRAMMÉ MAIS PAS ENCORE VISIBLE
+    #                         avatar_info = {
+    #                             'available': True,
+    #                             'status': 'scheduled',
+    #                             'mode': 'simulation' if avatar_service.simulation_mode else 'ai',
+    #                             'browser_running': False,
+    #                             'meeting_active': False,
+    #                             'scheduled_launch': (schedule.scheduled_at - timedelta(minutes=2)).isoformat(),
+    #                             'note': 'Avatar programmé automatiquement'
+    #                         }
                             
-                        schedule_data['avatar'] = avatar_info
-                        print(f"✅ Avatar info ajoutée: {avatar_info['status']}")
+    #                     schedule_data['avatar'] = avatar_info
+    #                     print(f"✅ Avatar info ajoutée: {avatar_info['status']}")
                         
-                    else:
-                        # Service non disponible
-                        schedule_data['avatar'] = {
-                            'available': False,
-                            'status': 'service_unavailable',
-                            'error': 'Service avatar non disponible'
-                        }
-                        print("⚠️ Service avatar non disponible")
+    #                 else:
+    #                     # Service non disponible
+    #                     schedule_data['avatar'] = {
+    #                         'available': False,
+    #                         'status': 'service_unavailable',
+    #                         'error': 'Service avatar non disponible'
+    #                     }
+    #                     print("⚠️ Service avatar non disponible")
                         
-                except Exception as e:
-                    print(f"❌ Erreur récupération avatar: {e}")
-                    schedule_data['avatar'] = {
-                        'available': False,
-                        'status': 'error',
-                        'error': str(e)
-                    }
-            can_respond = self.can_candidate_respond(schedule_id)
-            # response_history = self.get_candidate_response_history(schedule_id)
+    #             except Exception as e:
+    #                 print(f"❌ Erreur récupération avatar: {e}")
+    #                 schedule_data['avatar'] = {
+    #                     'available': False,
+    #                     'status': 'error',
+    #                     'error': str(e)
+    #                 }
+    #         can_respond = self.can_candidate_respond(schedule_id)
+    #         # response_history = self.get_candidate_response_history(schedule_id)
             
-            schedule_data.update({
-                'can_candidate_respond': can_respond,
-                # 'response_history': response_history,
-                'was_confirmed_by_candidate': schedule.status == 'confirmed',
-                'was_canceled_by_candidate': schedule.status == 'canceled' and 'candidat' in (schedule.cancellation_reason or '').lower()
-            })
+    #         schedule_data.update({
+    #             'can_candidate_respond': can_respond,
+    #             # 'response_history': response_history,
+    #             'was_confirmed_by_candidate': schedule.status == 'confirmed',
+    #             'was_canceled_by_candidate': schedule.status == 'canceled' and 'candidat' in (schedule.cancellation_reason or '').lower()
+    #         })
            
-            return schedule_data
+    #         return schedule_data
             
-        except Exception as e:
-            print(f"❌ Erreur get_schedule_with_response_info: {e}")
-            return None
+    #     except Exception as e:
+    #         print(f"❌ Erreur get_schedule_with_response_info: {e}")
+    #         return None
     
     def get_schedule_by_id(self, schedule_id, include_avatar=True):
         """

@@ -29,7 +29,7 @@ export interface InterviewSchedule {
   reminder_sent?: boolean;
   organization_id: string;
   recruiter_id: string;
-  
+  meet_link: string;
   was_confirmed_by_candidate: boolean;
   was_canceled_by_candidate: boolean;
   candidate_response_date?: string; // ISO date string
@@ -55,7 +55,6 @@ export interface InterviewSchedule {
     name: string;
   };
 
-  avatar?: AvatarStatus;
 
 }
 
@@ -124,6 +123,14 @@ export interface InterviewScheduleFormData {
   ai_assistant_id?: string;
   predefined_questions?: string[];
   job_id?: string
+}
+
+export interface InterviewScheduleFormDataWithExercises extends InterviewScheduleFormData {
+  exercise_ids?: string[];
+  coding_difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  coding_time_limit?: number;
+  exercise_count?: number;
+  auto_select_exercises?: boolean;
 }
 
 export interface InterviewScheduleUpdateData {
@@ -382,4 +389,71 @@ export interface ErrorDetails {
   details?: any;
   actionable?: boolean;
   suggestions?: string[];
+}
+
+
+export interface ExerciseSuggestion {
+  id: string;
+  title: string;
+  description?: string;
+  language: string;
+  difficulty: string;
+  challenge_count: number;
+  relevance_score?: number;
+}
+
+export interface CodingExerciseInfo {
+  assigned: boolean;
+  access_token?: string;
+  exercise_count?: number;
+  status?: string;
+  available_from?: string;
+  expires_at?: string;
+  time_limit_minutes?: number;
+  progress?: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+  reason?: string;
+}
+
+
+
+export interface InterviewScheduleWithExercises extends InterviewSchedule {
+  coding_exercises?: CodingExerciseInfo;
+}
+
+export interface ExerciseSuggestionsRequest {
+  position: string;
+  description?: string;
+  difficulty?: string;
+}
+
+export interface ExerciseSuggestionsResponse {
+  keywords_extracted: string[];
+  exercises: ExerciseSuggestion[];
+  total_found: number;
+}
+
+export interface AssignExercisesRequest {
+  exercise_ids: string[];
+  time_limit_minutes?: number;
+}
+
+export interface UserExerciseSession {
+  id: string;
+  interview_schedule_id: string;
+  candidate_email: string;
+  candidate_name: string;
+  exercise_ids: string[];
+  access_token: string;
+  status: string;
+  position: string;
+  available_from: string;
+  expires_at: string;
+  time_limit_minutes: number;
+  total_exercises: number;
+  exercises_completed: number;
+  total_score: number;
 }

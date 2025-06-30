@@ -580,7 +580,7 @@ export default function JobApplicationsPage() {
 
                           {/* Programmer l'entretien */}
                           <Link
-                            href={`/interviews/schedule?applicationId=${application.id}&jobId=${jobId}&candidateName=${encodeURIComponent(application.candidate_name)}&candidateEmail=${encodeURIComponent(application.candidate_email)}&jobTitle=${encodeURIComponent(jobPosting?.title || '')}&jobDesc=${encodeURIComponent(jobPosting?.description || '')}&cv_file_path=${encodeURIComponent(application?.resume_url || '')}`}
+                            href={`/interviews/schedule?applicationId=${application.id}&jobId=${jobId}&candidateName=${encodeURIComponent(application.candidate_name)}&candidateEmail=${encodeURIComponent(application.candidate_email)}&jobTitle=${encodeURIComponent(jobPosting?.title || '')}&jobDesc=${encodeURIComponent(jobPosting?.description || '')}&cv_file_path=${encodeURIComponent(application?.resume_url || '')}&candidateTel=${encodeURIComponent(application.candidate_phone || '')}`}
                             className="flex items-center justify-center w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700"
                           >
                             <Video className="h-4 w-4 mr-2" />

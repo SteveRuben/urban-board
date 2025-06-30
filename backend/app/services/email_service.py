@@ -28,7 +28,7 @@ class EmailService:
             autoescape=select_autoescape(['html', 'xml'])
         )
     
-    def send_email(self, to_email, subject, template_name, context={}, attachments=None):
+    def  send_email(self, to_email, subject, template_name, context={}, attachments=None):
         """
         Envoie un email avec un template HTML
         
@@ -45,7 +45,7 @@ class EmailService:
         try:
             # RECHARGEMENT FORCÉ des templates
             template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'emails')
-            
+            print('je vois seulement que le film ici',4444444)
             # Nouveau loader à chaque fois
             loader = FileSystemLoader(template_dir)
             jinja_env = Environment(
@@ -54,7 +54,8 @@ class EmailService:
             )
             
             print(f"🔄 Rechargement template {template_name} depuis {template_dir}")
-            
+            print('je vois seulement que le film ici',4444445)
+
             # Charger le template HTML
             html_template = self.jinja_env.get_template(f"{template_name}.html")
             text_template = self.jinja_env.get_template(f"{template_name}.txt")
@@ -96,7 +97,8 @@ class EmailService:
     
     
     def send_interview_invitation(self, email, candidate_name, interview_title, recruiter_name, 
-                             scheduled_at, duration_minutes, timezone, access_token, description=None, meet_link=None):
+                             scheduled_at, duration_minutes, timezone, access_token, description=None, meet_link=None,
+                             coding_link=None, coding_exercises_count=0):
         """Envoie une invitation à un entretien avec boutons de réponse"""
         print('..........135..............')
         subject = f"Invitation: {interview_title}"
@@ -112,7 +114,7 @@ class EmailService:
             interview_url = f"{base_url}/interviews/join/{access_token}"
             meeting_type = "application"
     
-        
+        print('debut programmtion...................25')
         
         
         # Générer les URLs de réponse candidat
@@ -127,7 +129,7 @@ class EmailService:
         
         confirm_url = f"{base_url_backend}/candidate/interview/{access_token}/confirm/{confirm_hash}"
         cancel_url = f"{base_url_backend}/candidate/interview/{access_token}/cancel/{cancel_hash}"
-        
+        print('debut programmtion...................26')
         # Formater la date pour l'affichage
         formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
         print('..........9..............')
@@ -142,10 +144,18 @@ class EmailService:
             'timezone': timezone,
             'description': description,
             'interview_url': interview_url,
-            'meeting_type': meeting_type,  # NOUVEAU: Type de meeting
+            'meeting_type': meeting_type, 
             'has_google_meet': bool(meet_link),
             'confirm_url': confirm_url,
             'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'coding_available_info': {
+                'available_before_interview': "1 heure avant l'entretien",
+                'expires_after_interview': "2 heures après l'entretien",
+                'time_limit': "2 heures maximum"
+            },
             'add_to_calendar_url': self._generate_calendar_link(
                 interview_title, description, scheduled_at, duration_minutes, timezone
             )
@@ -154,7 +164,8 @@ class EmailService:
         return self.send_email(email, subject, 'interview_invitation', context)
     
     def send_interview_reminder(self, email, candidate_name, interview_title, recruiter_name, 
-                           scheduled_at, duration_minutes, timezone, access_token, meet_link=None):
+                           scheduled_at, duration_minutes, timezone, access_token, meet_link=None
+                           ,coding_link=None, coding_exercises_count=0):
         """Envoie un rappel d'entretien avec boutons de réponse"""
         subject = f"Rappel: Votre entretien {interview_title} demain"
         
@@ -192,14 +203,19 @@ class EmailService:
             'timezone': timezone,
             'interview_url': interview_url,
             'confirm_url': confirm_url,
-            'cancel_url': cancel_url
+            'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'is_reminder': True
         }
         
         return self.send_email(email, subject, 'interview_reminder', context)
 
     
     def send_interview_rescheduled(self, email, candidate_name, interview_title, recruiter_name, 
-                              scheduled_at, duration_minutes, timezone, access_token,meet_link=None):
+                              scheduled_at, duration_minutes, timezone, access_token,meet_link=None,
+                              coding_link=None, coding_exercises_count=0):
         """Envoie une notification de reprogrammation d'entretien avec boutons de réponse"""
         subject = f"Modification: Votre entretien {interview_title} a été reprogrammé"
 
@@ -238,12 +254,44 @@ class EmailService:
             'interview_url': interview_url,
             'confirm_url': confirm_url,
             'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'is_rescheduled': True,
             'add_to_calendar_url': self._generate_calendar_link(
                 interview_title, None, scheduled_at, duration_minutes, timezone
             )
         }
 
         return self.send_email(email, subject, 'interview_rescheduled', context)
+    
+    def send_coding_exercises_reminder(self, email, candidate_name, interview_title, 
+                                     coding_link, coding_exercises_count, scheduled_at):
+        """
+        Envoie un rappel spécifique pour les exercices de coding
+        
+        Args:
+            email: Email du candidat
+            candidate_name: Nom du candidat
+            interview_title: Titre de l'entretien
+            coding_link: Lien vers les exercices
+            coding_exercises_count: Nombre d'exercices
+            scheduled_at: Date de l'entretien
+        """
+        subject = f"Exercices de préparation pour votre entretien {interview_title}"
+        
+        formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
+        
+        context = {
+            'candidate_name': candidate_name,
+            'interview_title': interview_title,
+            'scheduled_at': formatted_date,
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'coding_only': True  # Template spécial pour exercices uniquement
+        }
+        
+        return self.send_email(email, subject, 'coding_exercises_reminder', context)
     
     def send_interview_canceled(self, email, candidate_name, interview_title, recruiter_name, reason=None):
         """Envoie une notification d'annulation d'entretien"""

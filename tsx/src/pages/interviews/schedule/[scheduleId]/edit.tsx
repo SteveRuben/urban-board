@@ -221,7 +221,7 @@ const EditInterviewSchedulePage = () => {
     if (hasChanges && !confirm("Êtes-vous sûr de vouloir annuler les modifications ?")) {
       return
     }
-    router.push(`/interviews/scheduled/${scheduleId}`)
+    router.push(`/interviews/schedule/${scheduleId}`)
   }
 
   // Obtenir un label pour le type d'assistant
@@ -338,7 +338,7 @@ const EditInterviewSchedulePage = () => {
             {/* En-tête */}
             <div className="mb-8">
               <Link
-                href={`/interviews/scheduled/${scheduleId}`}
+                href={`/interviews/schedule/${scheduleId}`}
                 className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4 bg-white px-3 py-1.5 rounded-full shadow-sm transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />

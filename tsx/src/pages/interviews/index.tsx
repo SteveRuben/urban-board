@@ -359,7 +359,7 @@ const InterviewsIndexPage = () => {
                               <button
                                 onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                   e.stopPropagation();
-                                  router.push(`/interviews/scheduled/${schedule.id}`);
+                                  router.push(`/interviews/schedule/${schedule.id}`);
                                 }}
                                 className="text-indigo-600 hover:text-indigo-900"
                               >

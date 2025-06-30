@@ -1267,7 +1267,7 @@ class NotificationService:
                 email=schedule.candidate_email,
                 candidate_name=schedule.candidate_name,
                 interview_title=schedule.title,
-                recruiter_name=schedule.recruiter.name if schedule.recruiter else 'Le recruteur',
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Le recruteur',
                 reason=reason
             )
         except Exception as e:

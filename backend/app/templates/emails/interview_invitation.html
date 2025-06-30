@@ -53,7 +53,35 @@
             <a href="{{ confirm_url }}" class="btn btn-success">✅ Confirmer ma présence</a>
             <a href="{{ cancel_url }}" class="btn btn-danger">❌ Annuler</a>
         </div>
-        
+        {% if has_coding_exercises %}
+        <div class="coding-section">
+            <h3>
+                <span class="coding-icon">&lt;/&gt;</span>
+                💻 Exercices de coding préparatoires
+            </h3>
+            <p>En préparation de votre entretien, nous avons préparé <strong>{{ coding_exercises_count }} exercice{% if coding_exercises_count > 1 %}s{% endif %} de coding</strong> spécialement sélectionné{% if coding_exercises_count > 1 %}s{% endif %} pour évaluer vos compétences techniques.</p>
+            
+            <div class="exercise-info">
+                <h4>📋 Informations importantes :</h4>
+                <ul>
+                    <li><strong>Accès :</strong> {{ coding_available_info.available_before_interview }}</li>
+                    <li><strong>Expiration :</strong> {{ coding_available_info.expires_after_interview }}</li>
+                    <li><strong>Temps limite :</strong> {{ coding_available_info.time_limit }}</li>
+                    <li><strong>Format :</strong> Exercices interactifs en ligne avec tests automatisés</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{{ coding_link }}" class="button btn-success">
+                    🚀 Accéder aux exercices de coding
+                </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #059669; margin-top: 15px;">
+                <strong>💡 Conseil :</strong> Nous vous recommandons de compléter ces exercices avant l'entretien pour optimiser notre temps ensemble et nous permettre de mieux évaluer votre profil technique.
+            </p>
+        </div>
+        {% endif %}
         <div class="info-box">
             <h3>🔗 Accès à l'entretien</h3>
             <p>Le jour de l'entretien, vous pourrez accéder à la salle virtuelle via ce lien :</p>
