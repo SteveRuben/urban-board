@@ -17,7 +17,7 @@
     "lucide-react": "^0.503.0",
     "marked": "^15.0.10",
     "multiparty": "^4.2.3",
-    "next": "15.3.1",
+    "next": "15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.8",
