@@ -133,7 +133,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ userRole = 'recruiter', s
       access: hasAccess('ai_assistants') || true, // Temporairement accessible à tous pour le développement
       submenu: [
         { name: 'Mes assistants', href: '/ai-assistants' },
-        { name: 'Créer un assistant', href: '/ai-assistants/create' },
+        { name: 'Créer un assistant', href: '/ai-assistants/new' },
         { name: 'Galerie de modèles', href: '/ai-assistants/gallery' }
       ]
     },

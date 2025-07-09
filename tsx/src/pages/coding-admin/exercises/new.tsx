@@ -153,7 +153,7 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
             {/* En-tête */}
             <div className="flex items-center mb-8">
               <Link
-                href="/admin/exercises"
+                href="/coding-admin/exercises"
                 className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
               >
                 <ArrowLeft className="h-5 w-5 mr-2" />

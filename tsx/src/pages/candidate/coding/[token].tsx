@@ -276,6 +276,7 @@ const CandidateCodingPage: NextPageWithLayout = () => {
             const progressPromises = challengeDetails.steps.map(async (step: any) => {
               try {
                 const progressData = await CandidateExerciseService.loadProgress(token, challenge.id, step.id);
+                console.log('MyProgressDaat',progressData)
                 return {
                   stepId: step.id,
                   progress: progressData
@@ -294,20 +295,20 @@ const CandidateCodingPage: NextPageWithLayout = () => {
             // Construire l'objet de progression comme dans la page challenge
             allProgress.forEach(({ stepId, progress }) => {
               totalSteps++;
-              if (progress && progress.data) {
+              if (progress) {
                 attempted = true;
                 challengeHasProgress = true;
                 
                 stepsProgress[stepId] = {
                   step_id: stepId,
                   challenge_id: challenge.id,
-                  is_completed: progress.data.is_completed || false,
-                  tests_passed: progress.data.tests_passed || 0,
-                  tests_total: progress.data.tests_total || 0,
-                  last_submission: progress.data.last_edited
+                  is_completed: progress.is_completed || false,
+                  tests_passed: progress.tests_passed || 0,
+                  tests_total: progress.tests_total || 0,
+                  last_submission: progress.last_edited
                 };
 
-                if (progress.data.is_completed || (progress.data.code && progress.data.code.trim().length > 0)) {
+                if (progress.is_completed ) {
                   completedSteps++;
                   challengeCompletedSteps++;
                 }

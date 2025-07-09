@@ -227,14 +227,14 @@ def start_challenge_for_candidate(access_token, challenge_id):
         # Utiliser l'email du candidat comme identifiant de session
         session_info = {
             'type': 'anonymous_id',
-            'value': user_exercise.candidate_email
+            'value': access_token
         }
         
         # Démarrer le challenge avec le service de coding platform
         user_challenge = coding_service.start_challenge(
             challenge_id,
             session_info,
-            user_exercise.candidate_email  # Utiliser l'email, pas le nom
+            access_token # Utiliser l'email, pas le nom
         )
         
         return jsonify({
@@ -440,7 +440,7 @@ def save_progress_for_candidate(access_token, challenge_id, step_id):
             return jsonify({'status': 'error', 'message': 'Code et langage requis'}), 400
         
         # Utiliser l'email comme session pour le service de coding
-        session_info = {'type': 'anonymous_id', 'value': user_exercise.candidate_email}
+        session_info = {'type': 'anonymous_id', 'value': access_token}
         
         # Sauvegarder le progrès
         progress = coding_service.save_step_progress(
@@ -462,7 +462,7 @@ def load_progress_for_candidate(access_token, challenge_id, step_id):
             return jsonify({'status': 'error', 'message': 'Accès non autorisé'}), 403
         
         # Utiliser l'email comme session pour le service de coding
-        session_info = {'type': 'anonymous_id', 'value': user_exercise.candidate_email}
+        session_info = {'type': 'anonymous_id', 'value': access_token}
         
         # Charger le progrès
         progress = coding_service.load_step_progress(

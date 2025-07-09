@@ -821,12 +821,12 @@ def admin_validate_code(step_id):
 @coding_platform_bp.route('/<access_token>/challenges/<challenge_id>/steps/<step_id>/submit', methods=['POST'])
 def submit_code(challenge_id, step_id,access_token):
     """Soumet le code pour évaluation contre les cas de test - supporte les utilisateurs anonymes"""
-    # Utiliser l'email comme session pour le service de coding
+
     user_exercise = exercise_service.get_user_exercise_by_token(access_token)
     if not user_exercise or not user_exercise.is_accessible():
         return jsonify({'status': 'error', 'message': 'Accès non autorisé'}), 403
        
-    session_info = {'type': 'anonymous_id', 'value': user_exercise.candidate_email}
+    session_info = {'type': 'anonymous_id', 'value': access_token}
         
     data = request.get_json()
     if not data or 'code' not in data or 'language' not in data:

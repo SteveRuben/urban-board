@@ -667,40 +667,7 @@ class NotificationService:
             if not self.file_mode:
                 self.db.session.rollback()
             return False
-    
-    def _send_notification(self, notification):
-        """
-        Envoie la notification par différents canaux selon sa configuration.
-        
-        Args:
-            notification (Notification): Notification à envoyer
-        """
-        try:
-            user_id = notification.user_id
-            notification_type = notification.type
-            
-            # Vérifier si l'email est activé pour ce type de notification
-            should_send_email = self._should_send_notification(user_id, notification_type, 'email')
-            
-            # Vérifier si les notifications mobiles sont activées
-            should_send_mobile = self._should_send_notification(user_id, notification_type, 'mobile')
-            
-            # Envoi d'email en temps réel si configuré
-            if should_send_email and self._should_send_realtime_email(user_id):
-                self._send_email_notification(notification)
-            
-            # Envoi de notification mobile si configuré
-            if should_send_mobile:
-                self._send_mobile_notification(notification)
-                
-            # TODO: Implémenter d'autres canaux si nécessaire:
-            # - Webhooks
-            # - Intégrations avec des services tiers comme Slack
-            
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"Erreur lors de l'envoi d'une notification: {str(e)}")
-    
+
     def _should_send_notification(self, user_id, notification_type, category):
         """
         Vérifie si une notification doit être envoyée selon les préférences utilisateur.

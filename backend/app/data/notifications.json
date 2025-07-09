@@ -1582,5 +1582,93 @@
     "reference_id": "5f83053e-ca2f-430d-9c24-1cb8811c902c",
     "read": false,
     "date": "2025-06-30T10:24:55.055716"
+  },
+  {
+    "id": "a7bc1093-2e9b-49ba-b5f2-13fbbd853557",
+    "user_id": "tia42164@gmail.com",
+    "type": "application_confirmation",
+    "title": "Confirmation de candidature - Developpeur Python",
+    "message": "Votre candidature pour le poste de Developpeur Python a \u00e9t\u00e9 re\u00e7ue avec succ\u00e8s.",
+    "link": "/applications/f8721687-7f3e-4636-9895-b6303c11d090",
+    "reference_id": "f8721687-7f3e-4636-9895-b6303c11d090",
+    "read": false,
+    "date": "2025-06-30T16:11:12.743489"
+  },
+  {
+    "id": "37a1da8e-fbf7-42ee-891f-c9fde7bcd624",
+    "user_id": "48706563-bfa7-4645-a332-5012bf1ce75b",
+    "type": "new_application",
+    "title": "Nouvelle candidature pour Developpeur Python",
+    "message": "fn a postul\u00e9 pour le poste de Developpeur Python.",
+    "link": "/dashboard/applications/f8721687-7f3e-4636-9895-b6303c11d090",
+    "reference_id": "f8721687-7f3e-4636-9895-b6303c11d090",
+    "read": false,
+    "date": "2025-06-30T16:11:17.534030"
+  },
+  {
+    "id": "1aa30822-9506-43b0-8c27-58cbb15e1e10",
+    "user_id": "48706563-bfa7-4645-a332-5012bf1ce75b",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 30/06/2025 \u00e0 16:14",
+    "link": "/interviews/scheduled/928c16fa-c505-4f25-b1d1-61d4d693cde4",
+    "reference_id": "928c16fa-c505-4f25-b1d1-61d4d693cde4",
+    "read": false,
+    "date": "2025-06-30T16:13:18.192171"
+  },
+  {
+    "id": "4c842512-71f6-4e8a-b3cf-4ea5faed76cc",
+    "user_id": "fankamngaleu@gmail.com",
+    "type": "application_confirmation",
+    "title": "Confirmation de candidature - Developpeur Python",
+    "message": "Votre candidature pour le poste de Developpeur Python a \u00e9t\u00e9 re\u00e7ue avec succ\u00e8s.",
+    "link": "/applications/ff8b70fb-42e4-4728-b8e3-4f7409c62c79",
+    "reference_id": "ff8b70fb-42e4-4728-b8e3-4f7409c62c79",
+    "read": false,
+    "date": "2025-06-30T16:31:06.562159"
+  },
+  {
+    "id": "30f6151c-35e7-4ef3-b6e1-f1dcc078064a",
+    "user_id": "48706563-bfa7-4645-a332-5012bf1ce75b",
+    "type": "new_application",
+    "title": "Nouvelle candidature pour Developpeur Python",
+    "message": "fn a postul\u00e9 pour le poste de Developpeur Python.",
+    "link": "/dashboard/applications/ff8b70fb-42e4-4728-b8e3-4f7409c62c79",
+    "reference_id": "ff8b70fb-42e4-4728-b8e3-4f7409c62c79",
+    "read": false,
+    "date": "2025-06-30T16:31:10.886357"
+  },
+  {
+    "id": "cb6f0f27-c31b-45d5-bfda-11843d1d1ad7",
+    "user_id": "fankamngaleu@gmail.com",
+    "type": "application_confirmation",
+    "title": "Confirmation de candidature - Dev python",
+    "message": "Votre candidature pour le poste de Dev python a \u00e9t\u00e9 re\u00e7ue avec succ\u00e8s.",
+    "link": "/applications/74adf355-f3c8-4a3b-bc2a-8c179a4af734",
+    "reference_id": "74adf355-f3c8-4a3b-bc2a-8c179a4af734",
+    "read": false,
+    "date": "2025-07-01T00:55:18.708189"
+  },
+  {
+    "id": "4ac9f9bf-a526-44e4-ba03-1ac27d395eee",
+    "user_id": "48706563-bfa7-4645-a332-5012bf1ce75b",
+    "type": "new_application",
+    "title": "Nouvelle candidature pour Dev python",
+    "message": "fn a postul\u00e9 pour le poste de Dev python.",
+    "link": "/dashboard/applications/74adf355-f3c8-4a3b-bc2a-8c179a4af734",
+    "reference_id": "74adf355-f3c8-4a3b-bc2a-8c179a4af734",
+    "read": false,
+    "date": "2025-07-01T00:55:24.323377"
+  },
+  {
+    "id": "b0cb1273-0fcd-4ab2-8e9a-4e557c7c6102",
+    "user_id": "48706563-bfa7-4645-a332-5012bf1ce75b",
+    "type": "interview_scheduled",
+    "title": "Nouvel entretien planifi\u00e9",
+    "message": "Vous avez planifi\u00e9 un entretien avec fn pour le 01/07/2025 \u00e0 01:00",
+    "link": "/interviews/scheduled/3d5d03c1-f74c-4b63-826e-ca1ea36bf5de",
+    "reference_id": "3d5d03c1-f74c-4b63-826e-ca1ea36bf5de",
+    "read": false,
+    "date": "2025-07-01T00:59:22.031878"
   }
 ]

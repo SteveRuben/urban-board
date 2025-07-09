@@ -755,7 +755,7 @@ const InterviewScheduleDetailPage = () => {
 
                     {schedule.status === "completed" && (
                       <Link
-                        href={`/interviews/scheduled/${schedule.id}/coding-results`}
+                        href={`/interviews/scheduled/${schedule.id}/coding-results?token=${schedule.coding_exercises!.access_token}`}
                         className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                       >
                         <FileText className="h-4 w-4 mr-2" />
@@ -767,7 +767,7 @@ const InterviewScheduleDetailPage = () => {
                       schedule.coding_exercises.assigned &&
                       schedule.coding_exercises.progress  && (
                         <Link
-                          href={`/interviews/schedule/${schedule.id}/coding-results`}
+                          href={`/interviews/schedule/${schedule.id}/coding-results?token=${schedule.coding_exercises!.access_token}`}
                           className="w-full flex items-center justify-center px-4 py-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
                         >
                           <Code className="h-4 w-4 mr-2" />

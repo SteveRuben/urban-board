@@ -24,6 +24,29 @@ import {
   Award
 } from 'lucide-react';
 import { InterviewSchedulingService } from '@/services/interview-scheduling-service';
+import { CandidateExerciseService } from '@/services/candidate-exercise';
+
+// Types inspirés de candidateCodingPage
+interface ExerciseProgressInfo {
+  attempted: boolean;
+  completed: boolean;
+  completionRate: number;
+  totalSteps: number;
+  completedSteps: number;
+  totalChallenges: number;
+  completedChallenges: number;
+  stepsProgress: {[stepId: string]: any};
+}
+
+interface ChallengeProgressInfo {
+  attempted: boolean;
+  completed: boolean;
+  totalSteps: number;
+  completedSteps: number;
+  totalTests: number;
+  passedTests: number;
+  stepsProgress: any[];
+}
 
 const ProgressBar: React.FC<{ value: number; max: number; color?: string }> = ({ 
   value, 
@@ -94,7 +117,6 @@ const CodeViewer: React.FC<{ code: string; language: string }> = ({ code, langua
   );
 };
 
-// ✅ CORRECTION: Composant inspiré de StepProgressIndicator de la page challenge
 const StepProgressDetail: React.FC<{
   stepProgress: any;
   stepIndex: number;
@@ -117,41 +139,36 @@ const StepProgressDetail: React.FC<{
   };
 
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:shadow-sm transition-all">
-      <div className="flex items-center gap-4">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 ${getStepColor(status)}`}>
+    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 hover:border-gray-200 transition-all">
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 ${getStepColor(status)}`}>
           {status === 'completed' ? '✓' : stepIndex + 1}
         </div>
         <div>
-          <div className="text-sm font-semibold text-gray-900">
+          <div className="text-sm font-medium text-gray-900">
             Étape {stepIndex + 1}
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 flex items-center gap-4">
             <span className={`font-medium ${
               stepProgress.is_completed ? 'text-green-600' : 
               stepProgress.tests_passed > 0 ? 'text-yellow-600' : 'text-gray-500'
             }`}>
-              {stepProgress.tests_passed}/{stepProgress.tests_total} tests réussis
+              {stepProgress.tests_passed || 0}/{stepProgress.tests_total || 0} tests
             </span>
-            {stepProgress.tests_total > 0 && (
-              <span className="ml-2 text-gray-400">
-                ({Math.round((stepProgress.tests_passed / stepProgress.tests_total) * 100)}%)
+            {stepProgress.last_submission && (
+              <span className="text-gray-400">
+                {new Date(stepProgress.last_submission).toLocaleDateString('fr-FR')}
               </span>
             )}
           </div>
-          {stepProgress.last_edited && (
-            <div className="text-xs text-gray-400 mt-1">
-              Dernière modification: {new Date(stepProgress.last_edited).toLocaleDateString('fr-FR')}
-            </div>
-          )}
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {status === 'completed' && (
           <div className="flex items-center gap-1 text-green-600 bg-green-100 px-2 py-1 rounded-full">
             <CheckCircle className="h-3 w-3" />
-            <span className="text-xs font-medium">Complète</span>
+            <span className="text-xs font-medium">OK</span>
           </div>
         )}
         {status === 'attempted' && !stepProgress.is_completed && (
@@ -163,10 +180,10 @@ const StepProgressDetail: React.FC<{
         {stepProgress.code && stepProgress.code.trim().length > 0 && (
           <button
             onClick={() => onViewCode(stepProgress)}
-            className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
           >
             <Eye className="h-3 w-3" />
-            Voir le code
+            Code
           </button>
         )}
       </div>
@@ -175,151 +192,128 @@ const StepProgressDetail: React.FC<{
 };
 
 const ChallengeResultCard: React.FC<{ 
-  challengeResult: any;
+  challenge: any;
+  challengeProgress: ChallengeProgressInfo;
   onViewCode: (stepProgress: any) => void;
-}> = ({ challengeResult, onViewCode }) => {
-  const { challenge, user_challenge, steps_progress } = challengeResult;
+}> = ({ challenge, challengeProgress, onViewCode }) => {
   
-  // ✅ CORRECTION: Calculs précis basés sur les vraies données
-  const completedSteps = steps_progress.filter((step: any) => step.is_completed).length;
-  const attemptedSteps = steps_progress.filter((step: any) => 
-    step.is_completed || step.tests_passed > 0 || (step.code && step.code.trim().length > 0)
-  ).length;
-  const totalTests = steps_progress.reduce((sum: number, step: any) => sum + (step.tests_total || 0), 0);
-  const passedTests = steps_progress.reduce((sum: number, step: any) => sum + (step.tests_passed || 0), 0);
-  
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600';
-      case 'in_progress': return 'text-blue-600';
-      default: return 'text-gray-600';
-    }
+  const getStatusColor = (attempted: boolean, completed: boolean) => {
+    if (completed) return 'text-green-600';
+    if (attempted) return 'text-blue-600';
+    return 'text-gray-600';
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'in_progress': return <Clock className="h-4 w-4" />;
-      default: return <XCircle className="h-4 w-4" />;
-    }
+  const getStatusIcon = (attempted: boolean, completed: boolean) => {
+    if (completed) return <CheckCircle className="h-4 w-4" />;
+    if (attempted) return <Clock className="h-4 w-4" />;
+    return <XCircle className="h-4 w-4" />;
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Terminé';
-      case 'in_progress': return 'En cours';
-      case 'not_started': return 'Non commencé';
-      default: return status;
-    }
+  const getStatusLabel = (attempted: boolean, completed: boolean) => {
+    if (completed) return 'Terminé';
+    if (attempted) return 'En cours';
+    return 'Non commencé';
   };
-
-  // ✅ CORRECTION: Déterminer le vrai statut basé sur la progression des steps
-  const actualStatus = completedSteps === steps_progress.length && steps_progress.length > 0 ? 'completed' :
-                      attemptedSteps > 0 ? 'in_progress' : 'not_started';
 
   return (
-    <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-3">
-            <h4 className="text-lg font-semibold text-gray-900">{challenge.title}</h4>
-            <div className={`flex items-center gap-1 text-sm font-medium ${getStatusColor(actualStatus)}`}>
-              {getStatusIcon(actualStatus)}
-              <span>{getStatusLabel(actualStatus)}</span>
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mb-4">{challenge.description}</p>
-          
-          {/* ✅ CORRECTION: Affichage des statistiques réelles */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <div className="text-lg font-bold text-green-600">{completedSteps}</div>
-              <div className="text-xs text-gray-600">Étapes terminées</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-blue-600">{attemptedSteps}</div>
-              <div className="text-xs text-gray-600">Étapes tentées</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-purple-600">{passedTests}/{totalTests}</div>
-              <div className="text-xs text-gray-600">Tests réussis</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-orange-600">
-                {totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0}%
+    <div className="ml-6 relative">
+      {/* Ligne de connexion */}
+      <div className="absolute -left-3 top-0 bottom-0 w-px bg-blue-300"></div>
+      
+      {/* Carte du challenge */}
+      <div className="bg-gradient-to-r from-blue-50 to-gray-50 rounded-lg border-l-4 border-blue-400 p-5 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <h4 className="text-base font-semibold text-gray-900">{challenge.title}</h4>
+                <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                  challengeProgress.completed ? 'bg-green-100 text-green-700' :
+                  challengeProgress.attempted ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {getStatusIcon(challengeProgress.attempted, challengeProgress.completed)}
+                  <span>{getStatusLabel(challengeProgress.attempted, challengeProgress.completed)}</span>
+                </div>
               </div>
-              <div className="text-xs text-gray-600">Taux de réussite</div>
+              <p className="text-sm text-gray-600 mb-3">{challenge.description}</p>
+              
+              <div className="grid grid-cols-4 gap-2 p-3 bg-gray-50 rounded-md">
+                <div className="text-center">
+                  <div className="text-sm font-bold text-green-600">{challengeProgress.completedSteps}</div>
+                  <div className="text-xs text-gray-600">Complétées</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-blue-600">{challengeProgress.totalSteps}</div>
+                  <div className="text-xs text-gray-600">Total étapes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-purple-600">{challengeProgress.passedTests}/{challengeProgress.totalTests}</div>
+                  <div className="text-xs text-gray-600">Tests</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-orange-600">
+                    {challengeProgress.totalTests > 0 ? Math.round((challengeProgress.passedTests / challengeProgress.totalTests) * 100) : 0}%
+                  </div>
+                  <div className="text-xs text-gray-600">Réussite</div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="text-right text-sm text-gray-500 ml-4">
-          <div className="mb-2">
-            <span className="font-medium">{user_challenge.attempt_count || 0}</span> tentative{(user_challenge.attempt_count || 0) > 1 ? 's' : ''}
-          </div>
-          {user_challenge.started_at && (
-            <div className="text-xs mb-1">
-              Commencé: {new Date(user_challenge.started_at).toLocaleDateString('fr-FR')}
-            </div>
-          )}
-          {user_challenge.completed_at && (
-            <div className="text-xs">
-              Terminé: {new Date(user_challenge.completed_at).toLocaleDateString('fr-FR')}
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* ✅ CORRECTION: Barres de progression réelles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="text-center p-3 bg-white border rounded-lg">
-          <div className="text-sm text-gray-600 mb-2">Progression des étapes</div>
-          <div className="text-lg font-bold text-gray-900 mb-2">{completedSteps}/{steps_progress.length}</div>
-          <ProgressBar 
-            value={completedSteps} 
-            max={steps_progress.length} 
-            color="bg-green-600" 
-          />
-        </div>
-        <div className="text-center p-3 bg-white border rounded-lg">
-          <div className="text-sm text-gray-600 mb-2">Réussite aux tests</div>
-          <div className="text-lg font-bold text-gray-900 mb-2">{passedTests}/{totalTests}</div>
-          <ProgressBar 
-            value={passedTests} 
-            max={totalTests} 
-            color="bg-blue-600" 
-          />
-        </div>
-      </div>
-
-      {/* ✅ CORRECTION: Détail des étapes inspiré de la page challenge */}
-      {steps_progress.length > 0 && (
-        <div>
-          <h5 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Progression détaillée ({steps_progress.length} étapes)
-          </h5>
-          <div className="space-y-3">
-            {steps_progress.map((stepProgress: any, index: number) => (
-              <StepProgressDetail
-                key={stepProgress.id || index}
-                stepProgress={stepProgress}
-                stepIndex={index}
-                onViewCode={onViewCode}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div className="text-center p-2 bg-gray-50 border rounded">
+              <div className="text-xs text-gray-600 mb-1">Progression des étapes</div>
+              <div className="text-sm font-bold text-gray-900 mb-1">{challengeProgress.completedSteps}/{challengeProgress.totalSteps}</div>
+              <ProgressBar 
+                value={challengeProgress.completedSteps} 
+                max={challengeProgress.totalSteps} 
+                color="bg-green-600" 
               />
-            ))}
+            </div>
+            <div className="text-center p-2 bg-gray-50 border rounded">
+              <div className="text-xs text-gray-600 mb-1">Réussite aux tests</div>
+              <div className="text-sm font-bold text-gray-900 mb-1">{challengeProgress.passedTests}/{challengeProgress.totalTests}</div>
+              <ProgressBar 
+                value={challengeProgress.passedTests} 
+                max={challengeProgress.totalTests} 
+                color="bg-blue-600" 
+              />
+            </div>
           </div>
+
+          {challengeProgress.stepsProgress.length > 0 && (
+            <div>
+              <h5 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <Activity className="h-3 w-3" />
+                Détail des étapes ({challengeProgress.stepsProgress.length})
+              </h5>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {challengeProgress.stepsProgress.map((stepProgress: any, index: number) => (
+                  <StepProgressDetail
+                    key={stepProgress.step_id || index}
+                    stepProgress={stepProgress}
+                    stepIndex={index}
+                    onViewCode={onViewCode}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
 const ExerciseResultCard: React.FC<{
-  exerciseResult: any;
+  exercise: any;
+  exerciseProgress: ExerciseProgressInfo;
+  challengesProgress: {[challengeId: string]: ChallengeProgressInfo};
+  challenges: any[];
   onViewCode: (stepProgress: any) => void;
-}> = ({ exerciseResult, onViewCode }) => {
-  const { exercise, challenges_results } = exerciseResult;
+}> = ({ exercise, exerciseProgress, challengesProgress, challenges, onViewCode }) => {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -331,100 +325,99 @@ const ExerciseResultCard: React.FC<{
     }
   };
 
-  // ✅ CORRECTION: Calculs précis depuis les vraies données
-  const totalChallenges = challenges_results.length;
-  let totalSteps = 0;
-  let completedSteps = 0;
-  let attemptedSteps = 0;
-  let completedChallenges = 0;
-
-  challenges_results.forEach((challengeResult: any) => {
-    const { steps_progress } = challengeResult;
-    totalSteps += steps_progress.length;
-    
-    const challengeCompletedSteps = steps_progress.filter((step: any) => step.is_completed).length;
-    const challengeAttemptedSteps = steps_progress.filter((step: any) => 
-      step.is_completed || step.tests_passed > 0 || (step.code && step.code.trim().length > 0)
-    ).length;
-    
-    completedSteps += challengeCompletedSteps;
-    attemptedSteps += challengeAttemptedSteps;
-    
-    // Challenge complété si toutes ses étapes sont complétées
-    if (challengeCompletedSteps === steps_progress.length && steps_progress.length > 0) {
-      completedChallenges++;
-    }
-  });
-
-  const exerciseCompleted = completedChallenges === totalChallenges && totalChallenges > 0;
-  const exerciseAttempted = attemptedSteps > 0;
-  const completionRate = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-
   return (
-    <div className="space-y-6">
-      {/* En-tête de l'exercice */}
-      <div className="bg-white rounded-lg border p-6">
+    <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg">
+      {/* En-tête de l'exercice - Plus proéminent */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
-              <h3 className="text-xl font-semibold text-gray-900">{exercise.title}</h3>
+              <Code className="h-6 w-6" />
+              <h3 className="text-xl font-bold">{exercise.title}</h3>
               <div className="flex items-center gap-2">
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium">
                   {exercise.language}
                 </span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(exercise.difficulty)}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(exercise.difficulty)} text-gray-800`}>
                   {exercise.difficulty}
                 </span>
-                {exerciseCompleted && (
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                {exerciseProgress.completed && (
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
                     Terminé
                   </span>
                 )}
               </div>
             </div>
-            <p className="text-gray-600 mb-4">{exercise.description}</p>
+            <p className="text-blue-100 mb-4">{exercise.description}</p>
           </div>
         </div>
 
-        {/* ✅ CORRECTION: Statistiques de l'exercice basées sur les vraies données */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="text-center">
-            <div className="text-lg font-bold text-gray-900">{totalChallenges}</div>
-            <div className="text-xs text-gray-600">Challenge{totalChallenges > 1 ? 's' : ''}</div>
+        {/* Statistiques globales de l'exercice */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="text-center bg-white/10 backdrop-blur-sm rounded-lg p-3">
+            <div className="text-2xl font-bold text-white">{exerciseProgress.totalChallenges}</div>
+            <div className="text-xs text-blue-100">Challenge{exerciseProgress.totalChallenges > 1 ? 's' : ''}</div>
           </div>
-          <div className="text-center">
-            <div className={`text-lg font-bold ${exerciseAttempted ? 'text-blue-600' : 'text-gray-400'}`}>
-              {exerciseAttempted ? 'Oui' : 'Non'}
+          <div className="text-center bg-white/10 backdrop-blur-sm rounded-lg p-3">
+            <div className={`text-2xl font-bold ${exerciseProgress.attempted ? 'text-green-300' : 'text-red-300'}`}>
+              {exerciseProgress.attempted ? 'Oui' : 'Non'}
             </div>
-            <div className="text-xs text-gray-600">Tenté</div>
+            <div className="text-xs text-blue-100">Tenté</div>
           </div>
-          <div className="text-center">
-            <div className={`text-lg font-bold ${exerciseCompleted ? 'text-green-600' : 'text-gray-400'}`}>
-              {exerciseCompleted ? 'Oui' : 'Non'}
+          <div className="text-center bg-white/10 backdrop-blur-sm rounded-lg p-3">
+            <div className={`text-2xl font-bold ${exerciseProgress.completed ? 'text-green-300' : 'text-yellow-300'}`}>
+              {exerciseProgress.completed ? 'Oui' : 'Non'}
             </div>
-            <div className="text-xs text-gray-600">Complété</div>
+            <div className="text-xs text-blue-100">Complété</div>
           </div>
-          <div className="text-center">
-            <div className="text-lg font-bold text-purple-600">{completedSteps}/{totalSteps}</div>
-            <div className="text-xs text-gray-600">Étapes</div>
+          <div className="text-center bg-white/10 backdrop-blur-sm rounded-lg p-3">
+            <div className="text-2xl font-bold text-white">{exerciseProgress.completedSteps}/{exerciseProgress.totalSteps}</div>
+            <div className="text-xs text-blue-100">Étapes</div>
           </div>
-          <div className="text-center">
-            <div className="text-lg font-bold text-orange-600">{completionRate}%</div>
-            <div className="text-xs text-gray-600">Progression</div>
+          <div className="text-center bg-white/10 backdrop-blur-sm rounded-lg p-3">
+            <div className="text-2xl font-bold text-yellow-300">{exerciseProgress.completionRate}%</div>
+            <div className="text-xs text-blue-100">Progression</div>
           </div>
         </div>
       </div>
 
-      {/* Challenges de l'exercice */}
-      <div className="space-y-4">
-        {challenges_results.map((challengeResult: any) => (
-          <ChallengeResultCard
-            key={challengeResult.challenge.id}
-            challengeResult={challengeResult}
-            onViewCode={onViewCode}
-          />
-        ))}
+      {/* Section des challenges */}
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-1 h-8 bg-blue-600 rounded-full"></div>
+          <h4 className="text-lg font-semibold text-gray-900">
+            Challenges de cet exercice ({challenges.length})
+          </h4>
+        </div>
+        
+        {challenges.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+            <p>Aucun challenge disponible pour cet exercice</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {challenges.map((challenge: any, index: number) => {
+              const challengeProgress = challengesProgress[challenge.id];
+              if (!challengeProgress) return null;
+
+              return (
+                <div key={challenge.id} className="relative">
+                  {/* Indicateur visuel de numérotation */}
+                  <div className="absolute -left-2 top-6 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold z-10">
+                    {index + 1}
+                  </div>
+                  <ChallengeResultCard
+                    challenge={challenge}
+                    challengeProgress={challengeProgress}
+                    onViewCode={onViewCode}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -432,7 +425,7 @@ const ExerciseResultCard: React.FC<{
 
 const InterviewCodingResultsPage = () => {
   const router = useRouter();
-  const { scheduleId } = router.query;
+  const { scheduleId, token } = router.query;
   const id = scheduleId;
   
   const [loading, setLoading] = useState(true);
@@ -440,6 +433,160 @@ const InterviewCodingResultsPage = () => {
   const [results, setResults] = useState<any>(null);
   const [selectedCode, setSelectedCode] = useState<any>(null);
   const [showCodeModal, setShowCodeModal] = useState(false);
+  
+  // États pour la progression détaillée
+  const [exercisesProgress, setExercisesProgress] = useState<{[exerciseId: string]: ExerciseProgressInfo}>({});
+  const [challengesProgress, setChallengesProgress] = useState<{[challengeId: string]: ChallengeProgressInfo}>({});
+  const [exercisesChallenges, setExercisesChallenges] = useState<{[exerciseId: string]: any[]}>({});
+
+  // Fonction pour calculer la progression détaillée à partir des results.detailed_results
+  const calculateDetailedProgress = async (detailedResults: any[], candidateToken: string) => {
+    console.log('🔍 DEBUG: Calcul progression détaillée pour:', detailedResults);
+    
+    const exercisesProgressMap: {[exerciseId: string]: ExerciseProgressInfo} = {};
+    const challengesProgressMap: {[challengeId: string]: ChallengeProgressInfo} = {};
+    const exercisesChallengesMap: {[exerciseId: string]: any[]} = {};
+
+    for (const exerciseResult of detailedResults) {
+      const exercise = exerciseResult.exercise;
+      console.log('🔍 DEBUG: Traitement exercice:', exercise);
+
+      let totalSteps = 0;
+      let completedSteps = 0;
+      let totalChallenges = 0;
+      let completedChallenges = 0;
+      let attempted = false;
+      const stepsProgress: {[stepId: string]: any} = {};
+      const challenges: any[] = [];
+
+      try {
+        // Récupérer tous les challenges de l'exercice
+        const exerciseDetails = await CandidateExerciseService.getCandidateExercises(candidateToken);
+        console.log('🔍 DEBUG: Détails exercice depuis candidate service:', exerciseDetails);
+        
+        // Trouver l'exercice correspondant
+        const matchingExercise = exerciseDetails.exercises?.find((ex: any) => ex.id === exercise.id);
+        if (matchingExercise && matchingExercise.challenges) {
+          challenges.push(...matchingExercise.challenges);
+          totalChallenges = matchingExercise.challenges.length;
+
+          // Pour chaque challenge
+          for (const challenge of matchingExercise.challenges) {
+            try {
+              const challengeDetails = await CandidateExerciseService.getChallenge(candidateToken, challenge.id);
+              console.log('🔍 DEBUG: Détails challenge:', challengeDetails);
+              
+              if (challengeDetails && challengeDetails.steps) {
+                let challengeCompletedSteps = 0;
+                let challengeTotalTests = 0;
+                let challengePassedTests = 0;
+                const challengeStepsProgress: any[] = [];
+
+                // Pour chaque step du challenge
+                for (const step of challengeDetails.steps) {
+                  totalSteps++;
+                  try {
+                    const progressData = await CandidateExerciseService.loadProgress(candidateToken, challenge.id, step.id);
+                    console.log('🔍 DEBUG: Progression step:', progressData);
+                    
+                    const stepProgressInfo = {
+                      step_id: step.id,
+                      challenge_id: challenge.id,
+                      is_completed: progressData?.is_completed || false,
+                      tests_passed: progressData?.tests_passed || 0,
+                      tests_total: progressData?.tests_total || 0,
+                      last_submission: progressData?.last_edited || null,
+                      code: progressData?.code || ''
+                    };
+
+                    challengeTotalTests += stepProgressInfo.tests_total;
+                    challengePassedTests += stepProgressInfo.tests_passed;
+                    challengeStepsProgress.push(stepProgressInfo);
+
+                    if (progressData && (progressData.tests_passed > 0 || progressData.code?.trim().length > 0)) {
+                      attempted = true;
+                    }
+
+                    if (progressData?.is_completed) {
+                      completedSteps++;
+                      challengeCompletedSteps++;
+                    }
+
+                    stepsProgress[step.id] = stepProgressInfo;
+                  } catch (stepError) {
+                    console.log(`Step ${step.id} sans progression:`, stepError);
+                    // Step sans progression
+                    const stepProgressInfo = {
+                      step_id: step.id,
+                      challenge_id: challenge.id,
+                      is_completed: false,
+                      tests_passed: 0,
+                      tests_total: 0,
+                      last_submission: null,
+                      code: ''
+                    };
+                    challengeStepsProgress.push(stepProgressInfo);
+                    stepsProgress[step.id] = stepProgressInfo;
+                  }
+                }
+
+                // Challenge complété si tous ses steps sont complétés
+                if (challengeCompletedSteps === challengeDetails.steps.length && challengeDetails.steps.length > 0) {
+                  completedChallenges++;
+                }
+
+                // Stocker la progression du challenge
+                challengesProgressMap[challenge.id] = {
+                  attempted: challengeStepsProgress.some(step => step.tests_passed > 0 || step.code.trim().length > 0),
+                  completed: challengeCompletedSteps === challengeDetails.steps.length && challengeDetails.steps.length > 0,
+                  totalSteps: challengeDetails.steps.length,
+                  completedSteps: challengeCompletedSteps,
+                  totalTests: challengeTotalTests,
+                  passedTests: challengePassedTests,
+                  stepsProgress: challengeStepsProgress
+                };
+              }
+            } catch (challengeError) {
+              console.log(`Challenge ${challenge.id} non accessible:`, challengeError);
+              // Challenge sans progression
+              challengesProgressMap[challenge.id] = {
+                attempted: false,
+                completed: false,
+                totalSteps: challenge.step_count || 0,
+                completedSteps: 0,
+                totalTests: 0,
+                passedTests: 0,
+                stepsProgress: []
+              };
+            }
+          }
+        }
+      } catch (exerciseError) {
+        console.error(`Erreur lors du traitement de l'exercice ${exercise.id}:`, exerciseError);
+      }
+
+      const completionRate = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+      const completed = completedChallenges === totalChallenges && totalChallenges > 0;
+
+      exercisesProgressMap[exercise.id] = {
+        attempted,
+        completed,
+        completionRate,
+        totalSteps,
+        completedSteps,
+        totalChallenges,
+        completedChallenges,
+        stepsProgress
+      };
+
+      exercisesChallengesMap[exercise.id] = challenges;
+    }
+
+    setExercisesProgress(exercisesProgressMap);
+    setChallengesProgress(challengesProgressMap);
+    setExercisesChallenges(exercisesChallengesMap);
+    console.log('🔍 DEBUG: Progression calculée:', { exercisesProgressMap, challengesProgressMap, exercisesChallengesMap });
+  };
 
   useEffect(() => {
     if (!id || typeof id !== 'string') return;
@@ -449,10 +596,20 @@ const InterviewCodingResultsPage = () => {
         setLoading(true);
         console.log('🔍 DEBUG: Chargement des résultats pour:', id);
         
+        // Charger les résultats de base
         const data = await InterviewSchedulingService.getCandidateExerciseResults(id);
         console.log('🔍 DEBUG: Résultats reçus:', data);
         
         setResults(data);
+
+        // Si on a un token candidat, calculer la progression détaillée
+        if (token && typeof token === 'string') {
+          console.log('🔍 DEBUG: Token candidat trouvé, calcul progression détaillée...', token);
+          await calculateDetailedProgress(data.detailed_results || [], token);
+        } else {
+          console.log('🔍 DEBUG: Pas de token candidat, utilisation des données basiques');
+        }
+        
       } catch (err: any) {
         console.error('❌ Erreur chargement résultats:', err);
         setError(err.message || 'Erreur lors du chargement des résultats');
@@ -462,7 +619,7 @@ const InterviewCodingResultsPage = () => {
     };
 
     loadResults();
-  }, [id]);
+  }, [id, token]);
 
   const handleViewCode = (stepProgress: any) => {
     setSelectedCode(stepProgress);
@@ -472,7 +629,22 @@ const InterviewCodingResultsPage = () => {
   const handleDownloadResults = () => {
     if (!results) return;
     
-    // ✅ CORRECTION: Rapport avec vraies statistiques
+    // Calcul des vraies statistiques depuis les données détaillées
+    let globalTotalSteps = 0;
+    let globalCompletedSteps = 0;
+    let globalTotalTests = 0;
+    let globalPassedTests = 0;
+
+    Object.values(exercisesProgress).forEach((exercise: ExerciseProgressInfo) => {
+      globalTotalSteps += exercise.totalSteps;
+      globalCompletedSteps += exercise.completedSteps;
+    });
+
+    Object.values(challengesProgress).forEach((challenge: ChallengeProgressInfo) => {
+      globalTotalTests += challenge.totalTests;
+      globalPassedTests += challenge.passedTests;
+    });
+
     const report = {
       metadata: {
         generated_at: new Date().toISOString(),
@@ -481,37 +653,21 @@ const InterviewCodingResultsPage = () => {
         interview_date: results.user_exercise.interview_info?.scheduled_at
       },
       summary: {
-        total_score: results.user_exercise.total_score,
-        exercises_completed: results.user_exercise.exercises_completed,
-        total_exercises: results.user_exercise.total_exercises,
-        completion_rate: Math.round((results.user_exercise.exercises_completed / results.user_exercise.total_exercises) * 100),
+        real_total_score: globalTotalSteps > 0 ? Math.round((globalCompletedSteps / globalTotalSteps) * 100) : 0,
+        exercises_completed: Object.values(exercisesProgress).filter(e => e.completed).length,
+        total_exercises: Object.values(exercisesProgress).length,
+        total_steps: globalTotalSteps,
+        completed_steps: globalCompletedSteps,
+        total_tests: globalTotalTests,
+        passed_tests: globalPassedTests,
         time_limit: results.user_exercise.time_limit_minutes,
         session_status: results.user_exercise.status
       },
-      detailed_statistics: results.detailed_results.map((exerciseResult: any) => {
-        let totalSteps = 0;
-        let completedSteps = 0;
-        let totalTests = 0;
-        let passedTests = 0;
-
-        exerciseResult.challenges_results.forEach((challengeResult: any) => {
-          totalSteps += challengeResult.steps_progress.length;
-          completedSteps += challengeResult.steps_progress.filter((step: any) => step.is_completed).length;
-          totalTests += challengeResult.steps_progress.reduce((sum: number, step: any) => sum + (step.tests_total || 0), 0);
-          passedTests += challengeResult.steps_progress.reduce((sum: number, step: any) => sum + (step.tests_passed || 0), 0);
-        });
-
-        return {
-          exercise: exerciseResult.exercise.title,
-          completed_steps: completedSteps,
-          total_steps: totalSteps,
-          passed_tests: passedTests,
-          total_tests: totalTests,
-          completion_rate: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
-          test_success_rate: totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0
-        };
-      }),
-      detailed_results: results.detailed_results
+      detailed_progress: {
+        exercises: exercisesProgress,
+        challenges: challengesProgress
+      },
+      original_results: results
     };
     
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -566,19 +722,20 @@ const InterviewCodingResultsPage = () => {
     );
   }
 
-  // ✅ CORRECTION: Calcul du score global basé sur les vraies données
+  // Calcul des statistiques globales à partir des données détaillées
   let globalTotalSteps = 0;
   let globalCompletedSteps = 0;
   let globalTotalTests = 0;
   let globalPassedTests = 0;
 
-  results.detailed_results?.forEach((exerciseResult: any) => {
-    exerciseResult.challenges_results.forEach((challengeResult: any) => {
-      globalTotalSteps += challengeResult.steps_progress.length;
-      globalCompletedSteps += challengeResult.steps_progress.filter((step: any) => step.is_completed).length;
-      globalTotalTests += challengeResult.steps_progress.reduce((sum: number, step: any) => sum + (step.tests_total || 0), 0);
-      globalPassedTests += challengeResult.steps_progress.reduce((sum: number, step: any) => sum + (step.tests_passed || 0), 0);
-    });
+  Object.values(exercisesProgress).forEach((exercise: ExerciseProgressInfo) => {
+    globalTotalSteps += exercise.totalSteps;
+    globalCompletedSteps += exercise.completedSteps;
+  });
+
+  Object.values(challengesProgress).forEach((challenge: ChallengeProgressInfo) => {
+    globalTotalTests += challenge.totalTests;
+    globalPassedTests += challenge.passedTests;
   });
 
   const realOverallScore = globalTotalSteps > 0 ? Math.round((globalCompletedSteps / globalTotalSteps) * 100) : 0;
@@ -671,7 +828,7 @@ const InterviewCodingResultsPage = () => {
             </div>
           </div>
 
-          {/* ✅ CORRECTION: Métriques globales avec vraies données */}
+          {/* Métriques globales avec vraies données */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <ScoreCard
               title="Score global réel"
@@ -704,16 +861,47 @@ const InterviewCodingResultsPage = () => {
           </div>
 
           {/* Résultats détaillés par exercice */}
-          <div className="space-y-8">
-            <h2 className="text-2xl font-bold text-gray-900">Résultats détaillés</h2>
+          <div className="space-y-12">
+            <div className="flex items-center gap-4 mb-8">
+              <h2 className="text-3xl font-bold text-gray-900">Résultats détaillés par exercice</h2>
+              <div className="flex-1 h-px bg-gray-300"></div>
+              <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                {results.detailed_results?.length || 0} exercice{(results.detailed_results?.length || 0) > 1 ? 's' : ''}
+              </span>
+            </div>
             
-            {results.detailed_results && results.detailed_results.map((exerciseResult: any, index: number) => (
-              <ExerciseResultCard
-                key={exerciseResult.exercise.id}
-                exerciseResult={exerciseResult}
-                onViewCode={handleViewCode}
-              />
-            ))}
+            {results.detailed_results?.map((exerciseResult: any, exerciseIndex: number) => {
+              const exercise = exerciseResult.exercise;
+              const exerciseProgress = exercisesProgress[exercise.id];
+              const challenges = exercisesChallenges[exercise.id] || [];
+              
+              if (!exerciseProgress) return null;
+
+              return (
+                <div key={exercise.id} className="relative">
+                  {/* Numéro d'exercice */}
+                  <div className="absolute -left-6 top-6 w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-lg z-10">
+                    {exerciseIndex + 1}
+                  </div>
+                  
+                  <ExerciseResultCard
+                    exercise={exercise}
+                    exerciseProgress={exerciseProgress}
+                    challengesProgress={challengesProgress}
+                    challenges={challenges}
+                    onViewCode={handleViewCode}
+                  />
+                </div>
+              );
+            })}
+            
+            {(!results.detailed_results || results.detailed_results.length === 0) && (
+              <div className="text-center py-12">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun exercice trouvé</h3>
+                <p className="text-gray-600">Il n'y a aucun exercice de coding assigné à cet entretien.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -739,8 +927,8 @@ const InterviewCodingResultsPage = () => {
                   <span>Tests réussis: {selectedCode.tests_passed}/{selectedCode.tests_total}</span>
                   <span>
                     Dernière modification: {
-                      selectedCode.last_edited ? 
-                      new Date(selectedCode.last_edited).toLocaleString('fr-FR') : 
+                      selectedCode.last_submission ? 
+                      new Date(selectedCode.last_submission).toLocaleString('fr-FR') : 
                       'Non modifié'
                     }
                   </span>
@@ -751,7 +939,7 @@ const InterviewCodingResultsPage = () => {
                   color={selectedCode.is_completed ? 'bg-green-600' : 'bg-yellow-600'}
                 />
               </div>
-              <CodeViewer code={selectedCode.code} language={selectedCode.language} />
+              <CodeViewer code={selectedCode.code} language="javascript" />
             </div>
           </div>
         </div>

@@ -1,30 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Save, Layers, Plus, X, TestTube, Code, Upload } from 'lucide-react';
 import { CodingPlatformService} from '@/services/coding-platform-service';
-import { Challenge, ChallengeStep, ChallengeStepFormData, TestCaseFormData } from '@/types/coding-plateform';
+import { Challenge, ChallengeStep, ChallengeStepFormData, Exercise, TestCaseFormData } from '@/types/coding-plateform';
 
-interface StepFormPageProps {
-  challengeId?: string; // CORRECTION: string au lieu de number
-  stepId?: string; // CORRECTION: string au lieu de number
-}
 
-export default function StepFormPage({ challengeId, stepId }: StepFormPageProps) {
+
+export default function StepFormPage() {
   const router = useRouter();
-  const isEditing = !!stepId;
-  const isCreatingFromChallenge = !!challengeId;
-  
-  // Si on vient de l'URL, récupérer les paramètres
-  const urlChallengeId = router.query.id?.toString();
-  const urlStepId = router.query.stepId?.toString();
-  
-  const finalChallengeId = challengeId || urlChallengeId;
-  const finalStepId = stepId || urlStepId;
-  const finalIsEditing = !!finalStepId;
-  
+  const {id} = router.query;
+  const stepId = id?.toString();  
   const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [exercise, setExercise] = useState<Exercise | null>(null);
   const [formData, setFormData] = useState<ChallengeStepFormData>({
     title: '',
     instructions: '',
@@ -37,26 +26,15 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   
   const [testCases, setTestCases] = useState<TestCaseFormData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [initialLoading, setInitialLoading] = useState<boolean>(finalIsEditing || !!finalChallengeId);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'details' | 'code' | 'tests'>('details');
-
-  // Charger les données nécessaires
-  useEffect(() => {
-    if (finalIsEditing && finalStepId) {
-      loadStep();
-    } else if (finalChallengeId) {
-      loadChallenge();
-    }
-  }, [finalStepId, finalChallengeId, finalIsEditing]);
-
-  const loadStep = async () => {
+  
+  const loadStep = useCallback( async () => {
     try {
-      setInitialLoading(true);
       
       // CORRECTION: Utiliser la méthode getStep
-      const step = await CodingPlatformService.getStep(finalStepId!);
+      const step = await CodingPlatformService.getStep(stepId!);
       
       setFormData({
         title: step.title,
@@ -82,33 +60,25 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
       
       // Charger aussi les infos du challenge
       const challengeData = await CodingPlatformService.getChallenge(step.challenge_id);
+      
       setChallenge(challengeData);
+      const exerciseData = await CodingPlatformService.getExercise(challengeData.exercise_id)
+      setExercise(exerciseData)
+      
     } catch (err) {
       console.error('Erreur lors du chargement de l\'étape:', err);
       setError('Impossible de charger l\'étape. Veuillez réessayer.');
     } finally {
-      setInitialLoading(false);
-    }
-  };
-
-  const loadChallenge = async () => {
-    try {
-      setInitialLoading(true);
-      const challengeData = await CodingPlatformService.getChallenge(finalChallengeId!);
-      setChallenge(challengeData);
       
-      // Définir le prochain ordre basé sur le nombre d'étapes existantes
-      setFormData(prev => ({
-        ...prev,
-        order_index: (challengeData.step_count || 0) + 1
-      }));
-    } catch (err) {
-      console.error('Erreur lors du chargement du challenge:', err);
-      setError('Impossible de charger le challenge. Veuillez réessayer.');
-    } finally {
-      setInitialLoading(false);
     }
-  };
+  },[])
+  // Charger les données nécessaires
+  useEffect(() => {
+      loadStep();
+  },[loadStep]);
+
+  
+
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -146,15 +116,10 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
 
       let resultStepId: string;
 
-      if (finalIsEditing && finalStepId) {
         // CORRECTION: Utiliser updateStep
-        const updatedStep = await CodingPlatformService.updateStep(finalStepId, formData);
+        const updatedStep = await CodingPlatformService.updateStep(stepId!, formData);
         resultStepId = updatedStep.id;
-      } else {
-        const newStep = await CodingPlatformService.createChallengeStep(finalChallengeId!, formData);
-        resultStepId = newStep.id;
-      }
-
+   
       // Créer/mettre à jour les cas de test
       if (testCases.length > 0) {
         await CodingPlatformService.bulkImportTestCases(resultStepId, { testcases: testCases });
@@ -163,7 +128,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
       router.push(`/coding-admin/challenges/${challenge?.id}`);
     } catch (err) {
       console.error('Erreur lors de la sauvegarde:', err);
-      setError(finalIsEditing ? 'Erreur lors de la mise à jour de l\'étape' : 'Erreur lors de la création de l\'étape');
+      setError( 'Erreur lors de la mise à jour de l\'étape');
     } finally {
       setLoading(false);
     }
@@ -209,7 +174,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   const getDefaultStarterCode = () => {
     if (!challenge) return '';
     
-    switch (challenge.language) {
+    switch (exercise!.language) {
       case 'python':
         return 'def solution():\n    # Votre code ici\n    pass\n\n# Test\nprint(solution())';
       case 'javascript':
@@ -225,33 +190,13 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
     }
   };
 
-  if (initialLoading) {
-    return (
-      <div className="bg-gray-50 py-8 md:py-12 min-h-screen">
-        <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="bg-white rounded-lg shadow-md p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-500">Chargement...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  const backUrl = finalIsEditing 
-    ? `/coding-admin/challenges/${challenge?.id}` 
-    : challenge 
-      ? `/coding-admin/challenges/${challenge.id}` 
-      : '/coding-admin/exercises';
+  const backUrl = `/coding-admin/challenges/${challenge?.id}` 
+   
 
   return (
     <>
-      <Head>
-        <title>{finalIsEditing ? 'Modifier l\'étape' : 'Nouvelle étape'} - Administration</title>
-        <meta name="description" content={finalIsEditing ? 'Modifier une étape existante' : 'Créer une nouvelle étape'} />
-      </Head>
+     
 
       <div className="bg-gray-50 py-8 md:py-12 min-h-screen">
         <div className="container mx-auto px-4">
@@ -267,7 +212,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">
-                  {finalIsEditing ? 'Modifier l\'étape' : 'Nouvelle étape'}
+                  { 'Modifier l\'étape'}
                 </h1>
                 {challenge && (
                   <p className="text-gray-600 mt-1">
@@ -447,7 +392,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                           value={formData.starter_code}
                           onChange={(e) => handleInputChange('starter_code', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                          placeholder={`Code de base pour ${challenge?.language || 'le langage choisi'}...`}
+                          placeholder={`Code de base pour ${exercise?.language || 'le langage choisi'}...`}
                         />
                         <p className="mt-1 text-sm text-gray-500">
                           Ce code sera affiché dans l'éditeur au début de l'étape
@@ -618,12 +563,12 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        {finalIsEditing ? 'Mise à jour...' : 'Création...'}
+                        { 'Mise à jour...' }
                       </>
                     ) : (
                       <>
                         <Save className="h-4 w-4 mr-2" />
-                        {finalIsEditing ? 'Mettre à jour' : 'Créer l\'étape'}
+                        { 'Mettre à jour'}
                       </>
                     )}
                   </button>

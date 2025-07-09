@@ -471,19 +471,7 @@ export default function ChallengeDetailPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg border border-purple-200">
-                  <Monitor className="h-4 w-4" />
-                  <span className="text-sm font-medium">Mode Admin</span>
-                </div>
-                <Link
-                  href={`/coding-admin/challenges/${challenge?.id}/edit`}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="font-medium">Paramètres</span>
-                </Link>
-              </div>
+              
             </div>
           </div>
         </header>
