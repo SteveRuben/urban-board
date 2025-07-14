@@ -1,100 +1,125 @@
-<!-- templates/emails/interview_invitation.html -->
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invitation à un entretien</title>
+    <title>Invitation à l'entretien</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .header {
-            background-color: #4F46E5;
-            padding: 20px;
-            text-align: center;
-            color: white;
-        }
-        .content {
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
-        .button {
-            display: inline-block;
-            background-color: #4F46E5;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 4px;
-            margin: 20px 0;
-            font-weight: bold;
-        }
-        .info-box {
-            background-color: white;
-            border-left: 4px solid #4F46E5;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .footer {
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-        }
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #2c3e50; margin-bottom: 10px; }
+        .info-box { background-color: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #007bff; }
+        .info-box h3 { margin-top: 0; color: #495057; }
+        .info-item { margin: 10px 0; }
+        .info-item strong { color: #2c3e50; }
+        .buttons { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; border-radius: 6px; text-decoration: none; color: white; font-weight: bold; font-size: 16px; }
+        .btn-success { background-color: #28a745; }
+        .btn-success:hover { background-color: #218838; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-danger:hover { background-color: #c82333; }
+        .links { text-align: center; margin: 20px 0; }
+        .links a { color: #007bff; text-decoration: none; margin: 0 15px; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Invitation à un entretien</h1>
-    </div>
-    
-    <div class="content">
-        <p>Bonjour {{ candidate_name }},</p>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Invitation à l'entretien</h1>
+            <p>Nous avons le plaisir de vous inviter à un entretien</p>
+        </div>
         
-        <p>Nous sommes heureux de vous inviter à un entretien pour <strong>{{ interview_title }}</strong>.</p>
+        <p>Bonjour <strong>{{ candidate_name }}</strong>,</p>
+        
+        <p>Nous avons le plaisir de vous inviter à un entretien pour le poste que vous avez sollicité.</p>
         
         <div class="info-box">
-            <p><strong>Date et heure :</strong> {{ scheduled_at }}</p>
-            <p><strong>Durée :</strong> {{ duration_minutes }} minutes</p>
-            <p><strong>Fuseau horaire :</strong> {{ timezone }}</p>
-            <p><strong>Recruteur :</strong> {{ recruiter_name }}</p>
+            <h3>📅 Détails de l'entretien</h3>
+            <div class="info-item"><strong>Titre :</strong> {{ interview_title }}</div>
+            <div class="info-item"><strong>Date et heure :</strong> {{ scheduled_at }}</div>
+            <div class="info-item"><strong>Durée :</strong> {{ duration_minutes }} minutes</div>
+            <div class="info-item"><strong>Fuseau horaire :</strong> {{ timezone }}</div>
             {% if description %}
-            <p><strong>Description :</strong> {{ description }}</p>
+            <div class="info-item"><strong>Description :</strong> {{ description }}</div>
+            {% endif %}
+            <div class="info-item"><strong>Recruteur :</strong> {{ recruiter_name }}</div>
+        </div>
+        
+        <p><strong>⚠️ Merci de confirmer votre présence :</strong></p>
+        
+        <div class="buttons">
+            <a href="{{ confirm_url }}" class="btn btn-success">✅ Confirmer ma présence</a>
+            <a href="{{ cancel_url }}" class="btn btn-danger">❌ Annuler</a>
+        </div>
+        {% if has_coding_exercises %}
+        <div class="coding-section">
+            <h3>
+                <span class="coding-icon">&lt;/&gt;</span>
+                💻 Exercices de coding préparatoires
+            </h3>
+            <p>En préparation de votre entretien, nous avons préparé <strong>{{ coding_exercises_count }} exercice{% if coding_exercises_count > 1 %}s{% endif %} de coding</strong> spécialement sélectionné{% if coding_exercises_count > 1 %}s{% endif %} pour évaluer vos compétences techniques.</p>
+            
+            <div class="exercise-info">
+                <h4>📋 Informations importantes :</h4>
+                <ul>
+                    <li><strong>Accès :</strong> {{ coding_available_info.available_before_interview }}</li>
+                    <li><strong>Expiration :</strong> {{ coding_available_info.expires_after_interview }}</li>
+                    <li><strong>Temps limite :</strong> {{ coding_available_info.time_limit }}</li>
+                    <li><strong>Format :</strong> Exercices interactifs en ligne avec tests automatisés</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{{ coding_link }}" class="button btn-success">
+                    🚀 Accéder aux exercices de coding
+                </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #059669; margin-top: 15px;">
+                <strong>💡 Conseil :</strong> Nous vous recommandons de compléter ces exercices avant l'entretien pour optimiser notre temps ensemble et nous permettre de mieux évaluer votre profil technique.
+            </p>
+        </div>
+        {% endif %}
+        <div class="info-box">
+            <h3>🔗 Accès à l'entretien</h3>
+            <p>Le jour de l'entretien, vous pourrez accéder à la salle virtuelle via ce lien :</p>
+            <p style="text-align: center;">
+                {% if has_google_meet %}
+                    <p>
+                        <strong>Rejoindre la réunion :</strong><br>
+                        <a href="{{ interview_url }}" 
+                           style="background-color: #4285f4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 10px 0;">
+                            🎥 Rejoindre sur Google Meet
+                        </a>
+                    </p>
+                    <p><em>Cliquez sur le lien ci-dessus pour rejoindre directement la réunion Google Meet.</em></p>
+                {% else %}
+                    <p>
+                        <strong>Rejoindre l'entretien :</strong><br>
+                        <a href="{{ interview_url }}" 
+                           style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 10px 0;">
+                            📞 Rejoindre l'entretien
+                        </a>
+                    </p>
+                {% endif %}
+            </p>
+        </div>
+        
+        <div class="links">
+            {% if add_to_calendar_url %}
+            <a href="{{ add_to_calendar_url }}">📅 Ajouter à mon calendrier</a>
             {% endif %}
         </div>
         
-        <p>L'entretien se déroulera en ligne via notre plateforme RecruteIA. Veuillez cliquer sur le bouton ci-dessous pour accéder à votre entretien à l'heure prévue :</p>
-        
-        <div style="text-align: center;">
-            <a href="{{ interview_url }}" class="button">Accéder à l'entretien</a>
+        <div class="footer">
+            <p>Cordialement,<br>
+            <strong>{{ recruiter_name }}</strong><br>
+            Équipe RecruteIA</p>
+            
+            <p><em>Si vous avez des questions, n'hésitez pas à nous contacter.</em></p>
         </div>
-        
-        <p>Pour une expérience optimale, nous vous recommandons de :</p>
-        <ul>
-            <li>Utiliser un navigateur récent (Chrome, Firefox, Edge)</li>
-            <li>Tester votre microphone et caméra à l'avance</li>
-            <li>Vous installer dans un environnement calme avec une bonne connexion internet</li>
-        </ul>
-        
-        <p>N'hésitez pas à ajouter cet entretien à votre calendrier :</p>
-        <div style="text-align: center;">
-            <a href="{{ add_to_calendar_url }}" style="color: #4F46E5;">Ajouter à Google Calendar</a>
-        </div>
-        
-        <p>Si vous avez des questions ou si vous devez reporter cet entretien, veuillez contacter directement {{ recruiter_name }} ou répondre à cet email.</p>
-        
-        <p>Nous nous réjouissons de vous rencontrer !</p>
-        
-        <p>Cordialement,<br>L'équipe RecruteIA</p>
-    </div>
-    
-    <div class="footer">
-        <p>Ce message a été envoyé automatiquement par RecruteIA. Merci de ne pas y répondre directement.</p>
-        <p>&copy; 2025 RecruteIA. Tous droits réservés.</p>
     </div>
 </body>
 </html>

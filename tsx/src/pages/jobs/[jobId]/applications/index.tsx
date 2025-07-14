@@ -14,7 +14,9 @@ import {
   Search,
   ExternalLink,
   MessageSquare,
-  Zap
+  Zap,
+  Percent,
+  Video
 } from 'lucide-react';
 import { JobService } from '@/services/jobs-service';
 import { ApplicationCVAnalysisService } from '@/services/application-cv-analysis-service';
@@ -36,6 +38,8 @@ export default function JobApplicationsPage() {
   });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [scoreFilter, setScoreFilter] = useState<number>(0);
+  const [showOnlyAnalyzed, setShowOnlyAnalyzed] = useState<boolean>(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [bulkAnalyzing, setBulkAnalyzing] = useState(false);
 
@@ -74,7 +78,14 @@ export default function JobApplicationsPage() {
         application.candidate_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         application.candidate_email.toLowerCase().includes(searchTerm.toLowerCase());
       
-      return matchesStatus && matchesSearch;
+      // Filtrage par score
+      const analysis = ApplicationCVAnalysisService.getApplicationAnalysis(application.id);
+      const score = analysis?.match_score || 0;
+      
+      const matchesScore = score >= scoreFilter;
+      const matchesAnalyzed = !showOnlyAnalyzed || score > 0;
+      
+      return matchesStatus && matchesSearch && matchesScore && matchesAnalyzed;
     });
 
     return filtered.sort((a, b) => {
@@ -99,6 +110,23 @@ export default function JobApplicationsPage() {
   };
 
   const filteredApplications = getSortedApplications();
+
+  // Calculer les statistiques d'analyse
+  const getAnalysisStats = () => {
+    const totalApplications = applications.length;
+    const analyzedApplications = applications.filter(app => {
+      const analysis = ApplicationCVAnalysisService.getApplicationAnalysis(app.id);
+      return analysis && analysis.match_score > 0;
+    }).length;
+    
+    return {
+      total: totalApplications,
+      analyzed: analyzedApplications,
+      remaining: totalApplications - analyzedApplications
+    };
+  };
+
+  const analysisStats = getAnalysisStats();
 
   const handlePageChange = (newOffset: number) => {
     setPagination(prev => ({
@@ -169,6 +197,13 @@ export default function JobApplicationsPage() {
     } finally {
       setBulkAnalyzing(false);
     }
+  };
+
+  const handleClearFilters = () => {
+    setStatusFilter('all');
+    setSearchTerm('');
+    setScoreFilter(0);
+    setShowOnlyAnalyzed(false);
   };
 
   // Helper pour formater les dates
@@ -278,17 +313,25 @@ export default function JobApplicationsPage() {
                       </>
                     )}
                   </button>
-                  <span className="text-sm text-gray-600">
-                    Analysez automatiquement la compatibilité de tous les CV avec cette offre
-                  </span>
+                  <div className="text-sm text-gray-600">
+                    <span>Analysez automatiquement la compatibilité de tous les CV avec cette offre</span>
+                    <div className="mt-1">
+                      <span className="font-medium text-green-600">{analysisStats.analyzed}</span> analysés / 
+                      <span className="font-medium text-gray-800">{analysisStats.total}</span> total
+                      {analysisStats.remaining > 0 && (
+                        <span className="text-orange-600"> ({analysisStats.remaining} restants)</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Filtres et recherche */}
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-                <div className="relative flex-grow md:max-w-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Recherche */}
+                <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-5 w-5 text-gray-400" />
                   </div>
@@ -301,24 +344,63 @@ export default function JobApplicationsPage() {
                   />
                 </div>
                 
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Filter className="h-5 w-5 text-gray-500" />
-                    <label htmlFor="status-filter" className="text-gray-700 text-sm">Statut :</label>
-                  </div>
+                {/* Filtre de statut */}
+                <div className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5 text-gray-500" />
                   <select
-                    id="status-filter"
-                    className="border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="border border-gray-300 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
-                    <option value="all">Tous</option>
+                    <option value="all">Tous les statuts</option>
                     <option value="new">Nouveau</option>
                     <option value="reviewed">Examiné</option>
                     <option value="interview_scheduled">Entretien planifié</option>
                     <option value="hired">Embauché</option>
                     <option value="rejected">Rejeté</option>
                   </select>
+                </div>
+
+                {/* Filtre de score */}
+                <div className="flex items-center space-x-2">
+                  <Percent className="h-5 w-5 text-gray-500" />
+                  <div className="flex-1">
+                    <label htmlFor="score-filter" className="block text-xs text-gray-600 mb-1">
+                      Score minimum: {scoreFilter}%
+                    </label>
+                    <input
+                      id="score-filter"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={scoreFilter}
+                      onChange={(e) => setScoreFilter(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                  </div>
+                </div>
+
+                {/* Options supplémentaires */}
+                <div className="flex flex-col space-y-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={showOnlyAnalyzed}
+                      onChange={(e) => setShowOnlyAnalyzed(e.target.checked)}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">CV analysés uniquement</span>
+                  </label>
+                  
+                  {(statusFilter !== 'all' || searchTerm || scoreFilter > 0 || showOnlyAnalyzed) && (
+                    <button
+                      onClick={handleClearFilters}
+                      className="text-xs text-primary-600 hover:text-primary-700 text-left"
+                    >
+                      Effacer tous les filtres
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -327,6 +409,19 @@ export default function JobApplicationsPage() {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6">
                 {error}
+              </div>
+            )}
+
+            {/* Résumé des résultats filtrés */}
+            {(statusFilter !== 'all' || searchTerm || scoreFilter > 0 || showOnlyAnalyzed) && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md mb-6">
+                <p className="text-sm">
+                  <span className="font-medium">{filteredApplications.length}</span> candidature{filteredApplications.length > 1 ? 's' : ''} 
+                  {scoreFilter > 0 && ` avec un score ≥ ${scoreFilter}%`}
+                  {showOnlyAnalyzed && ' analysée(s)'}
+                  {statusFilter !== 'all' && ` (statut: ${JobService.getApplicationStatusLabel(statusFilter as ApplicationStatus)})`}
+                  {searchTerm && ` correspondant à "${searchTerm}"`}
+                </p>
               </div>
             )}
 
@@ -345,17 +440,14 @@ export default function JobApplicationsPage() {
                       ? 'Aucune candidature pour cette offre.' 
                       : 'Aucune candidature ne correspond aux filtres.'}
                   </p>
-                  {statusFilter !== 'all' || searchTerm ? (
+                  {(statusFilter !== 'all' || searchTerm || scoreFilter > 0 || showOnlyAnalyzed) && (
                     <button
-                      onClick={() => {
-                        setStatusFilter('all');
-                        setSearchTerm('');
-                      }}
+                      onClick={handleClearFilters}
                       className="text-primary-600 hover:text-primary-700"
                     >
                       Effacer les filtres
                     </button>
-                  ) : null}
+                  )}
                 </div>
               ) : (
                 filteredApplications.map((application, index) => (
@@ -485,6 +577,15 @@ export default function JobApplicationsPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Programmer l'entretien */}
+                          <Link
+                            href={`/interviews/schedule?applicationId=${application.id}&jobId=${jobId}&candidateName=${encodeURIComponent(application.candidate_name)}&candidateEmail=${encodeURIComponent(application.candidate_email)}&jobTitle=${encodeURIComponent(jobPosting?.title || '')}&jobDesc=${encodeURIComponent(jobPosting?.description || '')}&cv_file_path=${encodeURIComponent(application?.resume_url || '')}&candidateTel=${encodeURIComponent(application.candidate_phone || '')}`}
+                            className="flex items-center justify-center w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700"
+                          >
+                            <Video className="h-4 w-4 mr-2" />
+                            Programmer l'entretien
+                          </Link>
 
                           {/* Contact candidat */}
                           <a

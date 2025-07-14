@@ -1,0 +1,15 @@
+{{ notification_title }}
+
+Bonjour,
+
+{{ notification_message }}
+
+{% if notification_link %}
+Pour plus de détails, visitez : {{ notification_link }}
+{% endif %}
+
+Cordialement,
+L'équipe RecruteIA
+
+---
+RecruteIA - Plateforme de recrutement intelligente

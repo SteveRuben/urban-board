@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ notification_title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #2196F3; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .notification-details { background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #2196F3; }
+        .cta-button { background-color: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 15px 0; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ notification_title }}</h1>
+        </div>
+        
+        <div class="content">
+            <p>Bonjour,</p>
+            
+            <div class="notification-details">
+                <p>{{ notification_message }}</p>
+            </div>
+            
+            {% if notification_link %}
+            <p>Cliquez sur le lien ci-dessous pour plus de détails :</p>
+            <a href="{{ notification_link }}" class="cta-button">Voir les détails</a>
+            {% endif %}
+            
+            <p>Cordialement,<br>L'équipe RecruteIA</p>
+        </div>
+        
+        <div class="footer">
+            <p>RecruteIA - Plateforme de recrutement intelligente</p>
+        </div>
+    </div>
+</body>
+</html>

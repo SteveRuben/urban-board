@@ -110,11 +110,21 @@ const PublicJobsPage: NextPageWithLayout = () => {
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - date.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
     if (diffDays === 1) return "Hier"
     if (diffDays < 7) return `Il y a ${diffDays} jours`
     if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaine${Math.floor(diffDays / 7) > 1 ? "s" : ""}`
     return date.toLocaleDateString("fr-FR")
+  }
+
+  const formatClosedDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = Math.abs(date.getTime() - now.getTime() )
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    if (diffDays === 1) return "Expire demain"
+    if (diffDays < 7) return `Expire dans ${diffDays} jours}`
+    if (diffDays < 30) return `Expire dans ${Math.floor(diffDays / 7)} semaine${Math.floor(diffDays / 7) > 1 ? "s" : ""}`
+    return `Expire le ${date.toLocaleDateString("fr-FR")}`
   }
 
   // Helper pour formater le salaire
@@ -223,10 +233,10 @@ const PublicJobsPage: NextPageWithLayout = () => {
                       onChange={(e) => handleFilterChange("employment_type", e.target.value)}
                     >
                       <option value="">Tous</option>
-                      <option value="Full-time">Temps plein</option>
-                      <option value="Part-time">Temps partiel</option>
-                      <option value="Contract">Contrat</option>
-                      <option value="Internship">Stage</option>
+                      <option value="full-time">Temps plein</option>
+                      <option value="part-time">Temps partiel</option>
+                      <option value="contract">Contrat</option>
+                      <option value="internship">Stage</option>
                     </select>
                   </div>
 
@@ -238,9 +248,9 @@ const PublicJobsPage: NextPageWithLayout = () => {
                       onChange={(e) => handleFilterChange("remote_policy", e.target.value)}
                     >
                       <option value="">Indifférent</option>
-                      <option value="Remote">100% remote</option>
-                      <option value="Hybrid">Hybride</option>
-                      <option value="On-site">Sur site</option>
+                      <option value="remote">100% remote</option>
+                      <option value="hybrid">Hybride</option>
+                      <option value="on-site">Sur site</option>
                     </select>
                   </div>
 
@@ -431,9 +441,9 @@ const PublicJobsPage: NextPageWithLayout = () => {
                               {job.remote_policy && (
                                 <span className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
                                   <Clock className="h-4 w-4 mr-1 text-primary-500" />
-                                  {job.remote_policy === "Remote"
+                                  {job.remote_policy === "remote"
                                     ? "Télétravail"
-                                    : job.remote_policy === "Hybrid"
+                                    : job.remote_policy === "hybrid"
                                       ? "Hybride"
                                       : "Sur site"}
                                 </span>
@@ -476,7 +486,7 @@ const PublicJobsPage: NextPageWithLayout = () => {
                               )}
                               {job.closes_at && (
                                 <span className="bg-orange-50 text-orange-600 text-xs px-2 py-1 rounded border border-orange-200">
-                                  Expire le {formatDate(job.closes_at)}
+                                 {formatClosedDate(job.closes_at)}
                                 </span>
                               )}
                             </div>

@@ -5,6 +5,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from . import job_posting
 from app import db
+# from .meeting_platform import MeetingP·latform
+
 
 class InterviewSchedule(db.Model):
     __tablename__ = 'interview_schedules'
@@ -50,6 +52,23 @@ class InterviewSchedule(db.Model):
     # Résultat de l'entretien (lien vers l'entretien réalisé)
     interview_id = db.Column(db.String(36), db.ForeignKey("interviews.id"), nullable=True)
     
+
+     # ID de l'événement Google Calendar
+    google_event_id = db.Column(db.String(255), nullable=True)
+    # Lien Google Meet
+    meet_link = db.Column(db.Text, nullable=True)
+    # Lien vers l'événement dans Google Calendar
+    calendar_link = db.Column(db.Text, nullable=True)
+    
+    
+    # Statut de la synchronisation avec Google Calendar
+    calendar_sync_status = db.Column(db.Enum(
+        'pending', 'synced', 'error', 'disabled', 
+        name='calendar_sync_status'), default='pending')
+    # Message d'erreur de synchronisation si applicable
+    calendar_sync_error = db.Column(db.Text, nullable=True)
+    
+    
     # Métadonnées
     created_at = db.Column(db.DateTime, default=func.now())
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
@@ -63,6 +82,8 @@ class InterviewSchedule(db.Model):
     job_posting_id = db.Column(db.String(36), db.ForeignKey("job_postings.id"), nullable=True)
     job_posting = relationship("JobPosting", back_populates="interview_schedules")
     job_application = relationship("JobApplication", back_populates="interview_schedule", uselist=False)
+    ai_session_active = db.Column(db.Boolean, default=False, nullable=False)
+
     
     def __repr__(self):
         return f"<InterviewSchedule {self.candidate_name} - {self.scheduled_at}>"
@@ -73,7 +94,7 @@ class InterviewSchedule(db.Model):
             'id': self.id,
             'organization_id': self.organization_id,
             'recruiter_id': self.recruiter_id,
-            'recruiter_name': self.recruiter.name if self.recruiter else None,
+            'recruiter_name': self.recruiter.first_name if self.recruiter else None,
             'candidate_name': self.candidate_name,
             'candidate_email': self.candidate_email,
             'candidate_phone': self.candidate_phone,
@@ -94,4 +115,6 @@ class InterviewSchedule(db.Model):
             'interview_id': self.interview_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'ai_session_active': self.ai_session_active,
+            'meet_link': self.meet_link
         }

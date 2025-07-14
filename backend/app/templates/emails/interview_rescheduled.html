@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entretien reprogrammé</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #ff6b35; margin-bottom: 10px; }
+        .info-box { background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #ff6b35; }
+        .info-box h3 { margin-top: 0; color: #495057; }
+        .info-item { margin: 10px 0; }
+        .info-item strong { color: #2c3e50; }
+        .buttons { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; border-radius: 6px; text-decoration: none; color: white; font-weight: bold; font-size: 16px; }
+        .btn-success { background-color: #28a745; }
+        .btn-danger { background-color: #dc3545; }
+        .links { text-align: center; margin: 20px 0; }
+        .links a { color: #007bff; text-decoration: none; margin: 0 15px; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Entretien reprogrammé</h1>
+            <p>Nouvelle date et heure pour votre entretien</p>
+        </div>
+        
+        <p>Bonjour <strong>{{ candidate_name }}</strong>,</p>
+        
+        <p>Nous vous informons que votre entretien <strong>{{ interview_title }}</strong> a été reprogrammé.</p>
+        
+        <div class="info-box">
+            <h3>📅 Nouvelles informations</h3>
+            <div class="info-item"><strong>Titre :</strong> {{ interview_title }}</div>
+            <div class="info-item"><strong>📅 Nouvelle date :</strong> {{ scheduled_at }}</div>
+            <div class="info-item"><strong>⏱️ Durée :</strong> {{ duration_minutes }} minutes</div>
+            <div class="info-item"><strong>🌍 Fuseau horaire :</strong> {{ timezone }}</div>
+            <div class="info-item"><strong>👤 Recruteur :</strong> {{ recruiter_name }}</div>
+        </div>
+        
+        <p><strong>⚠️ Merci de confirmer votre disponibilité pour cette nouvelle date :</strong></p>
+        
+        <div class="buttons">
+            <a href="{{ confirm_url }}" class="btn btn-success">✅ Confirmer la nouvelle date</a>
+            <a href="{{ cancel_url }}" class="btn btn-danger">❌ Annuler l'entretien</a>
+        </div>
+        
+        <div class="info-box">
+            <h3>🔗 Accès à l'entretien</h3>
+            <p>Le jour de l'entretien, vous pourrez accéder à la salle virtuelle via ce lien :</p>
+            <p style="text-align: center;">
+                <a href="{{ interview_url }}" style="color: #007bff; font-weight: bold; font-size: 18px;">🎥 Rejoindre l'entretien</a>
+            </p>
+        </div>
+        
+        <div class="links">
+            {% if add_to_calendar_url %}
+            <a href="{{ add_to_calendar_url }}">📅 Mettre à jour mon calendrier</a>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <p>Nous nous excusons pour ce changement et espérons que cette nouvelle date vous conviendra.</p>
+            
+            <p>Cordialement,<br>
+            <strong>{{ recruiter_name }}</strong><br>
+            Équipe RecruteIA</p>
+        </div>
+    </div>
+</body>
+</html>

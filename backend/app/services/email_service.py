@@ -1,12 +1,13 @@
 # backend/services/email_service.py
+import hashlib
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from flask import current_app
+from flask import current_app, app
 
 class EmailService:
     """Service pour gérer l'envoi d'emails dans l'application"""
@@ -27,7 +28,7 @@ class EmailService:
             autoescape=select_autoescape(['html', 'xml'])
         )
     
-    def send_email(self, to_email, subject, template_name, context={}, attachments=None):
+    def  send_email(self, to_email, subject, template_name, context={}, attachments=None):
         """
         Envoie un email avec un template HTML
         
@@ -42,14 +43,27 @@ class EmailService:
             Boolean indiquant si l'envoi a réussi
         """
         try:
+            # RECHARGEMENT FORCÉ des templates
+            template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates', 'emails')
+            print('je vois seulement que le film ici',4444444)
+            # Nouveau loader à chaque fois
+            loader = FileSystemLoader(template_dir)
+            jinja_env = Environment(
+                loader=loader,
+                autoescape=select_autoescape(['html', 'xml'])
+            )
+            
+            print(f"🔄 Rechargement template {template_name} depuis {template_dir}")
+            print('je vois seulement que le film ici',4444445)
+
             # Charger le template HTML
             html_template = self.jinja_env.get_template(f"{template_name}.html")
             text_template = self.jinja_env.get_template(f"{template_name}.txt")
-            
+
             # Rendre les templates avec le contexte
             html_content = html_template.render(**context)
             text_content = text_template.render(**context)
-            
+
             # Créer le message
             message = MIMEMultipart('alternative')
             message['Subject'] = subject
@@ -80,16 +94,45 @@ class EmailService:
             print(f"Erreur lors de l'envoi de l'email: {str(e)}")
             return False
     
+    
+    
     def send_interview_invitation(self, email, candidate_name, interview_title, recruiter_name, 
-                                 scheduled_at, duration_minutes, timezone, access_token, description=None):
-        """Envoie une invitation à un entretien"""
+                             scheduled_at, duration_minutes, timezone, access_token, description=None, meet_link=None,
+                             coding_link=None, coding_exercises_count=0):
+        """Envoie une invitation à un entretien avec boutons de réponse"""
+        print('..........135..............')
         subject = f"Invitation: {interview_title}"
+        print('..........8..............')
         
-        # Générer le lien d'accès
-        interview_url = f"{app.config.get('FRONTEND_URL', 'https://recruteai.com')}/interview/join/{access_token}"
+        if meet_link:
+            # Utiliser le lien Google Meet directement
+            interview_url = meet_link
+            meeting_type = "google_meet"
+        else:
+            # Fallback sur le lien de l'application
+            base_url = current_app.config.get('FRONTEND_URL', 'https://recruteai.com')
+            interview_url = f"{base_url}/interviews/join/{access_token}"
+            meeting_type = "application"
+    
+        print('debut programmtion...................25')
         
+        
+        # Générer les URLs de réponse candidat
+        def generate_action_hash(access_token, action):
+            secret_key = current_app.config.get('CANDIDATE_RESPONSE_SECRET', 'default_secret_key')
+            data = f"{access_token}:{action}:{secret_key}"
+            return hashlib.sha256(data.encode()).hexdigest()[:16]
+        base_url_backend = current_app.config.get('API_BASE_URL', 'https://recruteai.com')
+
+        confirm_hash = generate_action_hash(access_token, 'confirm')
+        cancel_hash = generate_action_hash(access_token, 'cancel')
+        
+        confirm_url = f"{base_url_backend}/candidate/interview/{access_token}/confirm/{confirm_hash}"
+        cancel_url = f"{base_url_backend}/candidate/interview/{access_token}/cancel/{cancel_hash}"
+        print('debut programmtion...................26')
         # Formater la date pour l'affichage
         formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
+        print('..........9..............')
         
         # Préparer le contexte pour le template
         context = {
@@ -101,44 +144,51 @@ class EmailService:
             'timezone': timezone,
             'description': description,
             'interview_url': interview_url,
+            'meeting_type': meeting_type, 
+            'has_google_meet': bool(meet_link),
+            'confirm_url': confirm_url,
+            'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'coding_available_info': {
+                'available_before_interview': "1 heure avant l'entretien",
+                'expires_after_interview': "2 heures après l'entretien",
+                'time_limit': "2 heures maximum"
+            },
             'add_to_calendar_url': self._generate_calendar_link(
                 interview_title, description, scheduled_at, duration_minutes, timezone
             )
         }
-        
+        print('..........10..............')
         return self.send_email(email, subject, 'interview_invitation', context)
     
     def send_interview_reminder(self, email, candidate_name, interview_title, recruiter_name, 
-                               scheduled_at, duration_minutes, timezone, access_token):
-        """Envoie un rappel d'entretien"""
+                           scheduled_at, duration_minutes, timezone, access_token, meet_link=None
+                           ,coding_link=None, coding_exercises_count=0):
+        """Envoie un rappel d'entretien avec boutons de réponse"""
         subject = f"Rappel: Votre entretien {interview_title} demain"
         
         # Générer le lien d'accès
-        interview_url = f"{app.config.get('FRONTEND_URL', 'https://recruteai.com')}/interview/join/{access_token}"
+        if meet_link:
+            interview_url = meet_link
+            meeting_type = "google_meet"
+        else:
+            base_url = current_app.config.get('FRONTEND_URL', 'https://recruteai.com')
+            interview_url = f"{base_url}/interviews/join/{access_token}"
+            meeting_type = "application"
+            
+        # Générer les URLs de réponse candidat
+        def generate_action_hash(access_token, action):
+            secret_key = current_app.config.get('CANDIDATE_RESPONSE_SECRET', 'default_secret_key')
+            data = f"{access_token}:{action}:{secret_key}"
+            return hashlib.sha256(data.encode()).hexdigest()[:16]
+        base_url_backend = current_app.config.get('API_BASE_URL', 'https://recruteai.com')
+        confirm_hash = generate_action_hash(access_token, 'confirm')
+        cancel_hash = generate_action_hash(access_token, 'cancel')
         
-        # Formater la date pour l'affichage
-        formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
-        
-        # Préparer le contexte pour le template
-        context = {
-            'candidate_name': candidate_name,
-            'interview_title': interview_title,
-            'recruiter_name': recruiter_name,
-            'scheduled_at': formatted_date,
-            'duration_minutes': duration_minutes,
-            'timezone': timezone,
-            'interview_url': interview_url
-        }
-        
-        return self.send_email(email, subject, 'interview_reminder', context)
-    
-    def send_interview_rescheduled(self, email, candidate_name, interview_title, recruiter_name, 
-                                  scheduled_at, duration_minutes, timezone, access_token):
-        """Envoie une notification de reprogrammation d'entretien"""
-        subject = f"Modification: Votre entretien {interview_title} a été reprogrammé"
-        
-        # Générer le lien d'accès
-        interview_url = f"{app.config.get('FRONTEND_URL', 'https://recruteai.com')}/interview/join/{access_token}"
+        confirm_url = f"{base_url_backend}/candidate/interview/{access_token}/confirm/{confirm_hash}"
+        cancel_url = f"{base_url_backend}/candidate/interview/{access_token}/cancel/{cancel_hash}"
         
         # Formater la date pour l'affichage
         formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
@@ -152,12 +202,96 @@ class EmailService:
             'duration_minutes': duration_minutes,
             'timezone': timezone,
             'interview_url': interview_url,
+            'confirm_url': confirm_url,
+            'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'is_reminder': True
+        }
+        
+        return self.send_email(email, subject, 'interview_reminder', context)
+
+    
+    def send_interview_rescheduled(self, email, candidate_name, interview_title, recruiter_name, 
+                              scheduled_at, duration_minutes, timezone, access_token,meet_link=None,
+                              coding_link=None, coding_exercises_count=0):
+        """Envoie une notification de reprogrammation d'entretien avec boutons de réponse"""
+        subject = f"Modification: Votre entretien {interview_title} a été reprogrammé"
+
+        if meet_link:
+            interview_url = meet_link
+            meeting_type = "google_meet"
+        else:
+            base_url = current_app.config.get('FRONTEND_URL', 'https://recruteai.com')
+            interview_url = f"{base_url}/interviews/join/{access_token}"
+            meeting_type = "application"
+
+        # Générer les URLs de réponse candidat
+        def generate_action_hash(access_token, action):
+            secret_key = current_app.config.get('CANDIDATE_RESPONSE_SECRET', 'default_secret_key')
+            data = f"{access_token}:{action}:{secret_key}"
+            return hashlib.sha256(data.encode()).hexdigest()[:16]
+        base_url_backend = current_app.config.get('API_BASE_URL', 'https://recruteai.com')
+
+        confirm_hash = generate_action_hash(access_token, 'confirm')
+        cancel_hash = generate_action_hash(access_token, 'cancel')
+
+        confirm_url = f"{base_url_backend}/candidate/interview/{access_token}/confirm/{confirm_hash}"
+        cancel_url = f"{base_url_backend}/candidate/interview/{access_token}/cancel/{cancel_hash}"
+
+        # Formater la date pour l'affichage
+        formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
+
+        # Préparer le contexte pour le template
+        context = {
+            'candidate_name': candidate_name,
+            'interview_title': interview_title,
+            'recruiter_name': recruiter_name,
+            'scheduled_at': formatted_date,
+            'duration_minutes': duration_minutes,
+            'timezone': timezone,
+            'interview_url': interview_url,
+            'confirm_url': confirm_url,
+            'cancel_url': cancel_url,
+            'has_coding_exercises': bool(coding_link),
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'is_rescheduled': True,
             'add_to_calendar_url': self._generate_calendar_link(
                 interview_title, None, scheduled_at, duration_minutes, timezone
             )
         }
-        
+
         return self.send_email(email, subject, 'interview_rescheduled', context)
+    
+    def send_coding_exercises_reminder(self, email, candidate_name, interview_title, 
+                                     coding_link, coding_exercises_count, scheduled_at):
+        """
+        Envoie un rappel spécifique pour les exercices de coding
+        
+        Args:
+            email: Email du candidat
+            candidate_name: Nom du candidat
+            interview_title: Titre de l'entretien
+            coding_link: Lien vers les exercices
+            coding_exercises_count: Nombre d'exercices
+            scheduled_at: Date de l'entretien
+        """
+        subject = f"Exercices de préparation pour votre entretien {interview_title}"
+        
+        formatted_date = scheduled_at.strftime("%A %d %B %Y à %H:%M")
+        
+        context = {
+            'candidate_name': candidate_name,
+            'interview_title': interview_title,
+            'scheduled_at': formatted_date,
+            'coding_link': coding_link,
+            'coding_exercises_count': coding_exercises_count,
+            'coding_only': True  # Template spécial pour exercices uniquement
+        }
+        
+        return self.send_email(email, subject, 'coding_exercises_reminder', context)
     
     def send_interview_canceled(self, email, candidate_name, interview_title, recruiter_name, reason=None):
         """Envoie une notification d'annulation d'entretien"""
