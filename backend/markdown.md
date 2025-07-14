@@ -24,3 +24,10 @@ Pour Windows
 Lancement de l'application
 
     python wsgi.py
+
+ rm -rf migrations
+ rm -f *.db
+ rm -f instance/*.db
+ flask db init
+ flask db migrate -m "Fresh start - initial migration"
+ flask db upgrade

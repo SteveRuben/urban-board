@@ -1,0 +1,203 @@
+<!-- backend/templates/emails/coding_exercises_reminder.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercices de coding - {{ interview_title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 12px 12px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .content {
+            background-color: #f9fafb;
+            padding: 30px;
+            border-radius: 0 0 12px 12px;
+        }
+        .exercise-card {
+            background: white;
+            border: 2px solid #10b981;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .highlight-box {
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            border-left: 5px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .button {
+            display: inline-block;
+            padding: 16px 32px;
+            margin: 15px 0;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 18px;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        .timeline {
+            background: #fffbeb;
+            border: 1px solid #f59e0b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .timeline h4 {
+            color: #92400e;
+            margin-top: 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span class="icon">💻</span>
+        <h1>Exercices de coding</h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.9;">Préparez-vous pour votre entretien</p>
+    </div>
+    
+    <div class="content">
+        <p>Bonjour <strong>{{ candidate_name }}</strong>,</p>
+        
+        <p>Votre entretien <strong>{{ interview_title }}</strong> approche ! Pour vous permettre de démontrer au mieux vos compétences techniques, nous avons préparé des exercices de coding spécialement sélectionnés pour vous.</p>
+
+        <div class="exercise-card">
+            <h3 style="color: #10b981; margin-top: 0;">🎯 Vos exercices personnalisés</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">{{ coding_exercises_count }}</div>
+                    <div class="stat-label">Exercice{% if coding_exercises_count > 1 %}s{% endif %}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">2h</div>
+                    <div class="stat-label">Temps limite</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">Multi</div>
+                    <div class="stat-label">Langages</div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h4 style="margin-top: 0; color: #059669;">✨ Ce qui vous attend :</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>Exercices progressifs</strong> adaptés à votre niveau</li>
+                    <li><strong>Tests automatisés</strong> pour valider vos solutions</li>
+                    <li><strong>Sauvegarde automatique</strong> de votre progression</li>
+                    <li><strong>Interface intuitive</strong> avec éditeur de code intégré</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ coding_link }}" class="button btn-primary">
+                    🚀 Commencer les exercices
+                </a>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <h4>⏰ Planning recommandé</h4>
+            <p><strong>Votre entretien :</strong> {{ scheduled_at }}</p>
+            <ul style="margin: 15px 0;">
+                <li><strong>Maintenant :</strong> Accédez aux exercices et familiarisez-vous avec l'interface</li>
+                <li><strong>1 heure avant l'entretien :</strong> Dernière session d'exercices autorisée</li>
+                <li><strong>Pendant l'entretien :</strong> Discussion de vos solutions avec le recruteur</li>
+                <li><strong>2 heures après :</strong> Accès aux exercices expiré</li>
+            </ul>
+        </div>
+
+        <div style="background: #f0f9ff; border: 1px solid #0ea5e9; padding: 20px; border-radius: 8px; margin: 25px 0;">
+            <h4 style="color: #0c4a6e; margin-top: 0;">💡 Conseils pour réussir :</h4>
+            <ol style="margin: 0; padding-left: 20px; color: #0c4a6e;">
+                <li><strong>Lisez attentivement</strong> chaque énoncé avant de commencer</li>
+                <li><strong>Testez régulièrement</strong> votre code avec les exemples fournis</li>
+                <li><strong>Commentez votre code</strong> pour expliquer votre raisonnement</li>
+                <li><strong>Optimisez progressivement</strong> - une solution qui fonctionne vaut mieux qu'une solution parfaite inachevée</li>
+                <li><strong>Gérez votre temps</strong> - vous avez 2 heures au total</li>
+            </ol>
+        </div>
+
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <p style="margin: 0; color: #92400e;"><strong>⚠️ Important :</strong> Vos résultats seront automatiquement sauvegardés et analysés par notre équipe technique. Aucune action supplémentaire n'est nécessaire de votre part après completion.</p>
+        </div>
+
+        <p>Ces exercices sont l'occasion de montrer vos compétences en résolution de problèmes et votre maîtrise technique. Prenez votre temps et n'hésitez pas à explorer différentes approches.</p>
+        
+        <p>En cas de difficultés techniques, contactez-nous immédiatement.</p>
+        
+        <p>Bonne chance et bon coding !</p>
+        
+        <p>L'équipe technique RecruteIA</p>
+    </div>
+
+    <div class="footer">
+        <p>🔒 Vos données sont sécurisées et ne seront utilisées que dans le cadre de ce processus de recrutement</p>
+        <p>RecruteIA - Plateforme de recrutement assistée par IA</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+🎯 ENTRETIEN TERMINÉ
+
+Bonjour {{ recruiter_name|default('') }},
+
+L'entretien que vous aviez planifié vient de se terminer :
+
+DÉTAILS DE L'ENTRETIEN :
+- Poste : {{ job_title|default('Entretien') }}
+- Candidat : {{ candidate_name|default('Candidat') }}
+- Date de fin : {{ completion_date|default('Maintenant') }}
+{% if score %}
+- Score obtenu : {{ score }}/10
+{% endif %}
+
+Les résultats détaillés de l'entretien sont maintenant disponibles dans votre tableau de bord. Vous pouvez consulter l'analyse complète, les réponses du candidat et prendre votre décision.
+
+{% if notification_link %}
+Voir les résultats : {{ notification_link }}
+{% endif %}
+
+Bonne suite dans votre processus de recrutement !
+
+Cordialement,
+L'équipe RecruteIA
+
+---
+RecruteIA - Plateforme de recrutement intelligente

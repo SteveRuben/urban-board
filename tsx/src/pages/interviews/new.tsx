@@ -7,6 +7,10 @@ import ResumeUpload from '@/components/resume/resume-upload';
 import AIAssistantService from '@/services/ai-assistant-service';
 import axios from 'axios';
 import { Brain, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
+import { InterviewSchedulingService } from '@/services/interview-scheduling-service';
+import { CodingPlatformService } from '@/services/coding-platform-service';
+import { ExerciseSuggestion } from '@/types/interview-scheduling';
+
 
 // Types
 interface FormDataType {
@@ -21,6 +25,11 @@ interface FormDataType {
   resume_id: string | null;
   team_id: string;
   ai_assistants: string[];
+  exercise_ids: number[];
+  auto_select_exercises: boolean;
+  coding_difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  coding_time_limit: number;
+  exercise_count: number;
 }
 
 interface AIAssistantCapabilities {
@@ -69,6 +78,11 @@ const NewInterviewPage = () => {
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
   const [assistants, setAssistants] = useState<AIAssistant[]>([]);
   const [loadingAssistants, setLoadingAssistants] = useState<boolean>(false);
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<ExerciseSuggestion[]>([]);
+  const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [exerciseKeywords, setExerciseKeywords] = useState<string[]>([]);
+  const [showExerciseSelection, setShowExerciseSelection] = useState<boolean>(false);
+
   const [formData, setFormData] = useState<FormDataType>({
     job_role: '',
     experience_level: 'intermediaire',
@@ -81,6 +95,11 @@ const NewInterviewPage = () => {
     resume_id: null,
     team_id: '',
     ai_assistants: [],
+    exercise_ids: [],
+    auto_select_exercises: true,
+    coding_difficulty: 'intermediate',
+    coding_time_limit: 120,
+    exercise_count: 4
   });
 
   // Pré-remplir le formulaire avec les paramètres d'URL s'ils existent
@@ -146,6 +165,71 @@ const NewInterviewPage = () => {
     
     fetchAssistants();
   }, [step]);
+
+  useEffect(() => {
+    if (formData.job_role && step >= 2) {
+      loadExerciseSuggestions();
+    }
+  }, [formData.job_role, step]);
+
+  // Charger les suggestions d'exercices
+  const loadExerciseSuggestions = async () => {
+    if (!formData.job_role.trim()) return;
+
+    try {
+      setLoadingExercises(true);
+      const suggestions = await InterviewSchedulingService.getExerciseSuggestions({
+        position: formData.job_role,
+        description: '', // Pourrait être ajouté plus tard
+        difficulty: formData.coding_difficulty
+      });
+      
+      setExerciseSuggestions(suggestions.exercises);
+      setExerciseKeywords(suggestions.keywords_extracted);
+      
+      // Sélectionner automatiquement les meilleurs exercices si l'auto-sélection est activée
+      if (formData.auto_select_exercises && suggestions.exercises.length > 0) {
+        const topExercises = suggestions.exercises
+          .slice(0, formData.exercise_count)
+          .map(ex => ex.id);
+        setFormData(prev => ({ ...prev, exercise_ids: topExercises }));
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des exercices:', error);
+    } finally {
+      setLoadingExercises(false);
+    }
+  };
+
+  //  Gérer la sélection/déselection d'exercices
+  const toggleExerciseSelection = (exerciseId: number) => {
+    setFormData(prev => {
+      const currentIds = prev.exercise_ids || [];
+      if (currentIds.includes(exerciseId)) {
+        return {
+          ...prev,
+          exercise_ids: currentIds.filter(id => id !== exerciseId)
+        };
+      } else {
+        return {
+          ...prev,
+          exercise_ids: [...currentIds, exerciseId]
+        };
+      }
+    });
+  };
+
+  // Gérer le changement de mode de sélection d'exercices
+  const handleExerciseSelectionModeChange = (autoSelect: boolean) => {
+    setFormData(prev => ({ ...prev, auto_select_exercises: autoSelect }));
+    
+    if (autoSelect && exerciseSuggestions.length > 0) {
+      const topExercises = exerciseSuggestions
+        .slice(0, formData.exercise_count)
+        .map(ex => ex.id);
+      setFormData(prev => ({ ...prev, exercise_ids: topExercises }));
+    }
+  };
 
   // Gérer les changements de champs du formulaire
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -238,18 +322,26 @@ const NewInterviewPage = () => {
     
     try {
       setIsSubmitting(true);
-      
-      // En environnement de développement, simuler la création d'un entretien
-      if (process.env.NODE_ENV === 'development') {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const mockInterviewId = `int-${Date.now()}`;
-        router.push(`/interviews/${mockInterviewId}`);
-        return;
-      }
-      
+      const submissionData = {
+        ...formData,
+        candidate_name: formData.candidate_name,
+        candidate_email: formData.candidate_email,
+        title: `Entretien ${formData.job_role}`,
+        position: formData.job_role,
+        scheduled_at: formData.scheduled_time,
+        duration_minutes: formData.interview_duration,
+        mode: formData.interview_mode,
+        
+        description: `Entretien pour le poste de ${formData.job_role}`,
+        predefined_questions: formData.custom_questions,
+        exercise_ids: formData.auto_select_exercises ? undefined : formData.exercise_ids,
+        coding_difficulty: formData.coding_difficulty,
+        coding_time_limit: formData.coding_time_limit,
+        exercise_count: formData.exercise_count
+      };
       // En production, appeler l'API pour créer l'entretien
-      const response = await axios.post('/api/interviews', formData);
-      router.push(`/interviews/${response.data.id}`);
+      const response = await InterviewSchedulingService.createSchedule(submissionData);;
+      router.push(`/interviews/${response.id}`);
     } catch (err) {
       console.error('Erreur lors de la création de l\'entretien:', err);
       alert('Impossible de créer l\'entretien. Veuillez réessayer.');
@@ -273,6 +365,13 @@ const NewInterviewPage = () => {
         return;
       }
       setStep(3);
+    } else if (step === 3) {
+      // Valider les exercices si nécessaire
+      if (!formData.auto_select_exercises && formData.exercise_ids.length === 0) {
+        alert('Veuillez sélectionner au moins un exercice ou activer la sélection automatique.');
+        return;
+      }
+      setStep(4);
     }
   };
 
@@ -333,9 +432,15 @@ const NewInterviewPage = () => {
                 <div className="flex items-center">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
                     step >= 3 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    3
-                  </div>
+                  }`}>3</div>
+                  <div className="ml-2 text-sm font-medium">Exercices de coding</div>
+                </div>
+                <div className={`h-0.5 flex-1 mx-4 ${step > 3 ? 'bg-primary-600' : 'bg-gray-200'}`}></div>
+                
+                <div className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                    step >= 4 ? 'bg-primary-600 text-black' : 'bg-gray-200 text-gray-500'
+                  }`}>4</div>
                   <div className="ml-2 text-sm font-medium">Confirmation</div>
                 </div>
               </div>
@@ -665,6 +770,241 @@ const NewInterviewPage = () => {
                   </div>
                 </div>
               )}
+
+{step === 3 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-6">Exercices de coding</h2>
+                  
+                  <div className="space-y-6">
+                    {/* Mode de sélection des exercices */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Mode de sélection des exercices
+                      </label>
+                      <div className="space-y-4">
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            formData.auto_select_exercises 
+                              ? 'border-primary-600 bg-primary-50' 
+                              : 'border-gray-300 hover:border-primary-300'
+                          }`}
+                          onClick={() => handleExerciseSelectionModeChange(true)}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="auto_select"
+                              name="exercise_selection_mode"
+                              value="auto"
+                              checked={formData.auto_select_exercises}
+                              onChange={() => handleExerciseSelectionModeChange(true)}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                            />
+                            <label htmlFor="auto_select" className="ml-3 font-medium text-gray-800">
+                              Sélection automatique
+                            </label>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-600 ml-7">
+                            L'IA sélectionne automatiquement les exercices les plus pertinents selon le poste
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            !formData.auto_select_exercises 
+                              ? 'border-primary-600 bg-primary-50' 
+                              : 'border-gray-300 hover:border-primary-300'
+                          }`}
+                          onClick={() => handleExerciseSelectionModeChange(false)}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="manual_select"
+                              name="exercise_selection_mode"
+                              value="manual"
+                              checked={!formData.auto_select_exercises}
+                              onChange={() => handleExerciseSelectionModeChange(false)}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                            />
+                            <label htmlFor="manual_select" className="ml-3 font-medium text-gray-800">
+                              Sélection manuelle
+                            </label>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-600 ml-7">
+                            Choisissez manuellement les exercices spécifiques que vous souhaitez assigner
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Paramètres de sélection automatique */}
+                    {formData.auto_select_exercises && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <label htmlFor="exercise_count" className="block text-sm font-medium text-gray-700 mb-1">
+                            Nombre d'exercices
+                          </label>
+                          <select
+                            id="exercise_count"
+                            name="exercise_count"
+                            value={formData.exercise_count}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              exercise_count: parseInt(e.target.value) 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="2">2 exercices</option>
+                            <option value="3">3 exercices</option>
+                            <option value="4">4 exercices</option>
+                            <option value="5">5 exercices</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="coding_difficulty" className="block text-sm font-medium text-gray-700 mb-1">
+                            Niveau de difficulté
+                          </label>
+                          <select
+                            id="coding_difficulty"
+                            name="coding_difficulty"
+                            value={formData.coding_difficulty}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              coding_difficulty: e.target.value as any 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="beginner">Débutant</option>
+                            <option value="intermediate">Intermédiaire</option>
+                            <option value="advanced">Avancé</option>
+                            <option value="expert">Expert</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="coding_time_limit" className="block text-sm font-medium text-gray-700 mb-1">
+                            Temps limite (minutes)
+                          </label>
+                          <select
+                            id="coding_time_limit"
+                            name="coding_time_limit"
+                            value={formData.coding_time_limit}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              coding_time_limit: parseInt(e.target.value) 
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          >
+                            <option value="60">1 heure</option>
+                            <option value="90">1h30</option>
+                            <option value="120">2 heures</option>
+                            <option value="180">3 heures</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Affichage des mots-clés détectés */}
+                    {exerciseKeywords.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-blue-900 mb-2">
+                          Compétences détectées pour "{formData.job_role}"
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {exerciseKeywords.map((keyword, index) => (
+                            <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Liste des exercices suggérés */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {formData.auto_select_exercises ? 'Exercices sélectionnés automatiquement' : 'Exercices disponibles'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={loadExerciseSuggestions}
+                          disabled={loadingExercises}
+                          className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                          {loadingExercises ? 'Chargement...' : 'Actualiser'}
+                        </button>
+                      </div>
+                      
+                      {loadingExercises ? (
+                        <div className="flex justify-center items-center p-8 border border-dashed border-gray-300 rounded-md">
+                          <RefreshCw className="h-6 w-6 animate-spin text-primary-600 mr-2" />
+                          <span className="text-gray-500">Recherche d'exercices pertinents...</span>
+                        </div>
+                      ) : exerciseSuggestions.length === 0 ? (
+                        <div className="text-center p-6 border border-dashed border-gray-300 rounded-md">
+                          <Code className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                          <p className="text-gray-600 mb-3">Aucun exercice trouvé pour ce poste.</p>
+                          <p className="text-sm text-gray-500">
+                            Vous pourrez créer ou assigner des exercices après la création de l'entretien.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-md p-3">
+                          {exerciseSuggestions.map((exercise) => (
+                            <div 
+                              key={exercise.id}
+                              className={`rounded-lg p-4 cursor-pointer transition-colors ${
+                                formData.exercise_ids.includes(exercise.id) 
+                                  ? 'bg-primary-50 border-2 border-primary-300' 
+                                  : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+                              } ${formData.auto_select_exercises ? 'pointer-events-none opacity-75' : ''}`}
+                              onClick={() => !formData.auto_select_exercises && toggleExerciseSelection(exercise.id)}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-medium text-gray-900">{exercise.title}</h4>
+                                    {exercise.relevance_score && (
+                                      <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">
+                                        {Math.round(exercise.relevance_score * 10)}% pertinent
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 mb-2">{exercise.description}</p>
+                                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{exercise.language}</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{exercise.difficulty}</span>
+                                    <span>{exercise.challenge_count} challenge{exercise.challenge_count > 1 ? 's' : ''}</span>
+                                  </div>
+                                </div>
+                                {!formData.auto_select_exercises && (
+                                  <div className="ml-2">
+                                    {formData.exercise_ids.includes(exercise.id) ? (
+                                      <CheckCircle className="h-5 w-5 text-primary-600" />
+                                    ) : (
+                                      <div className="h-5 w-5 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {!formData.auto_select_exercises && exerciseSuggestions.length > 0 && (
+                        <p className="mt-2 text-xs text-gray-500">
+                          {formData.exercise_ids.length} exercice{formData.exercise_ids.length > 1 ? 's' : ''} sélectionné{formData.exercise_ids.length > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
 
               {/* Étape 3 : Confirmation */}
               {step === 3 && (

@@ -3,11 +3,16 @@ from flask import Blueprint, request, jsonify, current_app, g
 from werkzeug.exceptions import BadRequest, NotFound, Forbidden
 from sqlalchemy.orm.exc import NoResultFound
 
-from app.middleware.auth_middleware import token_required
+from app.routes.user import token_required
 from app.services.ai_assistant_service import ai_assistant_service
 
 # Création du Blueprint
 ai_assistant_bp = Blueprint('ai_assistant', __name__, url_prefix='/api/ai-assistants')
+
+def get_current_user_id():
+    """Retourne l'ID utilisateur actuel sous forme de string"""
+    return str(g.current_user.user_id)
+
 
 @ai_assistant_bp.route('', methods=['GET'])
 @token_required
@@ -90,10 +95,12 @@ def create_assistant():
         data = request.json
         if not data:
             raise BadRequest("Données manquantes")
-        
+        organization_id = g.current_user.current_organization_id
+
         assistant = ai_assistant_service.create_assistant(
             user_id=g.current_user.id,
-            assistant_data=data
+            assistant_data=data,
+            organization_id = organization_id,
         )
         return jsonify(assistant), 201
     except BadRequest as e:

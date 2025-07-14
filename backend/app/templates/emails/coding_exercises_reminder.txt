@@ -1,0 +1,53 @@
+
+<!-- backend/templates/emails/coding_exercises_reminder.txt -->
+Exercices de coding - {{ interview_title }}
+
+Bonjour {{ candidate_name }},
+
+Votre entretien {{ interview_title }} approche ! Pour vous permettre de démontrer au mieux vos compétences techniques, nous avons préparé des exercices de coding spécialement sélectionnés pour vous.
+
+VOS EXERCICES PERSONNALISÉS
+===========================
+- {{ coding_exercises_count }} exercice{% if coding_exercises_count > 1 %}s{% endif %} adaptés à votre profil
+- Temps limite : 2 heures
+- Langages multiples supportés
+- Tests automatisés pour validation
+
+CE QUI VOUS ATTEND
+==================
+✓ Exercices progressifs adaptés à votre niveau
+✓ Tests automatisés pour valider vos solutions  
+✓ Sauvegarde automatique de votre progression
+✓ Interface intuitive avec éditeur de code intégré
+
+ACCÉDER AUX EXERCICES
+=====================
+{{ coding_link }}
+
+PLANNING RECOMMANDÉ
+==================
+Votre entretien : {{ scheduled_at }}
+
+- Maintenant : Accédez aux exercices et familiarisez-vous
+- 1 heure avant l'entretien : Dernière session autorisée
+- Pendant l'entretien : Discussion de vos solutions
+- 2 heures après : Accès expiré
+
+CONSEILS POUR RÉUSSIR
+=====================
+1. Lisez attentivement chaque énoncé avant de commencer
+2. Testez régulièrement votre code avec les exemples fournis
+3. Commentez votre code pour expliquer votre raisonnement
+4. Optimisez progressivement - une solution qui fonctionne vaut mieux qu'une solution parfaite inachevée
+5. Gérez votre temps - vous avez 2 heures au total
+
+IMPORTANT : Vos résultats seront automatiquement sauvegardés et analysés par notre équipe technique. Aucune action supplémentaire n'est nécessaire après completion.
+
+En cas de difficultés techniques, contactez-nous immédiatement.
+
+Bonne chance et bon coding !
+
+L'équipe technique RecruteIA
+
+---
+Vos données sont sécurisées et ne seront utilisées que dans le cadre de ce processus de recrutement.

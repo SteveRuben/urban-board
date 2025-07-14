@@ -1,0 +1,40 @@
+ENTRETIEN REPROGRAMMÉ
+
+Bonjour {{ candidate_name }},
+
+Nous vous informons que votre entretien "{{ interview_title }}" a été reprogrammé.
+
+NOUVELLES INFORMATIONS :
+========================
+- Titre : {{ interview_title }}
+- Nouvelle date : {{ scheduled_at }}
+- Durée : {{ duration_minutes }} minutes
+- Fuseau horaire : {{ timezone }}
+- Recruteur : {{ recruiter_name }}
+
+CONFIRMER VOTRE DISPONIBILITÉ :
+===============================
+Merci de cliquer sur l'un des liens suivants :
+
+✅ Pour CONFIRMER la nouvelle date :
+{{ confirm_url }}
+
+❌ Pour ANNULER l'entretien :
+{{ cancel_url }}
+
+ACCÈS À L'ENTRETIEN :
+====================
+Le jour de l'entretien, utilisez ce lien pour rejoindre la salle virtuelle :
+{{ interview_url }}
+
+{% if add_to_calendar_url %}
+CALENDRIER :
+============
+Mettre à jour votre calendrier : {{ add_to_calendar_url }}
+{% endif %}
+
+Nous nous excusons pour ce changement et espérons que cette nouvelle date vous conviendra.
+
+Cordialement,
+{{ recruiter_name }}
+Équipe RecruteIA

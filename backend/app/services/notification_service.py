@@ -6,6 +6,7 @@ from datetime import datetime
 from flask import current_app
 from ..models.notification import Notification
 from ..models.notification_setting import NotificationSetting, NotificationPreference
+import hashlib
 
 class NotificationService:
     """
@@ -27,7 +28,10 @@ class NotificationService:
         """
         self.db = db
         self.logger = logger or current_app.logger if current_app else None
-        
+        self.email_service = None
+        if current_app:
+            from ..services.email_service import EmailService
+            self.email_service = EmailService()
         # Mode fichier JSON (pour le développement ou les tests)
         self.db_path = db_path or os.path.join(os.path.dirname(__file__), '../data/notifications.json')
         self.file_mode = db is None
@@ -181,42 +185,42 @@ class NotificationService:
             link=link
         )
     
-    def create_interview_scheduled_notification(self, user_id, interview_data):
-        """
-        Crée une notification pour un entretien planifié.
+    # def create_interview_scheduled_notification(self, user_id, interview_data):
+    #     """
+    #     Crée une notification pour un entretien planifié.
         
-        Args:
-            user_id (str): Identifiant du recruteur à notifier
-            interview_data (dict): Données de l'entretien planifié
+    #     Args:
+    #         user_id (str): Identifiant du recruteur à notifier
+    #         interview_data (dict): Données de l'entretien planifié
             
-        Returns:
-            Notification: La notification créée
-        """
-        candidate_name = interview_data.get('candidate_name', 'Un candidat')
-        job_role = interview_data.get('job_role', 'Poste non spécifié')
-        interview_id = interview_data.get('id')
-        date = interview_data.get('date')
+    #     Returns:
+    #         Notification: La notification créée
+    #     """
+    #     candidate_name = interview_data.get('candidate_name', 'Un candidat')
+    #     job_role = interview_data.get('job_role', 'Poste non spécifié')
+    #     interview_id = interview_data.get('id')
+    #     date = interview_data.get('date')
         
-        title = f"Entretien planifié: {candidate_name}"
-        message = f"Un entretien avec {candidate_name} pour le poste de {job_role} est planifié"
+    #     title = f"Entretien planifié: {candidate_name}"
+    #     message = f"Un entretien avec {candidate_name} pour le poste de {job_role} est planifié"
         
-        if date:
-            # Formatage de la date pour affichage
-            formatted_date = self._format_datetime(date)
-            message += f" pour le {formatted_date}."
-        else:
-            message += "."
+    #     if date:
+    #         # Formatage de la date pour affichage
+    #         formatted_date = self._format_datetime(date)
+    #         message += f" pour le {formatted_date}."
+    #     else:
+    #         message += "."
         
-        link = f"/interviews/{interview_id}"
+    #     link = f"/interviews/{interview_id}"
         
-        return self.create_notification(
-            user_id=user_id,
-            title=title,
-            message=message,
-            type='interview_scheduled',
-            reference_id=interview_id,
-            link=link
-        )
+    #     return self.create_notification(
+    #         user_id=user_id,
+    #         title=title,
+    #         message=message,
+    #         type='interview_scheduled',
+    #         reference_id=interview_id,
+    #         link=link
+    #     )
     
     def create_candidate_application_notification(self, user_id, candidate_data):
         """
@@ -663,40 +667,7 @@ class NotificationService:
             if not self.file_mode:
                 self.db.session.rollback()
             return False
-    
-    def _send_notification(self, notification):
-        """
-        Envoie la notification par différents canaux selon sa configuration.
-        
-        Args:
-            notification (Notification): Notification à envoyer
-        """
-        try:
-            user_id = notification.user_id
-            notification_type = notification.type
-            
-            # Vérifier si l'email est activé pour ce type de notification
-            should_send_email = self._should_send_notification(user_id, notification_type, 'email')
-            
-            # Vérifier si les notifications mobiles sont activées
-            should_send_mobile = self._should_send_notification(user_id, notification_type, 'mobile')
-            
-            # Envoi d'email en temps réel si configuré
-            if should_send_email and self._should_send_realtime_email(user_id):
-                self._send_email_notification(notification)
-            
-            # Envoi de notification mobile si configuré
-            if should_send_mobile:
-                self._send_mobile_notification(notification)
-                
-            # TODO: Implémenter d'autres canaux si nécessaire:
-            # - Webhooks
-            # - Intégrations avec des services tiers comme Slack
-            
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"Erreur lors de l'envoi d'une notification: {str(e)}")
-    
+
     def _should_send_notification(self, user_id, notification_type, category):
         """
         Vérifie si une notification doit être envoyée selon les préférences utilisateur.
@@ -772,12 +743,54 @@ class NotificationService:
         Args:
             notification (Notification): La notification à envoyer
         """
-        # Implémentation à connecter avec le service d'email
-        if self.logger:
-            self.logger.info(f"Email pour notification {notification.id} mis en file d'attente")
+        # # Implémentation à connecter avec le service d'email
+        # if self.logger:
+        #     self.logger.info(f"Email pour notification {notification.id} mis en file d'attente")
         
-        # TODO: Intégrer avec le service d'email_notification_service
-        pass
+        # # TODO: Intégrer avec le service d'email_notification_service
+        if not self.email_service:
+            if self.logger:
+                self.logger.warning("EmailService non disponible pour l'envoi de notification")
+            return False
+    
+        try:
+            # Déterminer le template et contexte selon le type de notification
+            template_name, context = self._get_email_template_and_context(notification)
+            
+            if not template_name:
+                if self.logger:
+                    self.logger.warning(f"Pas de template email pour le type: {notification.type}")
+                return False
+            
+            # Récupérer l'email de l'utilisateur
+            from ..models.user import User
+            user = User.query.get(notification.user_id)
+            if not user or not user.email:
+                if self.logger:
+                    self.logger.warning(f"Utilisateur {notification.user_id} introuvable ou sans email")
+                return False
+            
+            # Envoyer l'email
+            success = self.email_service.send_email(
+                to_email=user.email,
+                subject=notification.title,
+                template_name=template_name,
+                context=context
+            )
+            
+            if self.logger:
+                if success:
+                    self.logger.info(f"Email envoyé pour notification {notification.id}")
+                else:
+                    self.logger.error(f"Échec envoi email pour notification {notification.id}")
+            
+            return success
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur lors de l'envoi email notification {notification.id}: {str(e)}")
+            return False
+            # pass
     
     def _send_mobile_notification(self, notification):
         """
@@ -954,3 +967,405 @@ class NotificationService:
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Erreur lors de l'envoi d'une notification: {str(e)}")
+
+    def _get_email_template_and_context(self, notification):
+        """
+        Détermine le template et contexte email selon le type de notification.
+
+        Args:
+            notification (Notification): La notification
+
+        Returns:
+            tuple: (template_name, context) ou (None, None) si pas de template
+        """
+        # Contexte de base pour tous les emails
+        base_context = {
+            'notification_title': notification.title,
+            'notification_message': notification.message,
+            'notification_link': notification.link,
+            'user_id': notification.user_id
+        }
+
+        # Templates spécifiques selon le type
+        if notification.type == 'candidate_application':
+            return 'new_application_notification', base_context
+
+        elif notification.type == 'application_status_update':
+            return 'application_status_update', base_context
+
+        elif notification.type == 'interview_completed':
+            interview_context = base_context.copy()
+            interview_context.update({
+                'completion_date': datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                'candidate_name': 'Candidat',  # À récupérer depuis la référence
+                'job_title': 'Entretien',     # À récupérer depuis la référence
+                'recruiter_name': '',         # À récupérer depuis l'utilisateur
+                'score': None                 # À récupérer depuis les données d'entretien
+            })
+
+        elif notification.type == 'interview_scheduled':
+            return 'interview_rescheduled', base_context
+
+        # Template générique pour les autres types
+        return 'generic_notification', base_context
+
+    def create_application_confirmation_notification(self, application, job):
+        """Crée une notification de confirmation de candidature"""
+        try:
+            title = f"Confirmation de candidature - {job.title}"
+            message = f"Votre candidature pour le poste de {job.title} a été reçue avec succès."
+
+            # Créer la notification en base pour l'historique
+            notification = self.create_notification(
+                user_id=application.candidate_email,  # Utiliser l'email comme ID temporaire
+                title=title,
+                message=message,
+                type='application_confirmation',
+                reference_id=application.id,
+                link=f"/applications/{application.id}"
+            )
+
+            # Envoyer directement l'email avec le template spécifique
+            if self.email_service:
+                context = {
+                    'candidate_name': application.candidate_name,
+                    'job_title': job.title,
+                    'organization_name': job.organization.name if job.organization else 'l\'entreprise',
+                    'application_date': application.created_at.strftime("%d/%m/%Y à %H:%M"),
+                    'job_location': job.location,
+                    'employment_type': job.employment_type
+                }
+
+                return self.email_service.send_email(
+                    application.candidate_email,
+                    title,
+                    'application_confirmation',
+                    context
+                )
+
+            return notification
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification confirmation: {str(e)}")
+            return None
+
+    def create_new_application_notification(self, application, job):
+        """Crée une notification pour nouvelle candidature au recruteur"""
+        try:
+            if not job.creator:
+                return None
+
+            title = f"Nouvelle candidature pour {job.title}"
+            message = f"{application.candidate_name} a postulé pour le poste de {job.title}."
+
+            # Créer la notification pour le recruteur
+            notification = self.create_notification(
+                user_id=job.creator.id,
+                title=title,
+                message=message,
+                type='new_application',
+                reference_id=application.id,
+                link=f"/dashboard/applications/{application.id}"
+            )
+
+            # Le système enverra automatiquement l'email si configuré
+            return notification
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification nouvelle candidature: {str(e)}")
+            return None
+
+    def create_status_update_notification(self, application, old_status, new_status):
+        """Crée une notification de changement de statut pour le candidat"""
+        try:
+            # Messages selon le statut
+            status_messages = {
+                'reviewed': 'Votre candidature a été examinée',
+                'interview_scheduled': 'Un entretien a été planifié',
+                'rejected': 'Votre candidature n\'a pas été retenue',
+                'hired': 'Félicitations ! Votre candidature a été acceptée'
+            }
+
+            if new_status not in status_messages:
+                return None
+
+            title = f"Mise à jour de votre candidature - {application.job_posting.title}"
+            message = status_messages[new_status]
+
+            # Créer la notification avec l'email comme user_id temporaire
+            notification = self.create_notification(
+                user_id=application.candidate_email,
+                title=title,
+                message=message,
+                type='application_status_update',
+                reference_id=application.id,
+                link=f"/applications/{application.id}/status"
+            )
+
+            # Envoyer directement l'email
+            if self.email_service:
+                context = {
+                    'candidate_name': application.candidate_name,
+                    'job_title': application.job_posting.title,
+                    'organization_name': application.job_posting.organization.name if application.job_posting.organization else 'l\'entreprise',
+                    'status_message': message,
+                    'new_status': new_status,
+                    'notes': application.notes
+                }
+
+                return self.email_service.send_email(
+                    application.candidate_email,
+                    title,
+                    'application_status_update',
+                    context
+                )
+
+            return notification
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification statut: {str(e)}")
+            return None
+        
+    def create_interview_scheduled_notification(self, recruiter_id, schedule_data):
+        """Crée une notification d'entretien planifié pour le recruteur"""
+        try:
+            title = "Nouvel entretien planifié"
+            message = f"Vous avez planifié un entretien avec {schedule_data['candidate_name']} pour le {schedule_data['scheduled_at']}"
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='interview_scheduled',
+                reference_id=schedule_data['schedule_id'],
+                link=f"/interviews/scheduled/{schedule_data['schedule_id']}"
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification entretien planifié: {str(e)}")
+            return None
+
+    def create_interview_rescheduled_notification(self, recruiter_id, schedule_data):
+        """Crée une notification d'entretien reprogrammé"""
+        try:
+            title = "Entretien reprogrammé"
+            message = f"L'entretien avec {schedule_data['candidate_name']} a été reprogrammé pour le {schedule_data['scheduled_at']}"
+
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='interview_rescheduled',
+                reference_id=schedule_data['schedule_id'],
+                link=f"/interviews/scheduled/{schedule_data['schedule_id']}"
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification reprogrammation: {str(e)}")
+            return None
+
+    def create_interview_canceled_notification(self, recruiter_id, schedule_data):
+        """Crée une notification d'entretien annulé"""
+        try:
+            title = "Entretien annulé"
+            message = f"L'entretien avec {schedule_data['candidate_name']} a été annulé"
+
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='interview_canceled',
+                reference_id=schedule_data['schedule_id'],
+                link=f"/interviews/scheduled/{schedule_data['schedule_id']}"
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification annulation: {str(e)}")
+            return None
+
+    def create_interview_reminder_notification(self, recruiter_id, schedule_data):
+        """Crée une notification de rappel d'entretien"""
+        try:
+            title = "Rappel d'entretien"
+            message = f"Rappel: Vous avez un entretien avec {schedule_data['candidate_name']} demain à {schedule_data['time']}"
+
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='interview_reminder',
+                reference_id=schedule_data['schedule_id'],
+                link=f"/interviews/scheduled/{schedule_data['schedule_id']}"
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification rappel: {str(e)}")
+            return None
+
+    def send_interview_invitation_email(self, schedule):
+        """Envoie une invitation d'entretien par email au candidat"""
+        try:
+            return self.send_interview_invitation_with_response_buttons(schedule)
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi invitation entretien: {str(e)}")
+            return False
+
+    def send_interview_rescheduled_email(self, schedule):
+        """Envoie un email de reprogrammation au candidat"""
+        try:
+            return self.send_interview_rescheduled_with_response_buttons(schedule)
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi reprogrammation entretien: {str(e)}")
+            return False
+
+    def send_interview_canceled_email(self, schedule, reason=None):
+        """Envoie un email d'annulation au candidat"""
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_canceled(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Le recruteur',
+                reason=reason
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi annulation entretien: {str(e)}")
+            return False
+
+    def send_interview_reminder_email(self, schedule):
+        """Envoie un rappel d'entretien par email au candidat"""
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_reminder(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.name if schedule.recruiter else 'Le recruteur',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token,
+                meet_link=schedule.meet_link
+            )
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi rappel entretien: {str(e)}")
+            return False
+    
+    def send_interview_invitation_with_response_buttons(self, schedule):
+        """
+        Version simplifiée qui utilise directement EmailService
+        """
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_invitation(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token,
+                description=schedule.description,
+                meet_link=schedule.meet_link
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi invitation avec boutons: {str(e)}")
+            return False    
+
+    def send_interview_rescheduled_with_response_buttons(self, schedule):
+        """
+        Version simplifiée qui utilise directement EmailService
+        """
+        try:
+            if not self.email_service:
+                return False
+
+            return self.email_service.send_interview_rescheduled(
+                email=schedule.candidate_email,
+                candidate_name=schedule.candidate_name,
+                interview_title=schedule.title,
+                recruiter_name=schedule.recruiter.first_name if schedule.recruiter else 'Équipe RH',
+                scheduled_at=schedule.scheduled_at,
+                duration_minutes=schedule.duration_minutes,
+                timezone=schedule.timezone,
+                access_token=schedule.access_token
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur envoi reprogrammation avec boutons: {str(e)}")
+            return False
+    
+    def create_candidate_response_notification(self, recruiter_id, schedule, action, reason=None):
+        """
+        Crée une notification pour informer le recruteur de la réponse du candidat
+
+        Args:
+            recruiter_id: ID du recruteur
+            schedule: Objet InterviewSchedule
+            action: 'confirmed' ou 'canceled'
+            reason: Raison de l'annulation (si applicable)
+
+        Returns:
+            Notification créée
+        """
+        try:
+            if action == 'confirmed':
+                title = f"Entretien confirmé - {schedule.candidate_name}"
+                message = f"Le candidat {schedule.candidate_name} a confirmé sa présence pour l'entretien du {schedule.scheduled_at.strftime('%d/%m/%Y à %H:%M')}"
+            else:  # canceled
+                title = f"Entretien annulé - {schedule.candidate_name}"
+                message = f"Le candidat {schedule.candidate_name} a annulé l'entretien du {schedule.scheduled_at.strftime('%d/%m/%Y à %H:%M')}"
+                if reason:
+                    message += f" - Raison: {reason}"
+
+            return self.create_notification(
+                user_id=recruiter_id,
+                title=title,
+                message=message,
+                type='candidate_response',
+                reference_id=schedule.id,
+                link=f"/interviews/scheduled/{schedule.id}"
+            )
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Erreur création notification réponse candidat: {str(e)}")
+            return None
+
+    def generate_candidate_response_urls(self, access_token, base_url=None):
+        """Génère les URLs candidat (méthode d'instance)"""
+        
+        if base_url is None:
+            base_url = current_app.config.get('APP_BASE_URL', 'https://votre-domaine.com')
+
+        def generate_action_hash(access_token, action):
+            secret_key = current_app.config.get('CANDIDATE_RESPONSE_SECRET', 'default_secret_key')
+            data = f"{access_token}:{action}:{secret_key}"
+            return hashlib.sha256(data.encode()).hexdigest()[:16]
+
+        confirm_hash = generate_action_hash(access_token, 'confirm')
+        cancel_hash = generate_action_hash(access_token, 'cancel')
+
+        return {
+            'confirm_url': f"{base_url}/api/candidate/interview/{access_token}/confirm/{confirm_hash}",
+            'cancel_url': f"{base_url}/api/candidate/interview/{access_token}/cancel/{cancel_hash}",
+        }
