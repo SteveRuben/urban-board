@@ -1,4 +1,4 @@
-import { AdminTestResponse, BulkTestCasesData, Challenge, ChallengeDifficulty, ChallengeFormData, ChallengesResponse, ChallengeStatus, ChallengeStep, ChallengeStepFormData, CodeSubmissionData, ExecutionResult, Exercise, ExerciseFormData, ExercisesResponse, ExerciseWithChallenges, ProgrammingLanguage, StartChallengeData, StartChallengeResponse, SubmissionResponse, TestCase, TestCaseFormData, UserChallengeStatus, UserProgress } from '@/types/coding-plateform';
+import { AdminTestResponse, BulkTestCasesData, Challenge, ChallengeDifficulty, ChallengeFormData, ChallengesResponse, ChallengeStatus, ChallengeStep, ChallengeStepFormData, CodeSubmissionData, ExecutionResult, Exercise, ExerciseFormData, ExercisesResponse, ExerciseWithChallenges, ExtendedSubmissionData, ProgrammingLanguage, StartChallengeData, StartChallengeResponse, SubmissionResponse, TestCase, TestCaseFormData, UserChallengeStatus, UserProgress } from '@/types/coding-plateform';
 import { api } from './user-service';
 import axios from 'axios';
 
@@ -740,7 +740,7 @@ export class CodingPlatformService {
 
     // ✅ CORRECTION: Vérifier que les données sont bien structurées
     if (!data.code || !data.language) {
-      throw new Error('Les champs code et language sont obligatoires');
+      throw new Error('Les champs code et language sont obligatoires>>');
     }
 
     const response = await api.post(`${this.BASE_URL}/admin/steps/${stepId}/test`, {
@@ -771,17 +771,17 @@ export class CodingPlatformService {
 /**
  * Valide le code dans un contexte admin (Admin)
  */
-static async adminValidateCode(stepId: string, data: CodeSubmissionData): Promise<AdminTestResponse> {
+static async adminValidateCode(stepId: string, data: ExtendedSubmissionData): Promise<AdminTestResponse> {
   try {
     console.log("CodingPlatformService: Validation admin du code", { stepId, data });
 
     // ✅ CORRECTION: Vérifier que les données sont bien structurées
-    if (!data.code || !data.language) {
-      throw new Error('Les champs code et language sont obligatoires');
+    if (!data.content) {
+      throw new Error('Les champs code sont obligatoires>>>');
     }
 
     const response = await api.post(`${this.BASE_URL}/admin/steps/${stepId}/validate`, {
-      code: data.code,
+      content: data.content,
       language: data.language
     }, {
       headers: { 'Content-Type': 'application/json' },

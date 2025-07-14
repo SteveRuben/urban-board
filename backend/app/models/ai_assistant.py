@@ -4,10 +4,11 @@ import uuid
 from sqlalchemy import CHAR, TypeDecorator
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import relationship
+from cryptography.fernet import Fernet
+import os
 
 from app import db
 from ..models.organization import GUID
-
 
 
 class AIAssistant(db.Model):
@@ -26,6 +27,10 @@ class AIAssistant(db.Model):
     model = db.Column(db.String(50), nullable=False, default='claude-3-7-sonnet')
     capabilities = db.Column(db.JSON, nullable=True)  # Fonctionnalités disponibles pour cette IA
     
+    # Clé d'API chiffrée
+    api_key_encrypted = db.Column(db.Text, nullable=True)
+    api_provider = db.Column(db.String(50), nullable=True)  # 'openai', 'anthropic', 'google', etc.
+    api_key_last_updated = db.Column(db.DateTime, nullable=True)
     
     # Classification
     industry = db.Column(db.String(50), nullable=True)
@@ -76,9 +81,9 @@ class AIAssistant(db.Model):
     user = relationship('User', back_populates='ai_assistants')
     documents = relationship('AIAssistantDocument', back_populates='assistant', cascade='all, delete-orphan')
     interviews = relationship(
-    'Interview', 
-    back_populates='ai_assistant',
-    lazy='dynamic'  # Allows querying like assistant.interviews.filter(...)
+        'Interview', 
+        back_populates='ai_assistant',
+        lazy='dynamic'  # Allows querying like assistant.interviews.filter(...)
     )   
     organization = relationship("Organization", back_populates="ai_assistants")
     team_associations = db.relationship(
@@ -90,12 +95,100 @@ class AIAssistant(db.Model):
     def __repr__(self):
         return f'<AIAssistant {self.name}>'
     
-    def to_dict(self):
-        """Convertit l'assistant en dictionnaire pour l'API"""
-        return {
+    def _get_encryption_key(self):
+        """Récupère la clé de chiffrement depuis les variables d'environnement"""
+        key = os.getenv('API_KEY_ENCRYPTION_KEY')
+        print('lssssslsllksksksk')
+        if not key:
+            # Générer une clé par défaut en développement (à ne pas faire en production)
+            key = Fernet.generate_key()
+            os.environ['API_KEY_ENCRYPTION_KEY'] = key.decode()
+            print('lssssslsllksksksk1')
+        if isinstance(key, str):
+            print('lssssslsllksksksk3')
+            key = key.encode()
+        return key
+    
+    def set_api_key(self, api_key, provider=None):
+        """
+        Chiffre et stocke la clé d'API
+        
+        Args:
+            api_key (str): Clé d'API en clair
+            provider (str, optional): Fournisseur de l'API
+        """
+        if api_key:
+            print('Ajout de cle.............>>>>>>>>>>>1')
+            fernet = Fernet(self._get_encryption_key())
+            print('Ajout de cle.............>>>>>>>>>>>2')
+            self.api_key_encrypted = fernet.encrypt(api_key.encode()).decode()
+            print('Ajout de cle.............>>>>>>>>>>>3')
+            self.api_key_last_updated = datetime.utcnow()
+            print('Ajout de cle.............>>>>>>>>>>>4')
+            if provider:
+                print('Ajout de cle.............>>>>>>>>>>>5')
+                self.api_provider = provider
+        else:
+            self.api_key_encrypted = None
+            self.api_key_last_updated = None
+    
+    def get_api_key(self):
+        """
+        Déchiffre et retourne la clé d'API
+        
+        Returns:
+            str: Clé d'API en clair ou None
+        """
+        if not self.api_key_encrypted:
+            return None
+        
+        try:
+            fernet = Fernet(self._get_encryption_key())
+            return fernet.decrypt(self.api_key_encrypted.encode()).decode()
+        except Exception:
+            return None
+    
+    def has_api_key(self):
+        """
+        Vérifie si l'assistant a une clé d'API configurée
+        
+        Returns:
+            bool: True si une clé d'API est configurée
+        """
+        return self.api_key_encrypted is not None
+    
+    def get_masked_api_key(self):
+        """
+        Retourne une version masquée de la clé d'API pour l'affichage
+        
+        Returns:
+            str: Clé d'API masquée ou None
+        """
+        if not self.api_key_encrypted:
+            return None
+        
+        api_key = self.get_api_key()
+        if not api_key:
+            return None
+        
+        # Masquer la clé en ne montrant que les 4 premiers et 4 derniers caractères
+        if len(api_key) <= 8:
+            return "***"
+        
+        return f"{api_key[:4]}{'*' * (len(api_key) - 8)}{api_key[-4:]}"
+    
+    def to_dict(self, include_api_key=False):
+        """
+        Convertit l'assistant en dictionnaire pour l'API
+        
+        Args:
+            include_api_key (bool): Si True, inclut la clé d'API masquée
+        """
+        result = {
             'id': str(self.id),
             'name': self.name,
             'description': self.description,
+            'assistant_type': self.assistant_type,
             'avatar': self.avatar,
             'model': self.model,
             'industry': self.industry,
@@ -111,8 +204,17 @@ class AIAssistant(db.Model):
             'usageCount': self.usage_count,
             'lastUsed': self.last_used.isoformat() if self.last_used else None,
             'createdAt': self.created_at.isoformat(),
-            'updatedAt': self.updated_at.isoformat()
+            'updatedAt': self.updated_at.isoformat(),
+            'hasApiKey': self.has_api_key(),
+            'apiProvider': self.api_provider,
+            'apiKeyLastUpdated': self.api_key_last_updated.isoformat() if self.api_key_last_updated else None
         }
+        
+        if include_api_key:
+            result['apiKeyMasked'] = self.get_masked_api_key()
+        
+        return result
+
 
 class AIAssistantDocument(db.Model):
     """Modèle pour les documents associés aux assistants IA"""

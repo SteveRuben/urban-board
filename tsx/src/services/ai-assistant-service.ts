@@ -1,19 +1,46 @@
-// frontend/services/aiAssistantService.ts
-import { AIAssistant, CloneOptions, AIDocument, TestAssistantParams, HistoryFilters, AssistantTemplate } from '@/types/assistant';
-import axios from 'axios';
+// services/ai-assistant-service.ts
+import { AIAssistant, CloneOptions, AIDocument, TestAssistantParams, HistoryFilters, AssistantTemplate, CreateAssistantData, UpdateAssistantData, AssistantStats, APIKeyData, normalizeAssistant } from '@/types/assistant';
 import { api } from './user-service';
 
 const API_URL = '/ai-assistants';
 
+interface ListFilters {
+  type?: string;
+  include_templates?: boolean;
+  created_by_user?: boolean;
+}
+
+interface DuplicateOptions {
+  name?: string;
+  copyApiKey?: boolean;
+}
+
+interface TemplateOptions {
+  templateName?: string;
+  removeApiKey?: boolean;
+}
+
+interface CreateFromTemplateData {
+  name: string;
+  apiKey?: string;
+  apiProvider?: string;
+  customizations?: Record<string, any>;
+}
+
 class AIAssistantService {
+  // ====== CRUD DE BASE ======
 
   /**
-   * Récupère tous les assistants IA de l'utilisateur
-   * @returns {Promise<Array<AIAssistant>>} Liste des assistants
+   * Récupère tous les assistants IA avec filtres
    */
-  async getAllAssistants(): Promise<AIAssistant[]> {
+  async getAllAssistants(filters: ListFilters = {}): Promise<{ status: string; data: AIAssistant[] }> {
     try {
-      const response = await api.get(API_URL);
+      const params = new URLSearchParams();
+      if (filters.type) params.append('type', filters.type);
+      if (filters.include_templates) params.append('include_templates', 'true');
+      if (filters.created_by_user) params.append('created_by_user', 'true');
+
+      const response = await api.get(`${API_URL}?${params.toString()}`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -23,10 +50,8 @@ class AIAssistantService {
 
   /**
    * Récupère un assistant par son ID
-   * @param {string} id - ID de l'assistant
-   * @returns {Promise<AIAssistant>} Données de l'assistant
    */
-  async getAssistantById(id: string): Promise<AIAssistant> {
+  async getAssistantById(id: string): Promise< {statut: string, data: any}> {
     try {
       const response = await api.get(`${API_URL}/${id}`);
       return response.data;
@@ -38,41 +63,26 @@ class AIAssistantService {
 
   /**
    * Crée un nouvel assistant IA
-   * @param {any} assistantData - Données de l'assistant à créer
-   * @returns {Promise<AIAssistant>} Assistant créé
    */
-  async createAssistant(assistantData: any): Promise<AIAssistant> {
+  async createAssistant(assistantData: CreateAssistantData): Promise<{ status: string; data: AIAssistant; message: string }> {
     try {
       console.log('Données envoyées au backend:', assistantData);
       
-      // CORRECTION : Envoyer directement assistantData, pas { assistantData }
       const response = await api.post(API_URL, assistantData);
-      
       console.log('Réponse du backend:', response.data);
-      return response.data;
       
+      return response.data;
     } catch (error: any) {
       console.error('Erreur lors de la création:', error);
-      
-      // Améliorer la gestion d'erreurs
-      if (error.response) {
-        const errorMessage = error.response.data?.error || error.response.data?.message || 'Erreur inconnue';
-        throw new Error(`Erreur ${error.response.status}: ${errorMessage}`);
-      } else if (error.request) {
-        throw new Error('Erreur de connexion au serveur');
-      } else {
-        throw new Error(error.message || 'Erreur lors de la création de l\'assistant');
-      }
+      this.handleError(error);
+      throw error;
     }
   }
 
   /**
    * Met à jour un assistant existant
-   * @param {string} id - ID de l'assistant
-   * @param {any} assistantData - Nouvelles données de l'assistant
-   * @returns {Promise<AIAssistant>} Assistant mis à jour
    */
-  async updateAssistant(id: string, assistantData: any): Promise<AIAssistant> {
+  async updateAssistant(id: string, assistantData: UpdateAssistantData): Promise<{ status: string; data: AIAssistant; message: string }> {
     try {
       const response = await api.put(`${API_URL}/${id}`, assistantData);
       return response.data;
@@ -84,25 +94,11 @@ class AIAssistantService {
 
   /**
    * Supprime un assistant
-   * @param {string} id - ID de l'assistant à supprimer
-   * @returns {Promise<void>}
    */
-  async deleteAssistant(id: string): Promise<void> {
+  async deleteAssistant(id: string, force: boolean = false): Promise<{ status: string; message: string }> {
     try {
-      await api.delete(`${API_URL}/${id}`);
-    } catch (error) {
-      this.handleError(error);
-      throw error;
-    }
-  }
-
-  /**
-   * Récupère les modèles d'assistants prédéfinis
-   * @returns {Promise<Array<AssistantTemplate>>} Liste des modèles
-   */
-  async getAssistantTemplates(): Promise<AssistantTemplate[]> {
-    try {
-      const response = await api.get(`${API_URL}/templates`);
+      const params = force ? '?force=true' : '';
+      const response = await api.delete(`${API_URL}/${id}${params}`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -110,13 +106,12 @@ class AIAssistantService {
     }
   }
 
+  // ====== FONCTIONNALITÉS AVANCÉES ======
+
   /**
-   * Clone un assistant existant ou un modèle
-   * @param {string} id - ID de l'assistant ou du modèle à cloner
-   * @param {CloneOptions} options - Options de clonage (nouveau nom, etc.)
-   * @returns {Promise<AIAssistant>} Nouvel assistant cloné
+   * Duplique un assistant existant
    */
-  async cloneAssistant(id: string, options: CloneOptions = {}): Promise<AIAssistant> {
+  async duplicateAssistant(id: string, options: DuplicateOptions = {}): Promise<{ status: string; data: AIAssistant; message: string }> {
     try {
       const response = await api.post(`${API_URL}/${id}/clone`, options);
       return response.data;
@@ -127,19 +122,114 @@ class AIAssistantService {
   }
 
   /**
-   * Télécharge un document à associer à un assistant
-   * @param {string} assistantId - ID de l'assistant
-   * @param {File} file - Fichier à télécharger
-   * @param {string} documentType - Type de document (company_values, job_description, etc.)
-   * @returns {Promise<AIDocument>} Métadonnées du document
+   * Convertit un assistant en template
    */
-  async uploadDocument(assistantId: string, file: File, documentType: string): Promise<AIDocument> {
+  async makeTemplate(id: string, options: TemplateOptions = {}): Promise<{ status: string; data: AIAssistant; message: string }> {
+    try {
+      const response = await api.post(`${API_URL}/${id}/make-template`, options);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Valide la configuration d'un assistant
+   */
+  async validateAssistant(id: string): Promise<{ status: string; data: any }> {
+    try {
+      const response = await api.post(`${API_URL}/${id}/validate`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  // ====== GESTION DES TEMPLATES ======
+
+  /**
+   * Récupère les templates d'assistants disponibles
+   */
+  async getTemplates(type?: string): Promise<{ status: string; data: AssistantTemplate[] }> {
+    try {
+      const params = type ? `?type=${type}` : '';
+      const response = await api.get(`${API_URL}/templates${params}`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crée un assistant à partir d'un template
+   */
+  async createFromTemplate(templateId: string, data: CreateFromTemplateData): Promise<{ status: string; data: AIAssistant; message: string }> {
+    try {
+      const response = await api.post(`${API_URL}/from-template/${templateId}`, data);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  // ====== GESTION DES CLÉS D'API ======
+
+  /**
+   * Met à jour la clé d'API d'un assistant
+   */
+  async updateApiKey(id: string, apiKeyData: APIKeyData): Promise<{ status: string; data: any; message: string }> {
+    try {
+      const response = await api.post(`${API_URL}/${id}/api-key`, apiKeyData);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprime la clé d'API d'un assistant
+   */
+  async removeApiKey(id: string): Promise<{ status: string; message: string }> {
+    try {
+      const response = await api.delete(`${API_URL}/${id}/api-key`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  // ====== GESTION DES DOCUMENTS ======
+
+  /**
+   * Récupère les documents d'un assistant
+   */
+  async getDocuments(assistantId: string): Promise<{  data: AIDocument[] }> {
+    try {
+      const response = await api.get(`${API_URL}/${assistantId}/documents`);
+      return response;
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload un document pour un assistant
+   */
+  async uploadDocument(assistantId: string, file: File, documentType: string, description?: string): Promise<{ status: string; data: AIDocument; message: string }> {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('documentType', documentType);
+      formData.append('document_type', documentType);
+      if (description) formData.append('description', description);
       
-      const response = await api.post<AIDocument>(
+      const response = await api.post(
         `${API_URL}/${assistantId}/documents`, 
         formData, 
         {
@@ -157,13 +247,11 @@ class AIAssistantService {
   }
 
   /**
-   * Récupère la liste des documents associés à un assistant
-   * @param {string} assistantId - ID de l'assistant
-   * @returns {Promise<Array<AIDocument>>} Liste des documents
+   * Supprime un document d'un assistant
    */
-  async getAssistantDocuments(assistantId: string): Promise<AIDocument[]> {
+  async deleteDocument(assistantId: string, documentId: string): Promise<{ status: string; message: string }> {
     try {
-      const response = await api.get(`${API_URL}/${assistantId}/documents`);
+      const response = await api.delete(`${API_URL}/${assistantId}/documents/${documentId}`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -171,30 +259,14 @@ class AIAssistantService {
     }
   }
 
-  /**
-   * Supprime un document associé à un assistant
-   * @param {string} assistantId - ID de l'assistant
-   * @param {string} documentId - ID du document
-   * @returns {Promise<void>}
-   */
-  async deleteDocument(assistantId: string, documentId: string): Promise<void> {
-    try {
-      await api.delete(`${API_URL}/${assistantId}/documents/${documentId}`);
-    } catch (error) {
-      this.handleError(error);
-      throw error;
-    }
-  }
+  // ====== STATISTIQUES ET MONITORING ======
 
   /**
-   * Test la réponse de l'assistant à une question
-   * @param {string} assistantId - ID de l'assistant à tester
-   * @param {TestAssistantParams} params - Paramètres du test (question, etc.)
-   * @returns {Promise<any>} Réponse de l'assistant
+   * Récupère les statistiques d'un assistant
    */
-  async testAssistant(assistantId: string, params: TestAssistantParams): Promise<any> {
+  async getStats(assistantId: string): Promise<{ status: string; data: AssistantStats }> {
     try {
-      const response = await api.post(`${API_URL}/${assistantId}/test`, params);
+      const response = await api.get(`${API_URL}/${assistantId}/stats`);
       return response.data;
     } catch (error) {
       this.handleError(error);
@@ -202,26 +274,36 @@ class AIAssistantService {
     }
   }
 
+  // ====== MÉTHODES DE COMPATIBILITÉ (pour l'ancien code) ======
+
   /**
-   * Récupère l'historique des conversations avec un assistant
-   * @param {string} assistantId - ID de l'assistant
-   * @param {HistoryFilters} filters - Filtres optionnels (dates, etc.)
-   * @returns {Promise<Array>} Historique des conversations
+   * @deprecated Utiliser getAllAssistants() à la place
    */
-  async getAssistantHistory(assistantId: string, filters: HistoryFilters = {}): Promise<any[]> {
-    try {
-      const response = await api.get(`${API_URL}/${assistantId}/history`, { params: filters });
-      return response.data;
-    } catch (error) {
-      this.handleError(error);
-      throw error;
-    }
+  async getUserAssistants(): Promise<AIAssistant[]> {
+    const result = await this.getAllAssistants({ created_by_user: true });
+    return result.data;
   }
+
+  /**
+   * @deprecated Utiliser duplicateAssistant() à la place
+   */
+  async cloneAssistant(id: string, options: CloneOptions = {}): Promise<AIAssistant> {
+    const result = await this.duplicateAssistant(id, options);
+    return result.data;
+  }
+
+  /**
+   * @deprecated Utiliser getTemplates() à la place
+   */
+  async getAssistantTemplates(): Promise<AssistantTemplate[]> {
+    const result = await this.getTemplates();
+    return result.data;
+  }
+
+  // ====== MÉTHODES UTILITAIRES ======
 
   /**
    * Gère les erreurs API
-   * @param {any} error - Erreur à traiter
-   * @private
    */
   private handleError(error: any): void {
     console.error('AI Assistant Service Error:', error);
@@ -229,36 +311,90 @@ class AIAssistantService {
     if (error.response) {
       const { status, data } = error.response;
       
-      if (status === 401) {
-        console.warn('Authentication required for AI Assistant service');
-      }
+      // Messages d'erreur personnalisés
+      const errorMessages: Record<number, string> = {
+        400: 'Données invalides',
+        401: 'Authentification requise',
+        403: 'Accès non autorisé',
+        404: 'Assistant non trouvé',
+        409: 'Conflit - l\'assistant existe déjà ou est utilisé',
+        429: 'Trop de requêtes',
+        500: 'Erreur interne du serveur'
+      };
+
+      const customMessage = errorMessages[status];
+      const serverMessage = data?.message || data?.error;
       
-      if (status === 403) {
-        console.warn('User does not have permission to access AI Assistant service');
-      }
-      
-      // Personnaliser le message d'erreur
-      error.message = data?.error || data?.message || `Error ${status}: AI Assistant service request failed`;
+      error.message = serverMessage || customMessage || `Erreur ${status}`;
     } else if (error.request) {
       error.message = 'Erreur de connexion au serveur';
     }
   }
-  
+
   /**
-   * Récupère les assistants IA disponibles pour l'utilisateur
-   * @returns {Promise<Array<AIAssistant>>} Liste des assistants IA
+   * Valide les données d'un assistant avant envoi
    */
-  async getUserAssistants(): Promise<AIAssistant[]> {
-    try {
-      const response = await api.get('/ai-assistants');
-      return response.data;
-    } catch (error) {
-      console.error('Erreur de récupération des assistants IA:', error);
-      throw error;
+  private validateAssistantData(data: any): void {
+    if (!data.name?.trim()) {
+      throw new Error('Le nom de l\'assistant est requis');
+    }
+
+    if (!data.assistantType) {
+      throw new Error('Le type d\'assistant est requis');
+    }
+
+    if (!data.model) {
+      throw new Error('Le modèle IA est requis');
+    }
+
+    if (!data.interviewMode) {
+      throw new Error('Le mode d\'entretien est requis');
     }
   }
 
-  // ... autres méthodes restent identiques ...
+  /**
+   * Formate les données pour l'envoi au backend
+   */
+  private formatDataForBackend(data: any): any {
+    // Conversion camelCase vers snake_case pour certains champs si nécessaire
+    return {
+      ...data,
+      assistant_type: data.assistantType,
+      job_role: data.jobRole,
+      interview_mode: data.interviewMode,
+      base_knowledge: data.baseKnowledge,
+      custom_prompt: data.customPrompt,
+      question_bank: data.questionBank,
+      api_key: data.apiKey,
+      api_provider: data.apiProvider
+    };
+  }
+
+  /**
+   * Normalise les données reçues du backend
+   */
+  private normalizeDataFromBackend(data: any): any {
+    // Conversion snake_case vers camelCase
+    return {
+      ...data,
+      assistantType: data.assistant_type || data.assistantType,
+      jobRole: data.job_role || data.jobRole,
+      interviewMode: data.interview_mode || data.interviewMode,
+      baseKnowledge: data.base_knowledge || data.baseKnowledge,
+      customPrompt: data.custom_prompt || data.customPrompt,
+      questionBank: data.question_bank || data.questionBank,
+      usageCount: data.usage_count || data.usageCount,
+      lastUsed: data.last_used || data.lastUsed,
+      createdAt: data.created_at || data.createdAt,
+      updatedAt: data.updated_at || data.updatedAt,
+      isTemplate: data.is_template || data.isTemplate,
+      templateId: data.template_id || data.templateId,
+      hasApiKey: data.has_api_key || data.hasApiKey,
+      apiProvider: data.api_provider || data.apiProvider,
+      apiKeyMasked: data.api_key_masked || data.apiKeyMasked,
+      apiKeyLastUpdated: data.api_key_last_updated || data.apiKeyLastUpdated
+    };
+  }
 }
 
 // Exporter une instance unique du service

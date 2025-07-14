@@ -1,4 +1,4 @@
-// pages/ai-assistants/new.tsx
+// pages/ai-assistants/edit/[id].tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
@@ -10,10 +10,13 @@ import {
   EyeIcon,
   EyeSlashIcon,
   KeyIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { 
-  CreateAssistantData, 
+  UpdateAssistantData, 
+  AIAssistant,
+  APIKeyData,
   ASSISTANT_TYPE_LABELS, 
   INDUSTRY_LABELS, 
   JOB_ROLE_LABELS, 
@@ -21,26 +24,19 @@ import {
   INTERVIEW_MODE_LABELS,
   MODEL_LABELS,
   PROVIDER_LABELS,
-  getDefaultCapabilities,
-  getDefaultPersonality,
-  getDefaultBaseKnowledge,
   AssistantType,
   InterviewMode,
   AIModel,
   APIProvider,
   IndustryType,
   JobRoleType,
-  SeniorityLevel
+  SeniorityLevel,
+  normalizeAssistant
 } from '@/types/assistant';
 import aiAssistantService from '@/services/ai-assistant-service';
-import DashboardLayout from '@/components/layout/dashboard-layout';
 
-// Composant Tooltip
-interface TooltipProps {
-  text: string;
-}
-
-const Tooltip: React.FC<TooltipProps> = ({ text }) => {
+// Composants réutilisés de la page de création
+const Tooltip: React.FC<{ text: string }> = ({ text }) => {
   return (
     <div className="relative flex items-center group">
       <QuestionMarkCircleIcon className="h-5 w-5 text-gray-400 ml-1 cursor-help" />
@@ -52,7 +48,6 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-// Composant FormField
 interface FormFieldProps {
   label: string;
   id: string;
@@ -88,88 +83,226 @@ const FormField: React.FC<FormFieldProps> = ({ label, id, children, tooltip, req
   );
 };
 
-// Composant pour la section des clés d'API
-interface APIKeySectionProps {
-  apiKey: string;
-  apiProvider: APIProvider | '';
-  showApiKey: boolean;
-  onApiKeyChange: (value: string) => void;
-  onProviderChange: (value: APIProvider | '') => void;
-  onToggleVisibility: () => void;
+// Section de gestion des clés d'API
+interface APIKeyManagementProps {
+  assistant: AIAssistant;
+  onApiKeyUpdate: () => void;
 }
 
-const APIKeySection: React.FC<APIKeySectionProps> = ({
-  apiKey,
-  apiProvider,
-  showApiKey,
-  onApiKeyChange,
-  onProviderChange,
-  onToggleVisibility
-}) => {
+const APIKeyManagement: React.FC<APIKeyManagementProps> = ({ assistant, onApiKeyUpdate }) => {
+  const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [newApiKey, setNewApiKey] = useState('');
+  const [newProvider, setNewProvider] = useState<APIProvider | ''>('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const handleUpdateApiKey = async () => {
+    if (!newApiKey.trim() || !newProvider) return;
+
+    try {
+      setUpdating(true);
+      await aiAssistantService.updateApiKey(assistant.id, {
+        apiKey: newApiKey.trim(),
+        apiProvider: newProvider
+      });
+      
+      setNewApiKey('');
+      setNewProvider('');
+      setShowUpdateForm(false);
+      onApiKeyUpdate();
+    } catch (error: any) {
+      alert(`Erreur lors de la mise à jour: ${error.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleRemoveApiKey = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer la clé d\'API ?')) return;
+
+    try {
+      setRemoving(true);
+      await aiAssistantService.removeApiKey(assistant.id);
+      onApiKeyUpdate();
+    } catch (error: any) {
+      alert(`Erreur lors de la suppression: ${error.message}`);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   return (
     <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6">
       <div className="md:grid md:grid-cols-3 md:gap-6">
         <div className="md:col-span-1">
           <h3 className="text-lg font-medium leading-6 text-gray-900 flex items-center">
             <KeyIcon className="h-5 w-5 mr-2" />
-            Clé d'API
+            Gestion des clés d'API
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            Configurez la clé d'API pour permettre à l'assistant d'utiliser les services d'IA.
+            Configurez ou modifiez la clé d'API de l'assistant.
           </p>
         </div>
-        <div className="mt-5 md:mt-0 md:col-span-2 space-y-6">
-          <FormField 
-            label="Fournisseur d'API" 
-            id="apiProvider"
-            tooltip="Choisissez le fournisseur d'IA que vous souhaitez utiliser"
-          >
-            <select
-              id="apiProvider"
-              name="apiProvider"
-              value={apiProvider}
-              onChange={(e) => onProviderChange(e.target.value as APIProvider | '')}
-              className="max-w-lg block focus:ring-primary-500 focus:border-primary-500 w-full shadow-sm sm:max-w-xs sm:text-sm border-gray-300 rounded-md"
-            >
-              <option value="">Sélectionner un fournisseur...</option>
-              {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </FormField>
-          
-          {apiProvider && (
-            <FormField 
-              label="Clé d'API" 
-              id="apiKey"
-              tooltip="Votre clé d'API sera chiffrée et stockée de manière sécurisée"
-            >
-              <div className="flex rounded-md shadow-sm">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  name="apiKey"
-                  id="apiKey"
-                  value={apiKey}
-                  onChange={(e) => onApiKeyChange(e.target.value)}
-                  className="flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder={`Entrez votre clé d'API ${PROVIDER_LABELS[apiProvider as APIProvider]}`}
-                />
-                <button
-                  type="button"
-                  onClick={onToggleVisibility}
-                  className="relative -ml-px inline-flex items-center space-x-2 rounded-r-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  {showApiKey ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
+        <div className="mt-5 md:mt-0 md:col-span-2">
+          {assistant.hasApiKey ? (
+            <div className="space-y-4">
+              {/* État actuel */}
+              <div className="bg-green-50 p-4 rounded-md">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-green-800">
+                      Clé d'API configurée
+                    </h4>
+                    <div className="mt-1 text-sm text-green-700">
+                      <p>Fournisseur: {PROVIDER_LABELS[assistant.apiProvider as APIProvider] || assistant.apiProvider}</p>
+                      <p>Clé: {assistant.apiKeyMasked}</p>
+                      {assistant.apiKeyLastUpdated && (
+                        <p>Dernière mise à jour: {new Date(assistant.apiKeyLastUpdated).toLocaleDateString()}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setShowUpdateForm(!showUpdateForm)}
+                      className="text-sm bg-white text-green-700 border border-green-300 rounded px-3 py-1 hover:bg-green-50"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      onClick={handleRemoveApiKey}
+                      disabled={removing}
+                      className="text-sm bg-red-600 text-white rounded px-3 py-1 hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {removing ? 'Suppression...' : 'Supprimer'}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                💡 La clé d'API est optionnelle lors de la création. Vous pourrez l'ajouter plus tard.
-              </p>
-            </FormField>
+
+              {/* Formulaire de mise à jour */}
+              {showUpdateForm && (
+                <div className="border rounded-md p-4 space-y-4">
+                  <h4 className="text-sm font-medium text-gray-900">Mettre à jour la clé d'API</h4>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Fournisseur</label>
+                    <select
+                      value={newProvider}
+                      onChange={(e) => setNewProvider(e.target.value as APIProvider)}
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    >
+                      <option value="">Choisir un fournisseur...</option>
+                      {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Nouvelle clé d'API</label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={newApiKey}
+                        onChange={(e) => setNewApiKey(e.target.value)}
+                        className="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Entrez la nouvelle clé d'API"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="relative -ml-px inline-flex items-center space-x-2 rounded-r-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                      >
+                        {showApiKey ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => setShowUpdateForm(false)}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleUpdateApiKey}
+                      disabled={!newApiKey.trim() || !newProvider || updating}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {updating ? 'Mise à jour...' : 'Mettre à jour'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Pas de clé configurée */}
+              <div className="bg-yellow-50 p-4 rounded-md">
+                <div className="flex">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-yellow-800">
+                      Aucune clé d'API configurée
+                    </h4>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Configurez une clé d'API pour permettre à l'assistant d'utiliser les services d'IA.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formulaire d'ajout */}
+              <div className="border rounded-md p-4 space-y-4">
+                <h4 className="text-sm font-medium text-gray-900">Ajouter une clé d'API</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Fournisseur</label>
+                  <select
+                    value={newProvider}
+                    onChange={(e) => setNewProvider(e.target.value as APIProvider)}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  >
+                    <option value="">Choisir un fournisseur...</option>
+                    {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Clé d'API</label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      value={newApiKey}
+                      onChange={(e) => setNewApiKey(e.target.value)}
+                      className="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Entrez votre clé d'API"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="relative -ml-px inline-flex items-center space-x-2 rounded-r-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    >
+                      {showApiKey ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleUpdateApiKey}
+                    disabled={!newApiKey.trim() || !newProvider || updating}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {updating ? 'Ajout...' : 'Ajouter la clé d\'API'}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -177,31 +310,57 @@ const APIKeySection: React.FC<APIKeySectionProps> = ({
   );
 };
 
-// Composant principal
-export default function NewAIAssistant() {
+// Composant principal d'édition
+const EditAIAssistant: React.FC = () => {
   const router = useRouter();
+  const { id } = router.query;
   
-  const [formData, setFormData] = useState<CreateAssistantData>({
-    name: '',
-    description: '',
-    model: 'claude-3-7-sonnet' as AIModel,
-    assistantType: 'recruiter' as AssistantType,
-    interviewMode: 'collaborative' as InterviewMode,
-    personality: getDefaultPersonality(),
-    baseKnowledge: getDefaultBaseKnowledge(),
-    capabilities: getDefaultCapabilities(),
-    customPrompt: '',
-    questionBank: []
-  });
-  
-  const [apiKey, setApiKey] = useState<string>('');
-  const [apiProvider, setApiProvider] = useState<APIProvider | ''>('');
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  
-  const [loading, setLoading] = useState<boolean>(false);
+  const [assistant, setAssistant] = useState<AIAssistant | null>(null);
+  const [formData, setFormData] = useState<UpdateAssistantData>({});
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  
+  const fetchAssistant = async (): Promise<void> => {
+    if (!id || typeof id !== 'string') return;
+    
+    try {
+      setLoading(true);
+      const response = await aiAssistantService.getAssistantById(id);
+      const normalizedAssistant = normalizeAssistant(response);
+      setAssistant(normalizedAssistant);
+      console.log('......',normalizedAssistant)
+      // Initialiser le formulaire avec les données existantes
+      setFormData({
+        name: normalizedAssistant.name,
+        description: normalizedAssistant.description,
+        model: normalizedAssistant.model,
+        assistantType: normalizedAssistant.assistantType,
+        industry: normalizedAssistant.industry,
+        jobRole: normalizedAssistant.jobRole,
+        seniority: normalizedAssistant.seniority,
+        interviewMode: normalizedAssistant.interviewMode,
+        personality: normalizedAssistant.personality,
+        baseKnowledge: normalizedAssistant.baseKnowledge,
+        capabilities: normalizedAssistant.capabilities,
+        customPrompt: normalizedAssistant.customPrompt,
+        questionBank: normalizedAssistant.questionBank,
+        avatar: normalizedAssistant.avatar
+      });
+      
+      setError(null);
+    } catch (err: any) {
+      setError(`Erreur lors du chargement de l'assistant: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchAssistant();
+  }, [id]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void => {
     const { name, value, type } = e.target;
@@ -221,7 +380,7 @@ export default function NewAIAssistant() {
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...(prev[parent as keyof CreateAssistantData] as object || {}),
+          ...(prev[parent as keyof UpdateAssistantData] as object || {}),
           [child]: type === 'checkbox' ? checked : type === 'range' ? Number(value) : value
         }
       }));
@@ -236,24 +395,8 @@ export default function NewAIAssistant() {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
     
-    if (!formData.name.trim()) {
+    if (!formData.name?.trim()) {
       errors.name = 'Le nom de l\'assistant est requis';
-    }
-    
-    if (!formData.assistantType) {
-      errors.assistantType = 'Le type d\'assistant est requis';
-    }
-    
-    if (!formData.model) {
-      errors.model = 'Le modèle IA est requis';
-    }
-    
-    if (!formData.interviewMode) {
-      errors.interviewMode = 'Le mode d\'entretien est requis';
-    }
-    
-    if (apiProvider && !apiKey.trim()) {
-      errors.apiKey = 'La clé d\'API est requise si un fournisseur est sélectionné';
     }
     
     setFieldErrors(errors);
@@ -263,49 +406,63 @@ export default function NewAIAssistant() {
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      setError('Veuillez corriger les erreurs dans le formulaire');
-      return;
-    }
+    if (!validateForm() || !assistant) return;
     
     try {
-      setLoading(true);
+      setSaving(true);
       setError(null);
       
-      const dataToSend: CreateAssistantData = {
-        ...formData
-      };
+      const response = await aiAssistantService.updateAssistant(assistant.id, formData);
       
-      // Ajouter les informations de clé d'API si fournies
-      if (apiProvider && apiKey.trim()) {
-        dataToSend.apiKey = apiKey.trim();
-        dataToSend.apiProvider = apiProvider;
-      }
-      
-      console.log('Données du formulaire avant envoi:', dataToSend);
-      
-      const response = await aiAssistantService.createAssistant(dataToSend);
-      
-      console.log('Assistant créé:', response);
       setSuccess(true);
       
-      // Redirection après un court délai
-      setTimeout(() => {
-        router.push('/ai-assistants');
-      }, 1500);
+      // Mettre à jour les données locales
+      const updatedAssistant = normalizeAssistant(response);
+      setAssistant(updatedAssistant);
       
+      // Masquer le message de succès après quelques secondes
+      setTimeout(() => setSuccess(false), 3000);
+       router.push(`/ai-assistants/${updatedAssistant.id}`)
     } catch (err: any) {
-      console.error('Erreur complète:', err);
-      setError(err.message || 'Erreur lors de la création de l\'assistant');
+      setError(err.message || 'Erreur lors de la mise à jour de l\'assistant');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+  
+  if (loading) {
+    return (
+        <div className="text-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-500">Chargement de l'assistant...</p>
+        </div>
+    );
+  }
+  
+  if (!assistant) {
+    return (
+        <div className="text-center py-20">
+          <CpuChipIcon className="h-10 w-10 text-gray-400 mx-auto" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Assistant non trouvé</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            L'assistant demandé n'existe pas ou vous n'avez pas les permissions pour y accéder.
+          </p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/ai-assistants')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Retour à la liste
+            </button>
+          </div>
+        </div>
+    );
+  }
   
   return (
     <>
       <head>
-        <title>Nouvel assistant IA</title>
+        <title>Modifier {assistant.name}</title>
       </head>
       
       <div className="pb-5 border-b border-gray-200 sm:flex sm:items-center sm:justify-between">
@@ -318,8 +475,17 @@ export default function NewAIAssistant() {
             Retour
           </button>
           <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate">
-            Nouvel assistant IA
+            Modifier {assistant.name}
           </h1>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => router.push(`/ai-assistants/${assistant.id}`)}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <EyeIcon className="h-4 w-4 mr-1" />
+            Voir les détails
+          </button>
         </div>
       </div>
       
@@ -339,7 +505,7 @@ export default function NewAIAssistant() {
         {success && (
           <div className="bg-green-50 text-green-700 p-4 rounded-md mb-6 flex items-center">
             <CheckIcon className="h-5 w-5 mr-2" />
-            Assistant créé avec succès! Redirection...
+            Assistant mis à jour avec succès!
           </div>
         )}
         
@@ -350,7 +516,7 @@ export default function NewAIAssistant() {
               <div className="md:col-span-1">
                 <h3 className="text-lg font-medium leading-6 text-gray-900">Informations générales</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Informations de base pour configurer votre assistant IA.
+                  Informations de base de votre assistant IA.
                 </p>
               </div>
               <div className="mt-5 md:mt-0 md:col-span-2 space-y-6">
@@ -364,10 +530,9 @@ export default function NewAIAssistant() {
                     type="text"
                     name="name"
                     id="name"
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={handleChange}
                     className="max-w-lg block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:max-w-xs sm:text-sm border-gray-300 rounded-md"
-                    placeholder="Assistant d'entretien technique"
                     required
                   />
                 </FormField>
@@ -381,24 +546,21 @@ export default function NewAIAssistant() {
                     name="description"
                     id="description"
                     rows={3}
-                    value={formData.description}
+                    value={formData.description || ''}
                     onChange={handleChange}
                     className="max-w-lg block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border border-gray-300 rounded-md"
-                    placeholder="Cet assistant aide à conduire des entretiens techniques pour des postes d'ingénieurs logiciels..."
                   />
                 </FormField>
                 
                 <FormField 
                   label="Type d'assistant" 
                   id="assistantType"
-                  tooltip="Le type d'assistant détermine son rôle principal"
                   required
-                  error={fieldErrors.assistantType}
                 >
                   <select
                     id="assistantType"
                     name="assistantType"
-                    value={formData.assistantType}
+                    value={formData.assistantType || ''}
                     onChange={handleChange}
                     className="max-w-lg block focus:ring-primary-500 focus:border-primary-500 w-full shadow-sm sm:max-w-xs sm:text-sm border-gray-300 rounded-md"
                     required
@@ -412,14 +574,12 @@ export default function NewAIAssistant() {
                 <FormField 
                   label="Mode d'entretien" 
                   id="interviewMode"
-                  tooltip="Détermine le niveau d'autonomie de l'assistant pendant l'entretien"
                   required
-                  error={fieldErrors.interviewMode}
                 >
                   <select
                     id="interviewMode"
                     name="interviewMode"
-                    value={formData.interviewMode}
+                    value={formData.interviewMode || ''}
                     onChange={handleChange}
                     className="max-w-lg block focus:ring-primary-500 focus:border-primary-500 w-full shadow-sm sm:max-w-xs sm:text-sm border-gray-300 rounded-md"
                     required
@@ -433,14 +593,12 @@ export default function NewAIAssistant() {
                 <FormField 
                   label="Modèle IA" 
                   id="model"
-                  tooltip="Le modèle d'intelligence artificielle à utiliser"
                   required
-                  error={fieldErrors.model}
                 >
                   <select
                     id="model"
                     name="model"
-                    value={formData.model}
+                    value={formData.model || ''}
                     onChange={handleChange}
                     className="max-w-lg block focus:ring-primary-500 focus:border-primary-500 w-full shadow-sm sm:max-w-xs sm:text-sm border-gray-300 rounded-md"
                     required
@@ -454,14 +612,10 @@ export default function NewAIAssistant() {
             </div>
           </div>
           
-          {/* Section Clé d'API */}
-          <APIKeySection
-            apiKey={apiKey}
-            apiProvider={apiProvider}
-            showApiKey={showApiKey}
-            onApiKeyChange={setApiKey}
-            onProviderChange={setApiProvider}
-            onToggleVisibility={() => setShowApiKey(!showApiKey)}
+          {/* Gestion des clés d'API */}
+          <APIKeyManagement 
+            assistant={assistant} 
+            onApiKeyUpdate={fetchAssistant}
           />
           
           {/* Contexte professionnel */}
@@ -474,11 +628,7 @@ export default function NewAIAssistant() {
                 </p>
               </div>
               <div className="mt-5 md:mt-0 md:col-span-2 space-y-6">
-                <FormField 
-                  label="Industrie" 
-                  id="industry"
-                  tooltip="Secteur d'activité pour lequel l'assistant est spécialisé"
-                >
+                <FormField label="Industrie" id="industry">
                   <select
                     id="industry"
                     name="industry"
@@ -493,11 +643,7 @@ export default function NewAIAssistant() {
                   </select>
                 </FormField>
                 
-                <FormField 
-                  label="Poste" 
-                  id="jobRole"
-                  tooltip="Rôle professionnel pour lequel l'assistant est conçu"
-                >
+                <FormField label="Poste" id="jobRole">
                   <select
                     id="jobRole"
                     name="jobRole"
@@ -512,11 +658,7 @@ export default function NewAIAssistant() {
                   </select>
                 </FormField>
                 
-                <FormField 
-                  label="Niveau" 
-                  id="seniority"
-                  tooltip="Niveau d'expérience ciblé"
-                >
+                <FormField label="Niveau" id="seniority">
                   <select
                     id="seniority"
                     name="seniority"
@@ -544,11 +686,7 @@ export default function NewAIAssistant() {
                 </p>
               </div>
               <div className="mt-5 md:mt-0 md:col-span-2 space-y-6">
-                <FormField 
-                  label="Convivialité" 
-                  id="personality.friendliness"
-                  tooltip="Niveau de chaleur et d'empathie dans les interactions (1=Formel, 5=Très chaleureux)"
-                >
+                <FormField label="Convivialité" id="personality.friendliness">
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-500">Formel</span>
                     <input
@@ -568,11 +706,7 @@ export default function NewAIAssistant() {
                   </div>
                 </FormField>
 
-                <FormField 
-                  label="Formalité" 
-                  id="personality.formality"
-                  tooltip="Niveau de formalité dans le langage (1=Très décontracté, 5=Très formel)"
-                >
+                <FormField label="Formalité" id="personality.formality">
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-500">Décontracté</span>
                     <input
@@ -592,11 +726,7 @@ export default function NewAIAssistant() {
                   </div>
                 </FormField>
 
-                <FormField 
-                  label="Profondeur technique" 
-                  id="personality.technicalDepth"
-                  tooltip="Niveau de détail technique dans les questions (1=Général, 5=Très technique)"
-                >
+                <FormField label="Profondeur technique" id="personality.technicalDepth">
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-500">Général</span>
                     <input
@@ -616,11 +746,7 @@ export default function NewAIAssistant() {
                   </div>
                 </FormField>
 
-                <FormField 
-                  label="Intensité des questions de suivi" 
-                  id="personality.followUpIntensity"
-                  tooltip="Fréquence et profondeur des questions de suivi (1=Basique, 5=Très approfondi)"
-                >
+                <FormField label="Intensité des questions de suivi" id="personality.followUpIntensity">
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-500">Basique</span>
                     <input
@@ -819,11 +945,7 @@ export default function NewAIAssistant() {
                 </p>
               </div>
               <div className="mt-5 md:mt-0 md:col-span-2 space-y-6">
-                <FormField 
-                  label="Prompt personnalisé" 
-                  id="customPrompt"
-                  tooltip="Instructions spécifiques pour personnaliser le comportement de l'assistant"
-                >
+                <FormField label="Prompt personnalisé" id="customPrompt">
                   <textarea
                     name="customPrompt"
                     id="customPrompt"
@@ -831,9 +953,7 @@ export default function NewAIAssistant() {
                     value={formData.customPrompt || ''}
                     onChange={handleChange}
                     className="max-w-lg block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border border-gray-300 rounded-md"
-                    placeholder="1. Commencer par une présentation brève et professionnelle
-2. Poser des questions techniques adaptées au niveau du candidat
-3. Approfondir les réponses par des questions de suivi..."
+                    placeholder="Instructions spécifiques pour personnaliser le comportement de l'assistant..."
                   />
                 </FormField>
               </div>
@@ -851,19 +971,19 @@ export default function NewAIAssistant() {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
+              disabled={saving}
+              className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${saving ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
-              {loading ? (
+              {saving ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Création en cours...
+                  Enregistrement...
                 </>
               ) : (
-                'Créer l\'assistant'
+                'Enregistrer les modifications'
               )}
             </button>
           </div>
@@ -873,5 +993,5 @@ export default function NewAIAssistant() {
   );
 };
 
-// NewAIAssistant.getLayout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;
-// export default NewAIAssistant;
+// EditAIAssistant.getLayout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;
+export default EditAIAssistant;

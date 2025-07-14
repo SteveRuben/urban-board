@@ -2,26 +2,35 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Save, Code } from 'lucide-react';
-import { CodingPlatformService } from '@/services/coding-platform-service';
-import { ChallengeDifficulty, ExerciseFormData, ProgrammingLanguage } from '@/types/coding-plateform';
+import { ArrowLeft, Save, Code, Database, Plus, X } from 'lucide-react';
+import { ExtendedCodingPlatformService } from '@/services/extended-coding-platform-service';
+import { 
+  ChallengeDifficulty, 
+  ExerciseFormData, 
+  ProgrammingLanguage, 
+  ExerciseCategory 
+} from '@/types/coding-plateform';
 
-interface ExerciseFormPageProps {
-  exerciseId?: string; // undefined pour création, défini pour édition
+interface ExtendedExerciseFormPageProps {
+  exerciseId?: string;
 }
 
-export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) {
+export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPageProps) {
   const router = useRouter();
   const isEditing = !!exerciseId;
   
   const [formData, setFormData] = useState<ExerciseFormData>({
     title: '',
     description: '',
+    category: 'developer', // 🆕 Nouveau champ
     language: 'python',
     difficulty: 'beginner',
-    order_index: 1
+    order_index: 1,
+    required_skills: [], // 🆕 Nouveau champ
+    estimated_duration_minutes: 60 // 🆕 Nouveau champ
   });
   
+  const [newSkill, setNewSkill] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [initialLoading, setInitialLoading] = useState<boolean>(isEditing);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +46,19 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
   const loadExercise = async () => {
     try {
       setInitialLoading(true);
+      // Utiliser le service original pour la compatibilité
+      const { CodingPlatformService } = await import('@/services/coding-platform-service');
       const exercise = await CodingPlatformService.getExercise(exerciseId!);
+      
       setFormData({
         title: exercise.title,
         description: exercise.description,
+        category: exercise.category || 'developer',
         language: exercise.language,
         difficulty: exercise.difficulty,
-        order_index: exercise.order_index
+        order_index: exercise.order_index,
+        required_skills: exercise.required_skills || [],
+        estimated_duration_minutes: exercise.estimated_duration_minutes || 60
       });
     } catch (err) {
       console.error('Erreur lors du chargement de l\'exercice:', err);
@@ -68,8 +83,18 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
       newErrors.description = 'La description doit contenir au moins 10 caractères';
     }
 
-    if (!formData.language) {
-      newErrors.language = 'Le langage est requis';
+    if (!formData.category) {
+      newErrors.category = 'La catégorie est requise';
+    }
+
+    // 🆕 Le langage est requis seulement pour les développeurs
+    if (formData.category === 'developer' && !formData.language) {
+      newErrors.language = 'Le langage est requis pour les exercices développeur';
+    }
+
+    // 🆕 Les compétences sont requises pour les data analysts
+    if (formData.category === 'data_analyst' && (!formData.required_skills || formData.required_skills.length === 0)) {
+      newErrors.required_skills = 'Au moins une compétence est requise pour les exercices data analyst';
     }
 
     if (!formData.difficulty) {
@@ -78,6 +103,10 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
 
     if (formData.order_index !== undefined && formData.order_index < 1) {
       newErrors.order_index = 'L\'ordre doit être supérieur à 0';
+    }
+
+    if (formData.estimated_duration_minutes !== undefined && formData.estimated_duration_minutes <= 0) {
+      newErrors.estimated_duration_minutes = 'La durée estimée doit être supérieure à 0';
     }
 
     setErrors(newErrors);
@@ -95,10 +124,20 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
       setLoading(true);
       setError(null);
 
+      // Préparer les données selon la catégorie
+      const submitData = {
+        ...formData,
+        // 🆕 Ne pas envoyer le language si data_analyst
+        ...(formData.category === 'data_analyst' && { language: undefined })
+      };
+
       if (isEditing && exerciseId) {
-        await CodingPlatformService.updateExercise(exerciseId, formData);
+        // Utiliser le service original pour l'édition
+        const { CodingPlatformService } = await import('@/services/coding-platform-service');
+        await CodingPlatformService.updateExercise(exerciseId, submitData);
       } else {
-        await CodingPlatformService.createExercise(formData);
+        // 🆕 Utiliser le service étendu pour la création
+        await ExtendedCodingPlatformService.createExerciseExtended(submitData);
       }
 
       router.push('/coding-admin/exercises');
@@ -125,6 +164,48 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
     }
   };
 
+  // 🆕 Gestion des compétences
+  const addSkill = () => {
+    if (newSkill.trim() && !formData.required_skills?.includes(newSkill.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        required_skills: [...(prev.required_skills || []), newSkill.trim()]
+      }));
+      setNewSkill('');
+    }
+  };
+
+  const removeSkill = (skillToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      required_skills: prev.required_skills?.filter(skill => skill !== skillToRemove) || []
+    }));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addSkill();
+    }
+  };
+
+  // 🆕 Gestion du changement de catégorie
+  const handleCategoryChange = (category: ExerciseCategory) => {
+    setFormData(prev => ({
+      ...prev,
+      category,
+      // Réinitialiser les champs selon la catégorie
+      ...(category === 'developer' && {
+        language: prev.language || 'python',
+        required_skills: []
+      }),
+      ...(category === 'data_analyst' && {
+        language: undefined,
+        required_skills: prev.required_skills || []
+      })
+    }));
+  };
+
   if (initialLoading) {
     return (
       <div className="bg-gray-50 py-8 md:py-12 min-h-screen">
@@ -144,7 +225,7 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
     <>
       <Head>
         <title>{isEditing ? 'Modifier l\'exercice' : 'Nouvel exercice'} - Administration</title>
-        <meta name="description" content={isEditing ? 'Modifier un exercice existant' : 'Créer un nouvel exercice de codage'} />
+        <meta name="description" content={isEditing ? 'Modifier un exercice existant' : 'Créer un nouvel exercice'} />
       </Head>
 
       <div className="bg-gray-50 py-8 md:py-12 min-h-screen">
@@ -164,7 +245,7 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
                   {isEditing ? 'Modifier l\'exercice' : 'Nouvel exercice'}
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  {isEditing ? 'Modifiez les informations de l\'exercice' : 'Créez un nouvel exercice de codage'}
+                  {isEditing ? 'Modifiez les informations de l\'exercice' : 'Créez un exercice pour développeurs ou data analysts'}
                 </p>
               </div>
             </div>
@@ -179,12 +260,60 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
             {/* Formulaire */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-                <Code className="h-6 w-6 text-blue-600 mr-3" />
+                {formData.category === 'developer' ? (
+                  <Code className="h-6 w-6 text-blue-600 mr-3" />
+                ) : (
+                  <Database className="h-6 w-6 text-emerald-600 mr-3" />
+                )}
                 <h2 className="text-lg font-medium text-gray-800">Informations de l'exercice</h2>
               </div>
 
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="grid grid-cols-1 gap-6">
+                  {/* 🆕 Catégorie d'exercice */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Catégorie d'exercice *
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div
+                        onClick={() => handleCategoryChange('developer')}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          formData.category === 'developer'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <Code className="h-5 w-5 text-blue-600 mr-2" />
+                          <div>
+                            <h3 className="font-medium text-gray-900">Développeur</h3>
+                            <p className="text-sm text-gray-500">Algorithmique, programmation</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        onClick={() => handleCategoryChange('data_analyst')}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          formData.category === 'data_analyst'
+                            ? 'border-emerald-500 bg-emerald-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <Database className="h-5 w-5 text-emerald-600 mr-2" />
+                          <div>
+                            <h3 className="font-medium text-gray-900">Data Analyst</h3>
+                            <p className="text-sm text-gray-500">SQL, analyse, visualisation</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {errors.category && (
+                      <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+                    )}
+                  </div>
+
                   {/* Titre */}
                   <div>
                     <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
@@ -198,7 +327,11 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
                       className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         errors.title ? 'border-red-300' : 'border-gray-300'
                       }`}
-                      placeholder="Ex: Algorithmes de tri"
+                      placeholder={
+                        formData.category === 'developer' 
+                          ? "Ex: Algorithmes de tri" 
+                          : "Ex: Analyse des ventes e-commerce"
+                      }
                     />
                     {errors.title && (
                       <p className="mt-1 text-sm text-red-600">{errors.title}</p>
@@ -225,15 +358,15 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
                     )}
                   </div>
 
-                  {/* Langage et Difficulté */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 🆕 Champs conditionnels selon la catégorie */}
+                  {formData.category === 'developer' && (
                     <div>
                       <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
                         Langage de programmation *
                       </label>
                       <select
                         id="language"
-                        value={formData.language}
+                        value={formData.language || ''}
                         onChange={(e) => handleInputChange('language', e.target.value as ProgrammingLanguage)}
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           errors.language ? 'border-red-300' : 'border-gray-300'
@@ -249,7 +382,55 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
                         <p className="mt-1 text-sm text-red-600">{errors.language}</p>
                       )}
                     </div>
+                  )}
 
+                  {formData.category === 'data_analyst' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Compétences requises *
+                      </label>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {formData.required_skills?.map((skill, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-1 bg-emerald-100 text-emerald-800 text-sm rounded-md"
+                          >
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => removeSkill(skill)}
+                              className="ml-1 text-emerald-600 hover:text-emerald-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex">
+                        <input
+                          type="text"
+                          value={newSkill}
+                          onChange={(e) => setNewSkill(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Ex: sql, python, data-analysis..."
+                        />
+                        <button
+                          type="button"
+                          onClick={addSkill}
+                          className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {errors.required_skills && (
+                        <p className="mt-1 text-sm text-red-600">{errors.required_skills}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Difficulté et Durée */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="difficulty" className="block text-sm font-medium text-gray-700 mb-2">
                         Niveau de difficulté *
@@ -269,6 +450,26 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
                       </select>
                       {errors.difficulty && (
                         <p className="mt-1 text-sm text-red-600">{errors.difficulty}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="estimated_duration_minutes" className="block text-sm font-medium text-gray-700 mb-2">
+                        Durée estimée (minutes) *
+                      </label>
+                      <input
+                        type="number"
+                        id="estimated_duration_minutes"
+                        min="1"
+                        value={formData.estimated_duration_minutes || ''}
+                        onChange={(e) => handleInputChange('estimated_duration_minutes', parseInt(e.target.value) || 60)}
+                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          errors.estimated_duration_minutes ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="60"
+                      />
+                      {errors.estimated_duration_minutes && (
+                        <p className="mt-1 text-sm text-red-600">{errors.estimated_duration_minutes}</p>
                       )}
                     </div>
                   </div>
@@ -327,22 +528,46 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
               </form>
             </div>
 
-            {/* Info supplémentaire pour création */}
+            {/* 🆕 Info spécialisée selon la catégorie */}
             {!isEditing && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className={`mt-6 rounded-md p-4 ${
+                formData.category === 'developer' 
+                  ? 'bg-blue-50 border border-blue-200' 
+                  : 'bg-emerald-50 border border-emerald-200'
+              }`}>
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <Code className="h-5 w-5 text-blue-400" />
+                    {formData.category === 'developer' ? (
+                      <Code className="h-5 w-5 text-blue-400" />
+                    ) : (
+                      <Database className="h-5 w-5 text-emerald-400" />
+                    )}
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-blue-800">Prochaines étapes</h3>
-                    <div className="mt-2 text-sm text-blue-700">
+                    <h3 className={`text-sm font-medium ${
+                      formData.category === 'developer' ? 'text-blue-800' : 'text-emerald-800'
+                    }`}>
+                      Prochaines étapes - {ExtendedCodingPlatformService.getExerciseCategoryLabel(formData.category)}
+                    </h3>
+                    <div className={`mt-2 text-sm ${
+                      formData.category === 'developer' ? 'text-blue-700' : 'text-emerald-700'
+                    }`}>
                       <p>Après avoir créé cet exercice, vous pourrez :</p>
-                      <ul className="list-disc list-inside mt-1 space-y-1">
-                        <li>Ajouter des challenges à l'exercice</li>
-                        <li>Créer des étapes pour chaque challenge</li>
-                        <li>Définir des cas de test pour valider les solutions</li>
-                      </ul>
+                      {formData.category === 'developer' ? (
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Ajouter des challenges algorithmiques</li>
+                          <li>Créer des étapes avec code de démarrage</li>
+                          <li>Définir des cas de test d'entrée/sortie</li>
+                          <li>Tester avec l'éditeur de code intégré</li>
+                        </ul>
+                      ) : (
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Ajouter des datasets CSV, SQL, Excel</li>
+                          <li>Créer des challenges SQL et Python</li>
+                          <li>Définir des tests de visualisation</li>
+                          <li>Tester avec notebooks Jupyter</li>
+                        </ul>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -353,21 +578,4 @@ export default function ExerciseFormPage({ exerciseId }: ExerciseFormPageProps) 
       </div>
     </>
   );
-}
-
-// Fonction pour récupérer les props côté serveur (pour l'édition)
-export async function getServerSideProps(context: any) {
-  const { id } = context.query;
-  
-  if (id && id !== 'new') {
-    return {
-      props: {
-        exerciseId: parseInt(id)
-      }
-    };
-  }
-  
-  return {
-    props: {}
-  };
 }

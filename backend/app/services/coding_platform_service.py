@@ -1,9 +1,12 @@
 # backend/services/coding_platform_service.py
 from datetime import datetime, timezone
+import json
+from app.types.coding_platform import ExecutionEnvironment, ExerciseCategory, TestcaseType
+from app.services.execution_services import ExecutionServiceFactory
 from flask import abort, current_app
 from app import db
 from app.models.coding_platform import (
-    Exercise, Challenge, ChallengeStep, ChallengeStepTestcase, 
+    Exercise, Challenge, ChallengeStep, ChallengeStepTestcase, ExerciseDataset, 
     UserChallenge, UserChallengeProgress, 
     ChallengeStatus, ChallengeDifficulty, ProgrammingLanguage, 
     UserChallengeStatus
@@ -17,6 +20,7 @@ class CodingPlatformService:
     
     def __init__(self):
         self.code_execution_service = CodeExecutionService()
+        self.execution_factory = ExecutionServiceFactory()
     
     # =============================================================================
     # EXERCISE MANAGEMENT
@@ -34,15 +38,42 @@ class CodingPlatformService:
             L'exercice créé
         """
         try:
-            exercise = Exercise(
-                created_by=user_id,
-                title=data['title'],
-                description=data.get('description', ''),
-                language=ProgrammingLanguage(data['language']),
-                difficulty=ChallengeDifficulty(data['difficulty']),
-                order_index=data.get('order_index', 0)
-            )
             
+            category = ExerciseCategory(data.get('category', 'developer'))
+            
+            print(category)
+            # Pour les développeurs, le langage est obligatoire
+            if category == ExerciseCategory.DEVELOPER and not data.get('language'):
+                raise ValueError("Language is required for developer exercises")
+            
+            print('>>>>>>>>>>>>>>>>>')
+            # print(data['language'])
+            print('.......................................')
+            if category == ExerciseCategory.DEVELOPER:
+                exercise = Exercise(
+                    created_by=user_id,
+                    title=data['title'],
+                    description=data.get('description', ''),
+                    category=category,
+                    language=ProgrammingLanguage(data['language']),
+                    difficulty=ChallengeDifficulty(data['difficulty']),
+                    order_index=data.get('order_index', 0),
+                    required_skills=data.get('required_skills', []),
+                    estimated_duration_minutes=data.get('estimated_duration_minutes', 60),
+                )
+            else:
+                exercise = Exercise(
+                    created_by=user_id,
+                    title=data['title'],
+                    description=data.get('description', ''),
+                    category=category,
+                    difficulty=ChallengeDifficulty(data['difficulty']),
+                    order_index=data.get('order_index', 0),
+                    required_skills=data.get('required_skills', []),
+                    estimated_duration_minutes=data.get('estimated_duration_minutes', 60),
+                )
+            
+            print(exercise)
             db.session.add(exercise)
             db.session.commit()
             
@@ -55,7 +86,7 @@ class CodingPlatformService:
             db.session.rollback()
             raise Exception(f'Error creating exercise: {str(e)}')
     
-    def get_exercises(self, page=1, per_page=20, language=None, difficulty=None, user_id=None):
+    def get_exercises(self, page=1, per_page=20, category=None, language=None, difficulty=None, user_id=None):
         """
         Récupère les exercices avec pagination et filtres
         
@@ -78,6 +109,10 @@ class CodingPlatformService:
         if language:
             query = query.filter_by(language=ProgrammingLanguage(language))
         
+        if category:
+            query = query.filter_by(category=ExerciseCategory(category))
+        
+        
         if difficulty:
             query = query.filter_by(difficulty=ChallengeDifficulty(difficulty))
         
@@ -90,6 +125,62 @@ class CodingPlatformService:
         )
         
         return exercises.items, exercises.total
+    
+     
+    # =============================================================================
+    # DATASET MANAGEMENT - Nouveau pour les analystes
+    # =============================================================================
+    
+    def create_exercise_dataset(self, exercise_id, user_id, data):
+        """
+        Crée un dataset pour un exercice d'analyse de données
+        """
+        # Vérifier que l'exercice existe et appartient à l'utilisateur
+        exercise = Exercise.query.filter_by(id=exercise_id, created_by=user_id).first()
+        if not exercise:
+            abort(404, description="Exercise not found or access denied")
+        
+        # Vérifier que l'exercice est de type data_analyst
+        if exercise.category != ExerciseCategory.DATA_ANALYST:
+            abort(400, description="Datasets can only be added to data analyst exercises")
+        
+        try:
+            dataset = ExerciseDataset(
+                exercise_id=exercise_id,
+                name=data['name'],
+                description=data.get('description', ''),
+                dataset_type=data['dataset_type'],
+                file_path=data.get('file_path'),
+                connection_string=data.get('connection_string'),
+                sample_data=data.get('sample_data', {}),
+                schema_definition=data.get('schema_definition', {}),
+                size_mb=data.get('size_mb', 0.0),
+                row_count=data.get('row_count', 0)
+            )
+            
+            db.session.add(dataset)
+            db.session.commit()
+            
+            return dataset
+            
+        except Exception as e:
+            db.session.rollback()
+            raise Exception(f'Error creating dataset: {str(e)}')
+    
+    def get_exercise_datasets(self, exercise_id, user_id=None):
+        """
+        Récupère les datasets d'un exercice
+        """
+        query = ExerciseDataset.query.filter_by(exercise_id=exercise_id)
+        
+        # Si c'est un admin, vérifier les permissions
+        if user_id:
+            exercise = Exercise.query.filter_by(id=exercise_id, created_by=user_id).first()
+            if not exercise:
+                abort(404, description="Exercise not found or access denied")
+        
+        datasets = query.all()
+        return datasets
     
     def get_exercise_by_id(self, exercise_id, user_id=None):
         """
@@ -187,6 +278,10 @@ class CodingPlatformService:
             abort(404, description="Exercise not found")
         
         try:
+            
+            # Déterminer l'environnement d'exécution par défaut selon la catégorie
+            default_environment = self._get_default_execution_environment(exercise.category)
+            
             challenge = Challenge(
                 exercise_id=data['exercise_id'],
                 title=data['title'],
@@ -195,7 +290,11 @@ class CodingPlatformService:
                 tags=data.get('tags', []),
                 status=ChallengeStatus(data.get('status', 'draft')),
                 order_index=data.get('order_index', 0),
-                estimated_time_minutes=data.get('estimated_time_minutes', 30)
+                estimated_time_minutes=data.get('estimated_time_minutes', 30),
+                execution_environment=ExecutionEnvironment(
+                    data.get('execution_environment', default_environment.value)
+                ),
+                environment_config=data.get('environment_config', {})
             )
             
             db.session.add(challenge)
@@ -209,6 +308,14 @@ class CodingPlatformService:
         except Exception as e:
             db.session.rollback()
             raise Exception(f'Error creating challenge: {str(e)}')
+    
+    def _get_default_execution_environment(self, category: ExerciseCategory) -> ExecutionEnvironment:
+        """Retourne l'environnement d'exécution par défaut selon la catégorie"""
+        defaults = {
+            ExerciseCategory.DEVELOPER: ExecutionEnvironment.CODE_EXECUTOR,
+            ExerciseCategory.DATA_ANALYST: ExecutionEnvironment.JUPYTER_NOTEBOOK
+        }
+        return defaults.get(category, ExecutionEnvironment.CODE_EXECUTOR)
     
     def get_challenges(self, exercise_id=None, status=None, page=1, per_page=20, user_id=None):
         """
@@ -349,6 +456,8 @@ class CodingPlatformService:
         """
         challenge = self.get_challenge_by_id(challenge_id, user_id, check_published=False)
         
+        if challenge.exercise.created_by != user_id:
+            abort(403, description="Access denied")
         try:
             step = ChallengeStep(
                 challenge_id=challenge_id,
@@ -357,8 +466,12 @@ class CodingPlatformService:
                 hint=data.get('hint', ''),
                 starter_code=data.get('starter_code', ''),
                 solution_code=data.get('solution_code', ''),
+                notebook_template=data.get('notebook_template'),
+                sql_schema=data.get('sql_schema'),
+                expected_output_type=data.get('expected_output_type'),
                 order_index=data.get('order_index', 0),
-                is_final_step=data.get('is_final_step', False)
+                is_final_step=data.get('is_final_step', False),
+                evaluation_criteria=data.get('evaluation_criteria', {})
             )
             
             db.session.add(step)
@@ -419,94 +532,281 @@ class CodingPlatformService:
     # TEST CASE MANAGEMENT
     # =============================================================================
     
+    def validate_testcase_data(self, data):
+        """
+        Valide les données d'un cas de test avant création
+        """
+
+        print('que la validation commence.................1')
+        # Copie des données pour éviter les mutations
+        clean_data = data.copy()
+
+        # Validation du type de test
+        testcase_type = clean_data.get('testcase_type', 'unit_test')
+        print('que la validation commence.................2')
+
+        # Normaliser le type si c'est un enum
+        if hasattr(testcase_type, 'value'):
+            testcase_type = testcase_type.value
+        else:
+            testcase_type = str(testcase_type)
+
+        # Valider que le type est supporté
+        valid_types = [e.value for e in TestcaseType]
+        if testcase_type not in valid_types:
+            raise ValueError(f"Type de test non supporté: {testcase_type}")
+
+        # Trouver l'enum correspondant à la valeur string
+        testcase_enum = None
+        for enum_member in TestcaseType:
+            if enum_member.value == testcase_type:
+                testcase_enum = enum_member
+                break
+
+        if testcase_enum is None:
+            raise ValueError(f"Type de test non supporté: {testcase_type}")
+
+        # Stocker l'enum (pas la string) pour SQLAlchemy
+        clean_data['testcase_type'] = testcase_enum
+        print('que la validation commence.................3')
+
+        # Validation spécifique selon le type
+        if testcase_type == 'notebook_cell_test':
+            # Valider notebook_cell_output
+            notebook_output = clean_data.get('notebook_cell_output')
+            if not notebook_output:
+                raise ValueError("notebook_cell_output est requis pour les tests de cellule notebook")
+
+            # S'assurer que c'est un dict valide
+            if isinstance(notebook_output, str):
+                try:
+                    import json
+                    parsed_output = json.loads(notebook_output)
+
+                    # 🆕 CORRECTION: Gérer différents types de sortie JSON
+                    if isinstance(parsed_output, dict):
+                        # C'est déjà un objet, parfait
+                        clean_data['notebook_cell_output'] = parsed_output
+                    elif isinstance(parsed_output, (int, float, str, bool, list)):
+                        # 🆕 Convertir les autres types en format d'objet de sortie
+                        clean_data['notebook_cell_output'] = {
+                            "output_type": "execute_result",
+                            "data": {
+                                "text/plain": str(parsed_output)
+                            },
+                            "metadata": {}
+                        }
+                        print(f"Conversion automatique: {parsed_output} -> objet de sortie")
+                    else:
+                        raise ValueError("notebook_cell_output doit être un JSON valide")
+
+                except json.JSONDecodeError:
+                    raise ValueError("notebook_cell_output doit être un JSON valide")
+
+            elif isinstance(notebook_output, dict):
+                # C'est déjà un dict, valider qu'il a la structure minimale
+                clean_data['notebook_cell_output'] = notebook_output
+
+            elif isinstance(notebook_output, (int, float, str, bool, list)):
+                # 🆕 Conversion directe pour les types Python natifs
+                clean_data['notebook_cell_output'] = {
+                    "output_type": "execute_result", 
+                    "data": {
+                        "text/plain": str(notebook_output)
+                    },
+                    "metadata": {}
+                }
+                print(f"Conversion directe: {notebook_output} -> objet de sortie")
+
+            else:
+                raise ValueError("notebook_cell_output doit être un objet JSON, une string JSON, ou une valeur simple")
+
+            print('que la validation commence.................5')
+
+            # 🆕 Validation de la structure (plus flexible)
+            final_output = clean_data['notebook_cell_output']
+            if not isinstance(final_output, dict):
+                raise ValueError("Erreur interne: notebook_cell_output doit être un objet après traitement")
+
+            # 🆕 S'assurer qu'il y a au moins un champ 'data' ou 'output_type'
+            if 'data' not in final_output and 'output_type' not in final_output:
+                print("Ajout des champs manquants à la sortie notebook")
+                final_output.setdefault('output_type', 'execute_result')
+                final_output.setdefault('data', {'text/plain': 'undefined'})
+                final_output.setdefault('metadata', {})
+
+            print('que la validation commence.................6')
+
+            # Champs optionnels avec valeurs par défaut
+            clean_data['cell_type'] = clean_data.get('cell_type', 'code')
+            clean_data['input_data'] = clean_data.get('input_data', None)
+            clean_data['expected_output'] = clean_data.get('expected_output', None)
+
+        elif testcase_type == 'sql_query_test':
+            if not clean_data.get('sql_query_expected'):
+                raise ValueError("sql_query_expected est requis pour les tests SQL")
+
+        elif testcase_type == 'unit_test':
+            if not clean_data.get('input_data'):
+                raise ValueError("input_data est requis pour les tests unitaires")
+            if not clean_data.get('expected_output'):
+                raise ValueError("expected_output est requis pour les tests unitaires")
+
+        elif testcase_type == 'visualization_test':
+            if not clean_data.get('expected_visualization'):
+                raise ValueError("expected_visualization est requis pour les tests de visualisation")
+
+        elif testcase_type == 'statistical_test':
+            if not clean_data.get('statistical_assertions'):
+                raise ValueError("statistical_assertions est requis pour les tests statistiques")
+
+        # Valeurs par défaut pour les champs communs
+        clean_data.setdefault('is_hidden', False)
+        clean_data.setdefault('is_example', False)
+        clean_data.setdefault('timeout_seconds', 5)
+        clean_data.setdefault('memory_limit_mb', 128)
+        clean_data.setdefault('order_index', 0)
+        clean_data.setdefault('numerical_tolerance', 0.001)
+
+        print('que la validation commence.................8')
+
+        # Validation des types pour les champs numériques
+        try:
+            clean_data['timeout_seconds'] = int(clean_data['timeout_seconds'])
+            clean_data['memory_limit_mb'] = int(clean_data['memory_limit_mb'])
+            clean_data['order_index'] = int(clean_data['order_index'])
+            clean_data['numerical_tolerance'] = float(clean_data['numerical_tolerance'])
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Erreur de type dans les champs numériques: {e}")
+
+        # Validation des booléens
+        clean_data['is_hidden'] = bool(clean_data['is_hidden'])
+        clean_data['is_example'] = bool(clean_data['is_example'])
+
+        return clean_data
+
+    # Utilisation dans create_testcase :
     def create_testcase(self, step_id, user_id, data):
         """
-        Crée un cas de test
-        
-        Args:
-            step_id: ID de l'étape
-            user_id: ID de l'utilisateur
-            data: Données du cas de test
-            
-        Returns:
-            Le cas de test créé
+        Crée un cas de test avec validation
         """
         step = ChallengeStep.query.get(step_id)
         if not step:
             abort(404, description="Challenge step not found")
-        
-        # Vérifier les permissions
+
         if step.challenge.exercise.created_by != user_id:
             abort(403, description="Access denied")
-        
-        try:
+
+        try:  
+            # 🔧 Valider et nettoyer les données
+            print('que la validation commence.................high')
+            clean_data = self.validate_testcase_data(data)
+
+            print(f"Données validées: testcase_type={clean_data['testcase_type']}")
+
+            # Créer le testcase avec les données nettoyées
             testcase = ChallengeStepTestcase(
                 step_id=step_id,
-                input_data=data['input_data'],
-                expected_output=data['expected_output'],
-                is_hidden=data.get('is_hidden', False),
-                is_example=data.get('is_example', False),
-                timeout_seconds=data.get('timeout_seconds', 5),
-                memory_limit_mb=data.get('memory_limit_mb', 128),
-                order_index=data.get('order_index', 0)
+                **clean_data  # Utiliser les données nettoyées
             )
-            
+
             db.session.add(testcase)
             db.session.commit()
-            
+
             return testcase
-            
+
         except Exception as e:
             db.session.rollback()
+            print(f"Erreur détaillée lors de la création du testcase: {e}")
             raise Exception(f'Error creating test case: {str(e)}')
-    
-    def bulk_create_testcases(self, step_id, user_id, testcases_data):
+
+    def bulk_create_testcases(self, step_id, user_id, testcases_data):  
         """
-        Création en lot de cas de test
-        
+        Création en lot de cas de test avec support de tous les types
+
         Args:
             step_id: ID de l'étape
             user_id: ID de l'utilisateur
             testcases_data: Liste des données des cas de test
-            
+
         Returns:
-            Liste des cas de test créés
+            Dict contenant les cas de test créés et les erreurs
         """
         step = ChallengeStep.query.get(step_id)
         if not step:
             abort(404, description="Challenge step not found")
-        
+
         # Vérifier les permissions
         if step.challenge.exercise.created_by != user_id:
             abort(403, description="Access denied")
-        
-        try:
-            created_testcases = []
-            for i, tc_data in enumerate(testcases_data):
-                if 'input_data' not in tc_data or 'expected_output' not in tc_data:
+
+        created_testcases = []
+        errors = []
+
+        for i, tc_data in enumerate(testcases_data):
+            try:
+                # Validation du type de testcase
+                testcase_type = tc_data.get('testcase_type', 'unit_test')
+
+                # Validation des champs requis selon le type
+                if testcase_type == 'unit_test':
+                    required_fields = ['input_data', 'expected_output']
+                elif testcase_type == 'sql_query_test':
+                    required_fields = ['dataset_reference', 'sql_query_expected']
+                elif testcase_type == 'visualization_test':
+                    required_fields = ['expected_visualization']
+                elif testcase_type == 'statistical_test':
+                    required_fields = ['statistical_assertions']
+                else:
+                    errors.append(f"Cas de test {i+1}: Type de test case non supporté: {testcase_type}")
                     continue
-                    
+                
+                # Vérifier que tous les champs requis sont présents
+                missing_fields = []
+                for field in required_fields:
+                    if field not in tc_data or tc_data[field] is None:
+                        missing_fields.append(field)
+
+                if missing_fields:
+                    errors.append(f"Cas de test {i+1}: Champs manquants: {', '.join(missing_fields)}")
+                    continue
+                
+                # Créer le testcase
                 testcase = ChallengeStepTestcase(
                     step_id=step_id,
-                    input_data=tc_data['input_data'],
-                    expected_output=tc_data['expected_output'],
+                    testcase_type=TestcaseType(testcase_type),
+                    input_data=tc_data.get('input_data'),
+                    expected_output=tc_data.get('expected_output'),
+                    dataset_reference=tc_data.get('dataset_reference'),
+                    sql_query_expected=tc_data.get('sql_query_expected'),
+                    expected_visualization=tc_data.get('expected_visualization'),
+                    statistical_assertions=tc_data.get('statistical_assertions'),
                     is_hidden=tc_data.get('is_hidden', False),
                     is_example=tc_data.get('is_example', False),
                     timeout_seconds=tc_data.get('timeout_seconds', 5),
                     memory_limit_mb=tc_data.get('memory_limit_mb', 128),
-                    order_index=tc_data.get('order_index', i)
+                    order_index=tc_data.get('order_index', i),
+                    numerical_tolerance=tc_data.get('numerical_tolerance', 0.001)
                 )
-                
+
                 db.session.add(testcase)
                 created_testcases.append(testcase)
-            
-            db.session.commit()
-            return created_testcases
-            
+
+            except Exception as e:
+                errors.append(f"Cas de test {i+1}: {str(e)}")
+
+        try:
+            if created_testcases:
+                db.session.commit()
+
+            return {
+                'created_testcases': created_testcases,
+                'errors': errors
+            }
+
         except Exception as e:
             db.session.rollback()
             raise Exception(f'Error creating test cases: {str(e)}')
-    
     # =============================================================================
     # USER SESSION MANAGEMENT
     # =============================================================================
@@ -657,7 +957,7 @@ class CodingPlatformService:
     # CODE EXECUTION
     # =============================================================================
     
-    def submit_code(self, challenge_id, step_id, session_info, code, language):
+    def submit_code(self, challenge_id, step_id, session_info,  content, content_type, language):
         """
         Soumet le code pour évaluation
         """
@@ -677,63 +977,48 @@ class CodingPlatformService:
             abort(404, description="No test cases found for this step")
 
         try:
-            # Exécuter le code contre chaque cas de test
-            language_enum = ProgrammingLanguage(language)
+            # Déterminer le service d'exécution
+            execution_service = self.execution_factory.get_service(
+                step.challenge.execution_environment
+            )
+            
+            # Exécuter contre chaque cas de test
             execution_results = []
             passed_count = 0
-
+            
             for testcase in testcases:
-                result = self.code_execution_service.execute_code(
-                    code=code,
-                    language=language_enum,
-                    test_input=testcase.input_data,
-                    expected_output=testcase.expected_output,
-                    timeout=testcase.timeout_seconds
+                # Préparer les kwargs selon le type de test
+                execution_kwargs = self._prepare_execution_kwargs(
+                    testcase, language, step.challenge.environment_config
                 )
-                print(f'🔍 DEBUG: Testcase {testcase.id} - passed: {result["passed"]}')
-
-                # Préparer le résultat (masquer les sorties attendues pour les cas cachés)
-                testcase_result = {
-                    'testcase_id': testcase.id,
-                    'input': testcase.input_data,
-                    'expected_output': testcase.expected_output if not testcase.is_hidden else '[Hidden]',
-                    'actual_output': result.get('stdout', ''),
-                    'passed': result['passed'],
-                    'error': result.get('stderr', ''),
-                    'execution_time': result.get('time'),
-                    'memory_used': result.get('memory'),
-                    'status': result.get('status'),
-                    'is_hidden': testcase.is_hidden
-                }
-
+                
+                result = execution_service.execute(
+                    content, 
+                    testcase.to_dict(show_hidden=True), 
+                    **execution_kwargs
+                )
+                
+                # Préparer le résultat (masquer les données sensibles pour les cas cachés)
+                testcase_result = self._format_testcase_result(testcase, result)
                 execution_results.append(testcase_result)
-
-                if result['passed']:
+                
+                if result.get('passed', False):
                     passed_count += 1
-
-            print(f'🔍 DEBUG: Tests passés: {passed_count}/{len(testcases)}')
-
-            # CORRECTION 1: Mettre à jour le progrès de l'étape spécifique
+            
+            # Mettre à jour le progrès
             step_progress = self._update_step_progress(
-                user_challenge, step_id, code, language_enum, passed_count, len(testcases)
+                user_challenge, step_id, content, content_type, language, passed_count, len(testcases)
             )
-            print(f'🔍 DEBUG: Step progress is_completed: {step_progress.is_completed}')
-
-            # CORRECTION 2: Mettre à jour le challenge utilisateur SEULEMENT si l'étape est complétée
+            
+            # Mettre à jour la progression du challenge si l'étape est complétée
             step_completed = passed_count == len(testcases)
             if step_completed:
                 self._update_user_challenge_progression(user_challenge, step)
-                print(f'🔍 DEBUG: Étape complétée, progression du challenge mise à jour')
-            else:
-                print(f'🔍 DEBUG: Étape non complétée ({passed_count}/{len(testcases)}), pas de progression du challenge')
-
+            
             # Incrémenter le compteur de tentatives
             user_challenge.attempt_count += 1
             db.session.commit()
-
-            # CORRECTION 3: Récupérer les informations de progression actualisées
-            updated_user_challenge = UserChallenge.query.get(user_challenge.id)
-
+            
             # Préparer la réponse
             response = {
                 'execution_results': execution_results,
@@ -748,40 +1033,69 @@ class CodingPlatformService:
                     'is_completed': step_completed,
                     'tests_passed': passed_count,
                     'tests_total': len(testcases),
-                    'code': code,
-                    'language': language_enum.value
+                    'score': round((passed_count / len(testcases)) * 100, 2)
                 },
-                'user_challenge': {
-                    'id': updated_user_challenge.id,
-                    'current_step_id': updated_user_challenge.current_step_id,
-                    'status': updated_user_challenge.status.value,
-                    'attempt_count': updated_user_challenge.attempt_count,
-                    'started_at': updated_user_challenge.started_at.isoformat() if updated_user_challenge.started_at else None,
-                    'completed_at': updated_user_challenge.completed_at.isoformat() if updated_user_challenge.completed_at else None
-                }
+                'user_challenge': user_challenge.to_dict()
             }
-
-            # Ajouter info sur l'étape suivante si disponible
-            if updated_user_challenge.current_step_id:
-                next_step = ChallengeStep.query.get(updated_user_challenge.current_step_id)
-                if next_step:
-                    response['next_step'] = {
-                        'id': next_step.id,
-                        'title': next_step.title,
-                        'order_index': next_step.order_index
-                    }
-
-            print(f'🔍 DEBUG: Response prepared - current_step_id: {updated_user_challenge.current_step_id}')
+            
             return response
-
-        except ValueError as e:
-            db.session.rollback()
-            raise ValueError(f'Invalid enum value: {str(e)}')
+            
         except Exception as e:
             db.session.rollback()
-            raise Exception(f'Error submitting code: {str(e)}')
+            raise Exception(f'Error submitting solution: {str(e)}')
+    
+    def _prepare_execution_kwargs(self, testcase, language, environment_config):
+        """Prépare les arguments d'exécution selon le contexte"""
+        kwargs = {
+            'language': language,
+            'numerical_tolerance': testcase.numerical_tolerance,
+            'timeout': testcase.timeout_seconds,
+            'memory_limit': testcase.memory_limit_mb
+        }
+        
+        # Ajouter la configuration d'environnement
+        kwargs.update(environment_config or {})
+        
+        return kwargs
+    
+    def _format_testcase_result(self, testcase, execution_result):
+        """Formate le résultat d'un cas de test"""
+        result = {
+            'testcase_id': testcase.id,
+            'testcase_type': testcase.testcase_type.value,
+            'passed': execution_result.get('passed', False),
+            'is_hidden': testcase.is_hidden,
+            'execution_time': execution_result.get('execution_time'),
+            'memory_used': execution_result.get('memory_used')
+        }
+        
+        # Ajouter les détails selon le type de test
+        if testcase.testcase_type == TestcaseType.UNIT_TEST:
+            result.update({
+                'input': testcase.input_data,
+                'expected_output': testcase.expected_output if not testcase.is_hidden else '[Hidden]',
+                'actual_output': execution_result.get('stdout', ''),
+                'error': execution_result.get('stderr', '')
+            })
+        elif testcase.testcase_type == TestcaseType.SQL_QUERY_TEST:
+            result.update({
+                'dataset_reference': testcase.dataset_reference,
+                'result_rows': execution_result.get('row_count', 0),
+                'columns': execution_result.get('columns', [])
+            })
+        elif testcase.testcase_type == TestcaseType.VISUALIZATION_TEST:
+            result.update({
+                'visualization_type': execution_result.get('visualization_type'),
+                'data_points': execution_result.get('data_points', 0)
+            })
+        elif testcase.testcase_type == TestcaseType.STATISTICAL_TEST:
+            result.update({
+                'analysis_results': execution_result.get('analysis_results', {})
+            })
+        
+        return result
 
-    def _update_step_progress(self, user_challenge, step_id, code, language, passed_count, total_count):
+    def _update_step_progress(self, user_challenge, step_id, content, content_type, language, passed_count, total_count):
         """
         Met à jour le progrès d'une étape spécifique
         """
@@ -804,21 +1118,19 @@ class CodingPlatformService:
             print(f'🔍 DEBUG: Progress existant trouvé pour step_id: {step_id}')
 
         # Mettre à jour avec les résultats d'exécution
-        progress.code = code
-        progress.language = language
         progress.tests_passed = passed_count
         progress.tests_total = total_count
         progress.is_completed = passed_count == total_count
+        progress.score = round((passed_count / total_count) * 100, 2) if total_count > 0 else 0
         progress.last_execution_result = {
             'passed_count': passed_count,
             'total_count': total_count,
-            'submission_time': datetime.now(timezone.utc).isoformat()
+            'submission_time': datetime.now(timezone.utc).isoformat(),
+            'content_type': content_type
         }
         progress.last_edited = datetime.now(timezone.utc)
-
-        print(f'🔍 DEBUG: Progress mis à jour - is_completed: {progress.is_completed}, tests: {passed_count}/{total_count}')
-
-        db.session.flush()  # S'assurer que les changements sont visibles dans la session
+        
+        db.session.flush()
         return progress
     
     def _update_user_challenge_progression(self, user_challenge, completed_step):
@@ -1011,14 +1323,14 @@ class CodingPlatformService:
     # ADMIN CODE TESTING
     # =============================================================================
     
-    def admin_test_code(self, step_id, user_id, code, language):
+    def admin_test_code(self, step_id, user_id, content, language):
         """
         Teste le code dans un contexte admin (accès à tous les cas de test)
         
         Args:
             step_id: ID de l'étape
             user_id: ID de l'utilisateur admin
-            code: Code à tester
+            content: Contenu à tester (code, notebook, SQL, etc.)
             language: Langage de programmation
             
         Returns:
@@ -1045,33 +1357,28 @@ class CodingPlatformService:
             }
         
         try:
-            # Exécuter le code contre tous les cas de test
-            language_enum = ProgrammingLanguage(language)
+            execution_service = self.execution_factory.get_service(
+                step.challenge.execution_environment
+            )
+            
             execution_results = []
             passed_count = 0
             
             for testcase in testcases:
-                result = self.code_execution_service.execute_code(
-                    code=code,
-                    language=language_enum,
-                    test_input=testcase.input_data,
-                    expected_output=testcase.expected_output,
-                    timeout=testcase.timeout_seconds
+                execution_kwargs = self._prepare_execution_kwargs(
+                    testcase, language, step.challenge.environment_config
                 )
                 
-                testcase_result = {
-                    'testcase_id': testcase.id,
-                    'input': testcase.input_data,
-                    'expected_output': testcase.expected_output,
-                    'actual_output': result.get('stdout', ''),
-                    'passed': result['passed'],
-                    'error': result.get('stderr', ''),
-                    'execution_time': result.get('time'),
-                    'memory_used': result.get('memory'),
-                    'status': result.get('status'),
-                    'is_hidden': testcase.is_hidden,
-                    'is_example': testcase.is_example
-                }
+                result = execution_service.execute(
+                    content, 
+                    testcase.to_dict(show_hidden=True), 
+                    **execution_kwargs
+                )
+                
+                # Adapter le mapping selon le type d'environnement d'exécution
+                testcase_result = self._format_testcase_result(
+                    testcase, result, step.challenge.execution_environment
+                )
                 
                 execution_results.append(testcase_result)
                 
@@ -1093,6 +1400,109 @@ class CodingPlatformService:
             raise ValueError(f'Invalid enum value: {str(e)}')
         except Exception as e:
             raise Exception(f'Error testing code: {str(e)}')
+    
+    def _format_testcase_result(self, testcase, result, execution_environment):
+        """
+        Formate le résultat selon le type d'environnement d'exécution
+        """
+        base_result = {
+            'testcase_id': testcase.id,
+            'input': testcase.input_data,
+            'expected_output': testcase.expected_output,
+            'passed': result['passed'],
+            'is_hidden': testcase.is_hidden,
+            'is_example': testcase.is_example,
+            'success': result.get('success', True)
+        }
+        
+        if execution_environment == ExecutionEnvironment.CODE_EXECUTOR:
+            # Pour l'exécution de code classique (Judge0)
+            base_result.update({
+                'actual_output': result.get('stdout', ''),
+                'error': result.get('stderr', ''),
+                'execution_time': result.get('execution_time') or result.get('time'),
+                'memory_used': result.get('memory_used') or result.get('memory'),
+                'status': result.get('status')
+            })
+        
+        elif execution_environment == ExecutionEnvironment.JUPYTER_NOTEBOOK:
+            # Pour les notebooks Jupyter
+            stdout = result.get('stdout', '')
+            stderr = result.get('stderr', '')
+            
+            # Si pas de stdout/stderr, essayer d'extraire des outputs
+            if not stdout and 'outputs' in result:
+                stdout_parts = []
+                for output in result['outputs']:
+                    if output.get('type') == 'stream' and output.get('name') == 'stdout':
+                        stdout_parts.append(output.get('text', ''))
+                    elif output.get('type') == 'result':
+                        data = output.get('data', {})
+                        if 'text/plain' in data:
+                            stdout_parts.append(str(data['text/plain']))
+                stdout = ''.join(stdout_parts)
+            
+            base_result.update({
+                'actual_output': stdout,
+                'error': stderr,
+                'execution_time': result.get('execution_time'),
+                'memory_used': result.get('memory_used'),
+                'status': result.get('status', 'Completed'),
+                'outputs': result.get('outputs', []),
+                'kernel_used': result.get('kernel_used')
+            })
+        
+        elif execution_environment == ExecutionEnvironment.SQL_DATABASE:
+            # Pour les requêtes SQL
+            sql_result = result.get('result', [])
+            actual_output = json.dumps(sql_result) if sql_result else ''
+            
+            base_result.update({
+                'actual_output': actual_output,
+                'error': result.get('error', ''),
+                'execution_time': None,
+                'memory_used': None,
+                'status': 'Completed' if result.get('success') else 'Error',
+                'row_count': result.get('row_count', 0),
+                'columns': result.get('columns', [])
+            })
+        
+        elif execution_environment == ExecutionEnvironment.DATA_VISUALIZATION:
+            # Pour les visualisations
+            base_result.update({
+                'actual_output': json.dumps(result.get('properties', {})),
+                'error': result.get('error', ''),
+                'execution_time': None,
+                'memory_used': None,
+                'status': 'Completed' if result.get('success') else 'Error',
+                'visualization_type': result.get('visualization_type'),
+                'data_points': result.get('data_points', 0)
+            })
+        
+        elif execution_environment == ExecutionEnvironment.FILE_ANALYSIS:
+            # Pour l'analyse statistique
+            analysis_results = result.get('analysis_results', {})
+            actual_output = json.dumps(analysis_results) if analysis_results else ''
+            
+            base_result.update({
+                'actual_output': actual_output,
+                'error': result.get('error', ''),
+                'execution_time': None,
+                'memory_used': None,
+                'status': 'Completed' if result.get('success') else 'Error'
+            })
+        
+        else:
+            # Fallback générique
+            base_result.update({
+                'actual_output': str(result.get('result', '')),
+                'error': result.get('error', ''),
+                'execution_time': result.get('execution_time'),
+                'memory_used': result.get('memory_used'),
+                'status': result.get('status', 'Unknown')
+            })
+        
+        return base_result
     
     def admin_validate_code(self, step_id, user_id, code, language):
         """

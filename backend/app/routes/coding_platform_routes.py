@@ -3,6 +3,7 @@ import os
 import re
 from uuid import UUID
 from datetime import datetime, timezone
+from app.types.coding_platform import ExecutionEnvironment, ExerciseCategory, TestcaseType
 from flask import g, request, jsonify, abort, current_app, Blueprint
 from app.routes.user import token_required
 from app.services.coding_platform_service import CodingPlatformService
@@ -65,6 +66,7 @@ def get_exercises():
     # Paramètres de filtrage et pagination
     page = int(request.args.get('page', 1))
     per_page = min(int(request.args.get('per_page', 20)), 100)
+    category = request.args.get('category')
     language = request.args.get('language')
     difficulty = request.args.get('difficulty')
     
@@ -72,6 +74,7 @@ def get_exercises():
         exercises, total = coding_platform_service.get_exercises(
             page=page,
             per_page=per_page,
+            category=category,
             language=language,
             difficulty=difficulty,
             user_id=user_id
@@ -84,6 +87,10 @@ def get_exercises():
                 'page': page,
                 'per_page': per_page,
                 'pages': (total + per_page - 1) // per_page
+            },
+            'filters': {
+                'categories': [cat.value for cat in ExerciseCategory],
+                'execution_environments': [env.value for env in ExecutionEnvironment]
             }
         }
         
@@ -101,12 +108,20 @@ def create_exercise():
     """Crée un nouvel exercice"""
     user_id = get_current_user_id()
     data = request.get_json()
+    # Validation selon la catégorie
+    category = data.get('category', 'developer')
     
-    # Validation basique des champs obligatoires
-    required_fields = ['title', 'language', 'difficulty']
+    if category == 'developer':
+        required_fields = ['title', 'language', 'difficulty']
+    elif category == 'data_analyst':
+        required_fields = ['title', 'difficulty', 'required_skills']
+    else:
+        return jsonify({"error": "Invalid category. Must be 'developer' or 'data_analyst'"}), 400
+    
     for field in required_fields:
         if field not in data or not data[field]:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
+            return jsonify({"error": f"Le champ '{field}' est obligatoire pour la catégorie {category}"}), 400
+    
     
     try:
         exercise = coding_platform_service.create_exercise(user_id, data)
@@ -175,6 +190,50 @@ def delete_exercise(exercise_id):
             return jsonify({"error": str(e)}), 404
         print(f"Erreur dans delete_exercise route: {e}")
         return jsonify({"error": "Erreur lors de la suppression de l'exercice"}), 500
+
+# =============================================================================
+# ADMIN ROUTES - DATASET MANAGEMENT (Nouveau)
+# =============================================================================
+
+@coding_platform_bp.route('/admin/exercises/<exercise_id>/datasets', methods=['POST'])
+@token_required
+def create_exercise_dataset(exercise_id):
+    """Crée un dataset pour un exercice d'analyse de données"""
+    user_id = get_current_user_id()
+    data = request.get_json()
+    
+    required_fields = ['name', 'dataset_type']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
+    
+    try:
+        dataset = coding_platform_service.create_exercise_dataset(exercise_id, user_id, data)
+        return jsonify(dataset.to_dict()), 201
+        
+    except Exception as e:
+        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
+            return jsonify({"error": str(e)}), 404
+        elif 'can only be added' in str(e).lower():
+            return jsonify({"error": str(e)}), 400
+        print(f"Erreur dans create_exercise_dataset: {e}")
+        return jsonify({"error": "Erreur lors de la création du dataset"}), 500
+
+@coding_platform_bp.route('/admin/exercises/<exercise_id>/datasets', methods=['GET'])
+@token_required
+def get_exercise_datasets(exercise_id):
+    """Récupère les datasets d'un exercice"""
+    user_id = get_current_user_id()
+    
+    try:
+        datasets = coding_platform_service.get_exercise_datasets(exercise_id, user_id)
+        return jsonify([dataset.to_dict() for dataset in datasets]), 200
+        
+    except Exception as e:
+        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
+            return jsonify({"error": str(e)}), 404
+        print(f"Erreur dans get_exercise_datasets: {e}")
+        return jsonify({"error": "Erreur lors de la récupération des datasets"}), 500
 
 # =============================================================================
 # ADMIN ROUTES - CHALLENGE MANAGEMENT
@@ -417,11 +476,22 @@ def create_testcase(step_id):
     user_id = get_current_user_id()
     data = request.get_json()
     
-    # Validation basique des champs obligatoires
-    required_fields = ['input_data', 'expected_output']
+    testcase_type = data.get('testcase_type', 'unit_test')
+    
+    if testcase_type == 'unit_test':
+        required_fields = ['input_data', 'expected_output']
+    elif testcase_type == 'sql_query_test':
+        required_fields = ['dataset_reference', 'sql_query_expected']
+    elif testcase_type == 'visualization_test':
+        required_fields = ['expected_visualization']
+    elif testcase_type == 'statistical_test':
+        required_fields = ['statistical_assertions']
+    else:
+        return jsonify({"error": f"Type de test case non supporté: {testcase_type}"}), 400
+    
     for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
+        if field not in data or data[field] is None:
+            return jsonify({"error": f"Le champ '{field}' est obligatoire pour le type {testcase_type}"}), 400
     
     try:
         testcase = coding_platform_service.create_testcase(step_id, user_id, data)
@@ -433,10 +503,59 @@ def create_testcase(step_id):
         print(f"Erreur dans create_testcase route: {e}")
         return jsonify({"error": "Erreur lors de la création du cas de test"}), 500
 
+def process_testcase_data(testcase_data):
+    """
+    Traite les données des cas de test avant insertion en base
+    """
+    processed_data = testcase_data.copy()
+    
+    # 🔧 S'assurer que testcase_type est une string et non un enum
+    if 'testcase_type' in processed_data:
+        if hasattr(processed_data['testcase_type'], 'value'):
+            # Si c'est un enum, extraire la valeur string
+            processed_data['testcase_type'] = processed_data['testcase_type'].value
+        elif isinstance(processed_data['testcase_type'], str):
+            # Si c'est déjà une string, garder tel quel
+            pass
+        else:
+            # Conversion de sécurité
+            processed_data['testcase_type'] = str(processed_data['testcase_type'])
+    
+    # 🔧 Valider que le type de test est supporté
+    valid_types = [e.value for e in TestcaseType]
+    if processed_data.get('testcase_type') not in valid_types:
+        raise ValueError(f"Type de test non supporté: {processed_data.get('testcase_type')}")
+    
+    # 🔧 Nettoyer les champs selon le type de test
+    testcase_type = processed_data.get('testcase_type', 'unit_test')
+    
+    if testcase_type == 'notebook_cell_test':
+        # Pour les tests de notebook, input_data et expected_output peuvent être None
+        processed_data['input_data'] = processed_data.get('input_data') or None
+        processed_data['expected_output'] = processed_data.get('expected_output') or None
+        
+        # S'assurer que notebook_cell_output est présent
+        if not processed_data.get('notebook_cell_output'):
+            raise ValueError("notebook_cell_output est requis pour les tests de cellule notebook")
+            
+    elif testcase_type == 'sql_query_test':
+        # Pour les tests SQL
+        if not processed_data.get('sql_query_expected'):
+            raise ValueError("sql_query_expected est requis pour les tests SQL")
+            
+    elif testcase_type == 'unit_test':
+        # Pour les tests unitaires classiques
+        if not processed_data.get('input_data'):
+            raise ValueError("input_data est requis pour les tests unitaires")
+        if not processed_data.get('expected_output'):
+            raise ValueError("expected_output est requis pour les tests unitaires")
+    
+    return processed_data
+
 @coding_platform_bp.route('/admin/steps/<step_id>/testcases/bulk', methods=['POST'])
 @token_required
-def bulk_import_testcases(step_id):
-    """Import en lot de cas de test depuis JSON"""
+def bulk_import_testcases_simple(step_id):
+    """Import en lot de cas de test - Version avec appels individuels"""
     user_id = get_current_user_id()
     data = request.get_json()
     
@@ -444,21 +563,66 @@ def bulk_import_testcases(step_id):
         return jsonify({"error": "Le champ 'testcases' est obligatoire"}), 400
     
     try:
-        created_testcases = coding_platform_service.bulk_create_testcases(
-            step_id, user_id, data['testcases']
-        )
+        print(f"Début import bulk pour step_id: {step_id}, {len(data['testcases'])} cas de test")
         
-        return jsonify({
+        created_testcases = []
+        errors = []
+        
+        for i, tc_data in enumerate(data['testcases']):
+            try:
+                # 🔧 Debug: Log des données reçues
+                testcase_type = tc_data.get('testcase_type', 'unit_test')
+                print(f"Traitement cas de test {i+1}: type={testcase_type}")
+                
+                # Ajouter l'index d'ordre si pas fourni
+                if 'order_index' not in tc_data:
+                    tc_data['order_index'] = i
+                
+                # 🔧 Debug: Log avant création
+                print(f"Données du cas de test {i+1}: {list(tc_data.keys())}")
+                
+                # Créer le cas de test individuellement
+                testcase = coding_platform_service.create_testcase(step_id, user_id, tc_data)
+                created_testcases.append(testcase.to_dict(show_hidden=True))
+                
+                print(f"Cas de test {i+1} créé avec succès: {testcase.id}")
+                
+            except Exception as e:
+                error_msg = f"Cas de test {i+1}: {str(e)}"
+                errors.append(error_msg)
+                print(f"Erreur cas de test {i+1}: {e}")
+                print(f"Données problématiques: {tc_data}")
+        
+        print(f"Résultat import: {len(created_testcases)} créés, {len(errors)} erreurs")
+        
+        # Préparer la réponse
+        response_data = {
             "message": f"Créé {len(created_testcases)} cas de test avec succès",
-            "testcases": [tc.to_dict(show_hidden=True) for tc in created_testcases]
-        }), 201
+            "testcases": created_testcases
+        }
+        
+        if errors:
+            response_data["errors"] = errors
+            response_data["message"] += f", {len(errors)} erreurs"
+        
+        # Déterminer le code de statut
+        if not created_testcases:
+            return jsonify({
+                "error": "Aucun cas de test n'a pu être créé",
+                "errors": errors
+            }), 400
+        elif errors:
+            return jsonify(response_data), 207  # Multi-status: succès partiels
+        else:
+            return jsonify(response_data), 201
         
     except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
+        error_msg = str(e).lower()
+        if 'not found' in error_msg or 'access denied' in error_msg:
             return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans bulk_import_testcases route: {e}")
+        print(f"Erreur globale dans bulk_import_testcases_simple: {e}")
         return jsonify({"error": "Erreur lors de l'import en lot des cas de test"}), 500
-
+    
 # =============================================================================
 # PUBLIC ROUTES - USER CHALLENGE DISCOVERY
 # =============================================================================
@@ -641,36 +805,6 @@ def get_challenge_step(challenge_id, step_id):
 # PUBLIC ROUTES - PROGRESS MANAGEMENT
 # =============================================================================
 
-# @coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/save', methods=['POST'])
-# def save_step_progress(challenge_id, step_id):
-#     """Sauvegarde le progrès de code d'une étape (autosave) - supporte les utilisateurs anonymes"""
-#     session_info = get_session_identifier()
-#     if not session_info:
-#         return jsonify({"error": "Identifiant de session requis (utiliser l'en-tête X-Session-Token)"}), 400
-    
-#     data = request.get_json()
-#     if not data or 'code' not in data or 'language' not in data:
-#         return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
-    
-#     try:
-#         progress = coding_platform_service.save_step_progress(
-#             challenge_id, 
-#             step_id, 
-#             session_info, 
-#             data['code'], 
-#             data['language']
-#         )
-        
-#         return jsonify(progress.to_dict() if hasattr(progress, 'to_dict') else progress), 200
-        
-#     except ValueError as e:
-#         return jsonify({"error": str(e)}), 400
-#     except Exception as e:
-#         if 'not found' in str(e).lower():
-#             return jsonify({"error": str(e)}), 404
-#         print(f"Erreur dans save_step_progress route: {e}")
-#         return jsonify({"error": "Erreur lors de la sauvegarde du progrès"}), 500
-
 @coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/load', methods=['GET'])
 def load_step_progress(challenge_id, step_id):
     """Charge le progrès de code sauvegardé d'une étape - supporte les utilisateurs anonymes"""
@@ -700,35 +834,6 @@ def load_step_progress(challenge_id, step_id):
 # PUBLIC ROUTES - CODE EXECUTION
 # =============================================================================
 
-# @coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/submit', methods=['POST'])
-# def submit_code(challenge_id, step_id):
-#     """Soumet le code pour évaluation contre les cas de test - supporte les utilisateurs anonymes"""
-#     session_info = get_session_identifier()
-#     if not session_info:
-#         return jsonify({"error": "Identifiant de session requis (utiliser l'en-tête X-Session-Token)"}), 400
-    
-#     data = request.get_json()
-#     if not data or 'code' not in data or 'language' not in data:
-#         return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
-    
-#     try:
-#         response = coding_platform_service.submit_code(
-#             challenge_id, 
-#             step_id, 
-#             session_info, 
-#             data['code'], 
-#             data['language']
-#         )
-#         print('ca c\'est la vraie sorcelerie')
-#         return jsonify(response), 200
-        
-#     except ValueError as e:
-#         return jsonify({"error": str(e)}), 400
-#     except Exception as e:
-#         if 'not found' in str(e).lower():
-#             return jsonify({"error": str(e)}), 404
-#         print(f"Erreur dans submit_code route: {e}")
-#         return jsonify({"error": "Erreur lors de la soumission du code"}), 500
 
 @coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/test', methods=['POST'])
 def test_code(challenge_id, step_id):
@@ -760,6 +865,7 @@ def test_code(challenge_id, step_id):
         print(f"Erreur dans test_code route: {e}")
         return jsonify({"error": "Erreur lors du test du code"}), 500
     
+
 @coding_platform_bp.route('/admin/steps/<step_id>/test', methods=['POST'])
 @token_required
 def admin_test_code(step_id):
@@ -795,15 +901,15 @@ def admin_validate_code(step_id):
     user_id = get_current_user_id()
     data = request.get_json()
     
-    if not data or 'code' not in data or 'language' not in data:
-        return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
+    if not data:
+        return jsonify({"error": "Aucune donnée fournie"}), 400
     
     try:
         response = coding_platform_service.admin_validate_code(
             step_id, 
             user_id, 
-            data['code'], 
-            data['language']
+            data.get('content'), 
+            data.get('language')
         )
         
         return jsonify(response), 200
@@ -829,8 +935,16 @@ def submit_code(challenge_id, step_id,access_token):
     session_info = {'type': 'anonymous_id', 'value': access_token}
         
     data = request.get_json()
-    if not data or 'code' not in data or 'language' not in data:
-        return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
+    if not data:
+        return jsonify({"error": "Aucune donnée fournie"}), 400
+    
+    content_type = data.get('content_type', 'code')  # 'code', 'notebook', 'sql', 'analysis', 'visualization'
+    content = data.get('content', '')
+    language = data.get('language')
+    
+    if content_type == 'code' and not language:
+        return jsonify({"error": "Le langage est obligatoire pour les soumissions de code"}), 400
+    
     
     try:
         print(f'🔍 DEBUG: Route submit_code appelée - Challenge: {challenge_id}, Step: {step_id}')
@@ -840,8 +954,9 @@ def submit_code(challenge_id, step_id,access_token):
             challenge_id, 
             step_id, 
             session_info, 
-            data['code'], 
-            data['language']
+            content, 
+            content_type,
+            language
         )
         
         print(f'🔍 DEBUG: Response from service: {response}')
@@ -1065,3 +1180,118 @@ def recalculate_stats():
     except Exception as e:
         print(f'🔍 DEBUG: Erreur recalculate_stats: {e}')
         return jsonify({"error": "Erreur lors du recalcul des statistiques"}), 500
+    
+# =============================================================================
+# PUBLIC ROUTES - CONTEXT INFORMATION
+# =============================================================================
+
+@coding_platform_bp.route('/challenges/<challenge_id>/context', methods=['GET'])
+def get_challenge_context(challenge_id):
+    """Récupère le contexte d'un challenge (environnement, datasets, etc.)"""
+    session_info = get_session_identifier()
+    
+    try:
+        from app.models.coding_platform import Challenge, ExerciseDataset
+        
+        challenge = Challenge.query.filter_by(id=challenge_id).first()
+        if not challenge:
+            return jsonify({"error": "Challenge non trouvé"}), 404
+        
+        # Informations de contexte
+        context = {
+            'challenge': challenge.to_dict(),
+            'execution_environment': challenge.execution_environment.value,
+            'environment_config': challenge.environment_config,
+            'exercise_category': challenge.exercise.category.value
+        }
+        
+        # Ajouter les datasets si c'est un exercice d'analyse de données
+        if challenge.exercise.category.value == 'data_analyst':
+            datasets = ExerciseDataset.query.filter_by(exercise_id=challenge.exercise_id).all()
+            context['datasets'] = [dataset.to_dict() for dataset in datasets]
+        
+        # Ajouter les informations de session si disponible
+        if session_info:
+            user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
+            if user_challenge:
+                context['user_progress'] = user_challenge.to_dict()
+        
+        return jsonify(context), 200
+        
+    except Exception as e:
+        print(f"Erreur dans get_challenge_context: {e}")
+        return jsonify({"error": "Erreur lors de la récupération du contexte"}), 500
+
+@coding_platform_bp.route('/meta/types', methods=['GET'])
+def get_available_types():
+    """Récupère tous les types disponibles pour l'interface"""
+    try:
+        types_info = {
+            'exercise_categories': [cat.value for cat in ExerciseCategory],
+            'execution_environments': [env.value for env in ExecutionEnvironment],
+            'testcase_types': [tc_type.value for tc_type in TestcaseType],
+            'programming_languages': [lang.value for lang in ProgrammingLanguage]
+        }
+        
+        return jsonify(types_info), 200
+        
+    except Exception as e:
+        print(f"Erreur dans get_available_types: {e}")
+        return jsonify({"error": "Erreur lors de la récupération des types"}), 500
+
+# =============================================================================
+# ROUTES DE VALIDATION (Pour développement et test)
+# =============================================================================
+
+@coding_platform_bp.route('/admin/validate/sql', methods=['POST'])
+@token_required
+def validate_sql_query():
+    """Valide une requête SQL contre un dataset (pour développement)"""
+    user_id = get_current_user_id()
+    data = request.get_json()
+    
+    required_fields = ['query', 'dataset_reference']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
+    
+    try:
+        from app.services.execution_services import SQLExecutionService
+        
+        sql_service = SQLExecutionService()
+        result = sql_service.execute(
+            data['query'], 
+            {'dataset_reference': data['dataset_reference']},
+            numerical_tolerance=data.get('numerical_tolerance', 0.001)
+        )
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        print(f"Erreur dans validate_sql_query: {e}")
+        return jsonify({"error": f"Erreur lors de la validation SQL: {str(e)}"}), 500
+
+@coding_platform_bp.route('/admin/validate/visualization', methods=['POST'])
+@token_required
+def validate_visualization():
+    """Valide une visualisation de données (pour développement)"""
+    user_id = get_current_user_id()
+    data = request.get_json()
+    
+    if 'visualization_data' not in data:
+        return jsonify({"error": "Le champ 'visualization_data' est obligatoire"}), 400
+    
+    try:
+        from app.services.execution_services import DataVisualizationService
+        
+        viz_service = DataVisualizationService()
+        result = viz_service.execute(
+            data['visualization_data'], 
+            {'expected_visualization': data.get('expected_structure', {})}
+        )
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        print(f"Erreur dans validate_visualization: {e}")
+        return jsonify({"error": f"Erreur lors de la validation de visualisation: {str(e)}"}), 500

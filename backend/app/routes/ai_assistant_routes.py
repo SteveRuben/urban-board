@@ -100,7 +100,7 @@ def create_assistant():
         assistant = ai_assistant_service.create_assistant(
             user_id=g.current_user.id,
             assistant_data=data,
-            organization_id = organization_id,
+            organization_id=organization_id,
         )
         return jsonify(assistant), 201
     except BadRequest as e:
@@ -143,6 +143,106 @@ def update_assistant(assistant_id):
         return jsonify({"error": str(e)}), 403
     except Exception as e:
         current_app.logger.error(f"Erreur lors de la mise à jour de l'assistant: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@ai_assistant_bp.route('/<uuid:assistant_id>/api-key', methods=['PUT'])
+@token_required
+def update_api_key(assistant_id):
+    """
+    Met à jour la clé d'API d'un assistant
+    
+    Args:
+        assistant_id (uuid): ID de l'assistant
+    
+    Request body:
+        json:
+            apiKey (str): Nouvelle clé d'API
+            apiProvider (str): Fournisseur de l'API
+    
+    Returns:
+        json: Statut de la mise à jour
+    """
+    try:
+        data = request.json
+        if not data:
+            raise BadRequest("Données manquantes")
+        
+        api_key = data.get('apiKey')
+        api_provider = data.get('apiProvider')
+        
+        if not api_key:
+            raise BadRequest("Clé d'API manquante")
+        
+        if not api_provider:
+            raise BadRequest("Fournisseur d'API manquant")
+        
+        result = ai_assistant_service.update_api_key(
+            assistant_id=str(assistant_id),
+            user_id=g.current_user.id,
+            api_key=api_key,
+            api_provider=api_provider
+        )
+        return jsonify(result)
+    except BadRequest as e:
+        return jsonify({"error": str(e)}), 400
+    except NoResultFound:
+        return jsonify({"error": "Assistant non trouvé"}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la mise à jour de la clé d'API: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@ai_assistant_bp.route('/<uuid:assistant_id>/api-key', methods=['DELETE'])
+@token_required
+def remove_api_key(assistant_id):
+    """
+    Supprime la clé d'API d'un assistant
+    
+    Args:
+        assistant_id (uuid): ID de l'assistant
+    
+    Returns:
+        json: Statut de la suppression
+    """
+    try:
+        result = ai_assistant_service.remove_api_key(
+            assistant_id=str(assistant_id),
+            user_id=g.current_user.id
+        )
+        return jsonify(result)
+    except NoResultFound:
+        return jsonify({"error": "Assistant non trouvé"}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la suppression de la clé d'API: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@ai_assistant_bp.route('/<uuid:assistant_id>/api-key/test', methods=['POST'])
+@token_required
+def test_api_key(assistant_id):
+    """
+    Teste la validité de la clé d'API d'un assistant
+    
+    Args:
+        assistant_id (uuid): ID de l'assistant
+    
+    Returns:
+        json: Résultat du test
+    """
+    try:
+        result = ai_assistant_service.test_api_key(
+            assistant_id=str(assistant_id),
+            user_id=g.current_user.id
+        )
+        return jsonify(result)
+    except NoResultFound:
+        return jsonify({"error": "Assistant non trouvé"}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors du test de la clé d'API: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @ai_assistant_bp.route('/<uuid:assistant_id>', methods=['DELETE'])
@@ -383,6 +483,67 @@ def get_history(assistant_id):
         return jsonify({"error": str(e)}), 403
     except Exception as e:
         current_app.logger.error(f"Erreur lors de la récupération de l'historique: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@ai_assistant_bp.route('/<uuid:assistant_id>/usage', methods=['POST'])
+@token_required
+def increment_usage(assistant_id):
+    """
+    Incrémente le compteur d'utilisation d'un assistant
+    
+    Args:
+        assistant_id (uuid): ID de l'assistant
+    
+    Returns:
+        json: Statut de la mise à jour
+    """
+    try:
+        # Cette méthode pourrait être ajoutée au service pour tracker l'utilisation
+        # Pour l'instant, on retourne un succès simple
+        return jsonify({"success": True, "message": "Utilisation enregistrée"})
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de l'enregistrement de l'utilisation: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@ai_assistant_bp.route('/providers', methods=['GET'])
+@token_required
+def get_api_providers():
+    """
+    Récupère la liste des fournisseurs d'API supportés
+    
+    Returns:
+        json: Liste des fournisseurs
+    """
+    try:
+        providers = [
+            {
+                'id': 'openai',
+                'name': 'OpenAI',
+                'description': 'GPT-3.5, GPT-4, etc.',
+                'models': ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo']
+            },
+            {
+                'id': 'anthropic',
+                'name': 'Anthropic',
+                'description': 'Claude 3 et versions ultérieures',
+                'models': ['claude-3-haiku', 'claude-3-sonnet', 'claude-3-opus']
+            },
+            {
+                'id': 'google',
+                'name': 'Google',
+                'description': 'Gemini et PaLM',
+                'models': ['gemini-pro', 'gemini-pro-vision']
+            },
+            {
+                'id': 'huggingface',
+                'name': 'Hugging Face',
+                'description': 'Modèles open source',
+                'models': ['mistral-7b', 'llama-2-70b']
+            }
+        ]
+        return jsonify(providers)
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des fournisseurs: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Enregistrement du Blueprint
