@@ -32,6 +32,25 @@ class Config:
     API_RATE_LIMIT = '100/hour'
     API_TIMEOUT = 60  # secondes
     
+    DATASETS_PATH = os.getenv('DATASETS_PATH', '/app/datasets/')
+    SQL_DATABASES = {
+        'sqlite': {
+            'path': os.path.join(DATASETS_PATH, 'sqlite/')
+        },
+        'postgresql': {
+            'host': os.getenv('POSTGRES_HOST', 'localhost'),
+            'port': os.getenv('POSTGRES_PORT', '5432'),
+            'username': os.getenv('POSTGRES_USER', 'postgres'),
+            'password': os.getenv('POSTGRES_PASSWORD', ''),
+            'database': os.getenv('POSTGRES_DB', 'coding_platform')
+        }
+    }
+    
+    # Limites de sécurité
+    SQL_QUERY_TIMEOUT = int(os.getenv('SQL_QUERY_TIMEOUT', '30'))
+    MAX_DATASET_SIZE_MB = int(os.getenv('MAX_DATASET_SIZE_MB', '100'))
+    NOTEBOOK_EXECUTION_TIMEOUT = int(os.getenv('NOTEBOOK_EXECUTION_TIMEOUT', '300'))
+
     # Configuration JWT pour l'authentification
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)

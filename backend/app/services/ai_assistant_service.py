@@ -8,12 +8,13 @@ from sqlalchemy.orm.exc import NoResultFound
 from app import db
 from ..models.ai_assistant import AIAssistant, AIAssistantDocument
 from ..models.user import User
+
 # Import corrigé - s'assurer que cette fonction existe
 try:
     from ..services.llm_service import get_llm_response
 except ImportError:
     # Fonction de fallback si le service LLM n'existe pas encore
-    def get_llm_response(prompt, model="claude-3-7-sonnet"):
+    def get_llm_response(prompt, model="claude-3-7-sonnet", api_key=None):
         return f"Réponse simulée pour le prompt: {prompt[:100]}..."
 
 class AIAssistantService:
@@ -41,9 +42,9 @@ class AIAssistantService:
         # Si demandé, ajouter les modèles publics
         if include_templates:
             templates = AIAssistant.query.filter_by(is_template=True).all()
-            return [assistant.to_dict() for assistant in assistants] + [template.to_dict() for template in templates]
+            return [assistant.to_dict(include_api_key=True) for assistant in assistants] + [template.to_dict() for template in templates]
         
-        return [assistant.to_dict() for assistant in assistants]
+        return [assistant.to_dict(include_api_key=True) for assistant in assistants]
     
     def get_assistant_by_id(self, assistant_id, user_id=None):
         """
@@ -67,7 +68,7 @@ class AIAssistantService:
             if not assistant.is_template and user_id and str(assistant.user_id) != str(user_id):
                 raise PermissionError("Vous n'avez pas accès à cet assistant.")
             
-            return assistant.to_dict()
+            return assistant.to_dict(include_api_key=True)
         except NoResultFound:
             raise NoResultFound("Assistant non trouvé.")
     
@@ -78,6 +79,7 @@ class AIAssistantService:
         Args:
             user_id (str): ID de l'utilisateur
             assistant_data (dict): Données de l'assistant
+            organization_id (str): ID de l'organisation
             
         Returns:
             dict: Assistant créé
@@ -86,8 +88,6 @@ class AIAssistantService:
             print(f"Création assistant pour user_id: {user_id}")
             print(f"Données reçues: {assistant_data}")
             
-            # Récupérer l'utilisateur et son organization_id
-            
             # Convertir les noms de champs camelCase en snake_case pour la BD
             data_mapping = {
                 'jobRole': 'job_role',
@@ -95,7 +95,9 @@ class AIAssistantService:
                 'baseKnowledge': 'base_knowledge',
                 'customPrompt': 'custom_prompt',
                 'questionBank': 'question_bank',
-                'assistantType': 'assistant_type'
+                'assistantType': 'assistant_type',
+                'apiKey': 'api_key',
+                'apiProvider': 'api_provider'
             }
             
             db_data = {}
@@ -108,9 +110,9 @@ class AIAssistantService:
             # Créer l'assistant avec les champs requis selon le modèle
             assistant = AIAssistant(
                 user_id=user_id,
-                organization_id=organization_id,  # REQUIS : Récupérer depuis l'utilisateur
+                organization_id=organization_id,
                 name=db_data.get('name', 'Assistant sans nom'),
-                assistant_type=db_data.get('assistant_type', 'recruiter'),  # REQUIS : Valeur par défaut
+                assistant_type=db_data.get('assistant_type', 'recruiter'),
                 description=db_data.get('description', ''),
                 avatar=db_data.get('avatar'),
                 model=db_data.get('model', 'claude-3-7-sonnet'),
@@ -143,6 +145,14 @@ class AIAssistantService:
                 is_template=False
             )
             
+            # Gérer la clé d'API si fournie
+            api_key = db_data.get('api_key')
+            api_provider = db_data.get('api_provider')
+            
+            if api_key and api_provider:
+                print(f"Configuration de la clé API pour le provider: {api_provider}")
+                assistant.set_api_key(api_key, api_provider)
+            
             print(f"Assistant créé en mémoire: {assistant}")
             
             db.session.add(assistant)
@@ -150,7 +160,7 @@ class AIAssistantService:
             
             print(f"Assistant sauvegardé avec ID: {assistant.id}")
             
-            return assistant.to_dict()
+            return assistant.to_dict(include_api_key=True)
             
         except Exception as e:
             print(f"Erreur lors de la création de l'assistant: {str(e)}")
@@ -186,22 +196,171 @@ class AIAssistantService:
                 'interviewMode': 'interview_mode',
                 'baseKnowledge': 'base_knowledge',
                 'customPrompt': 'custom_prompt',
-                'questionBank': 'question_bank'
+                'questionBank': 'question_bank',
+                'assistantType': 'assistant_type',
+                'apiKey': 'api_key',
+                'apiProvider': 'api_provider'
             }
             
-            # Mettre à jour les champs
+            # Extraire les données de clé API avant la mise à jour
+            api_key = assistant_data.get('apiKey')
+            api_provider = assistant_data.get('apiProvider')
+            
+            # Mettre à jour les champs standards
             for key, value in assistant_data.items():
-                if key in ['id', 'user_id', 'created_at', 'updated_at']:
-                    continue  # Ignorer ces champs
+                if key in ['id', 'user_id', 'created_at', 'updated_at', 'apiKey', 'apiProvider']:
+                    continue  # Ignorer ces champs spéciaux
                 
                 db_key = data_mapping.get(key, key.lower())
                 if hasattr(assistant, db_key):
                     setattr(assistant, db_key, value)
             
+            # Gérer la clé d'API séparément
+            if api_key is not None:  # Permet de supprimer la clé en passant None ou ''
+                if api_key == '':
+                    # Supprimer la clé d'API
+                    assistant.set_api_key(None)
+                    print("Clé API supprimée")
+                else:
+                    # Mettre à jour ou ajouter la clé d'API
+                    provider = api_provider or assistant.api_provider or 'anthropic'
+                    assistant.set_api_key(api_key, provider)
+                    print(f"Clé API mise à jour pour le provider: {provider}")
+            
             assistant.updated_at = datetime.utcnow()
             db.session.commit()
             
-            return assistant.to_dict()
+            return assistant.to_dict(include_api_key=True)
+        except NoResultFound:
+            raise NoResultFound("Assistant non trouvé.")
+    
+    def update_api_key(self, assistant_id, user_id, api_key, api_provider):
+        """
+        Met à jour uniquement la clé d'API d'un assistant
+        
+        Args:
+            assistant_id (str): ID de l'assistant
+            user_id (str): ID de l'utilisateur
+            api_key (str): Nouvelle clé d'API
+            api_provider (str): Fournisseur de l'API
+            
+        Returns:
+            dict: Statut de la mise à jour
+            
+        Raises:
+            NoResultFound: Si l'assistant n'existe pas
+            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
+        """
+        try:
+            assistant = AIAssistant.query.filter_by(id=assistant_id).one()
+            
+            # Vérifier les permissions
+            if str(assistant.user_id) != str(user_id):
+                raise PermissionError("Vous n'avez pas accès à cet assistant.")
+            
+            # Mettre à jour la clé d'API
+            assistant.set_api_key(api_key, api_provider)
+            assistant.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            return {
+                'success': True,
+                'message': 'Clé API mise à jour avec succès',
+                'apiProvider': assistant.api_provider,
+                'apiKeyMasked': assistant.get_masked_api_key(),
+                'apiKeyLastUpdated': assistant.api_key_last_updated.isoformat() if assistant.api_key_last_updated else None
+            }
+        except NoResultFound:
+            raise NoResultFound("Assistant non trouvé.")
+    
+    def remove_api_key(self, assistant_id, user_id):
+        """
+        Supprime la clé d'API d'un assistant
+        
+        Args:
+            assistant_id (str): ID de l'assistant
+            user_id (str): ID de l'utilisateur
+            
+        Returns:
+            dict: Statut de la suppression
+            
+        Raises:
+            NoResultFound: Si l'assistant n'existe pas
+            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
+        """
+        try:
+            assistant = AIAssistant.query.filter_by(id=assistant_id).one()
+            
+            # Vérifier les permissions
+            if str(assistant.user_id) != str(user_id):
+                raise PermissionError("Vous n'avez pas accès à cet assistant.")
+            
+            # Supprimer la clé d'API
+            assistant.set_api_key(None)
+            assistant.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            return {
+                'success': True,
+                'message': 'Clé API supprimée avec succès'
+            }
+        except NoResultFound:
+            raise NoResultFound("Assistant non trouvé.")
+    
+    def test_api_key(self, assistant_id, user_id):
+        """
+        Teste la validité de la clé d'API d'un assistant
+        
+        Args:
+            assistant_id (str): ID de l'assistant
+            user_id (str): ID de l'utilisateur
+            
+        Returns:
+            dict: Résultat du test
+            
+        Raises:
+            NoResultFound: Si l'assistant n'existe pas
+            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
+        """
+        try:
+            assistant = AIAssistant.query.filter_by(id=assistant_id).one()
+            
+            # Vérifier les permissions
+            if str(assistant.user_id) != str(user_id):
+                raise PermissionError("Vous n'avez pas accès à cet assistant.")
+            
+            if not assistant.has_api_key():
+                return {
+                    'success': False,
+                    'message': 'Aucune clé API configurée pour cet assistant'
+                }
+            
+            # Tester la clé avec une requête simple
+            api_key = assistant.get_api_key()
+            test_prompt = "Bonjour, ceci est un test de connexion."
+            
+            try:
+                response = get_llm_response(
+                    prompt=test_prompt,
+                    model=assistant.model,
+                    api_key=api_key
+                )
+                
+                return {
+                    'success': True,
+                    'message': 'Clé API valide et fonctionnelle',
+                    'provider': assistant.api_provider,
+                    'model': assistant.model
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'message': f'Erreur lors du test de la clé API: {str(e)}',
+                    'provider': assistant.api_provider
+                }
+                
         except NoResultFound:
             raise NoResultFound("Assistant non trouvé.")
     
@@ -254,7 +413,7 @@ class AIAssistantService:
         for template in templates:
             template_dict = template.to_dict()
             
-            # Ajouter les points forts du modèle (pourrait être stocké dans un champ supplémentaire)
+            # Ajouter les points forts du modèle
             template_dict['highlights'] = self._get_template_highlights(template)
             
             template_dicts.append(template_dict)
@@ -353,6 +512,9 @@ class AIAssistantService:
         try:
             template = AIAssistant.query.filter_by(id=template_id).one()
             
+            # Récupérer l'utilisateur pour obtenir l'organization_id
+            user = User.query.filter_by(id=user_id).one()
+            
             # Configurer les options
             options = options or {}
             new_name = options.get('name', f"Copie de {template.name}")
@@ -360,7 +522,9 @@ class AIAssistantService:
             # Créer une copie de l'assistant
             new_assistant = AIAssistant(
                 user_id=user_id,
+                organization_id=user.current_organization_id,
                 name=new_name,
+                assistant_type=template.assistant_type,
                 description=template.description,
                 avatar=template.avatar,
                 model=template.model,
@@ -377,10 +541,13 @@ class AIAssistantService:
                 template_id=template.id if template.is_template else template.template_id
             )
             
+            # Note: On ne clone pas la clé d'API pour des raisons de sécurité
+            # L'utilisateur devra configurer sa propre clé
+            
             db.session.add(new_assistant)
             db.session.commit()
             
-            return new_assistant.to_dict()
+            return new_assistant.to_dict(include_api_key=True)
         except NoResultFound:
             raise NoResultFound("Assistant à cloner non trouvé.")
     
@@ -441,7 +608,7 @@ class AIAssistantService:
             db.session.add(document)
             db.session.commit()
             
-            # Lancer l'indexation du document en arrière-plan (dans un vrai système, ce serait une tâche asynchrone)
+            # Lancer l'indexation du document en arrière-plan
             self._index_document(document.id)
             
             return document.to_dict()
@@ -454,9 +621,6 @@ class AIAssistantService:
         
         Args:
             document_id (str): ID du document
-            
-        Note:
-            Dans un système réel, cette méthode serait exécutée de manière asynchrone
         """
         try:
             document = AIAssistantDocument.query.filter_by(id=document_id).one()
@@ -465,7 +629,6 @@ class AIAssistantService:
             
             # Logique d'indexation ici...
             # Dans un système réel, on utiliserait un service d'embeddings
-            # pour créer des vecteurs à partir du contenu du document
             
             # Simuler un traitement réussi
             document.vector_index_status = 'completed'
@@ -478,7 +641,6 @@ class AIAssistantService:
             except:
                 pass
             
-            # Log l'erreur
             print(f"Erreur lors de l'indexation du document {document_id}: {str(e)}")
     
     def get_assistant_documents(self, assistant_id, user_id):
@@ -491,10 +653,6 @@ class AIAssistantService:
             
         Returns:
             list: Liste des documents
-            
-        Raises:
-            NoResultFound: Si l'assistant n'existe pas
-            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
         """
         try:
             assistant = AIAssistant.query.filter_by(id=assistant_id).one()
@@ -515,10 +673,6 @@ class AIAssistantService:
             assistant_id (str): ID de l'assistant
             document_id (str): ID du document
             user_id (str): ID de l'utilisateur
-            
-        Raises:
-            NoResultFound: Si l'assistant ou le document n'existe pas
-            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
         """
         try:
             assistant = AIAssistant.query.filter_by(id=assistant_id).one()
@@ -534,7 +688,6 @@ class AIAssistantService:
                 if os.path.exists(document.file_path):
                     os.remove(document.file_path)
             except Exception as e:
-                # Log l'erreur mais continuer
                 print(f"Erreur lors de la suppression du fichier {document.file_path}: {str(e)}")
             
             # Supprimer l'enregistrement
@@ -554,10 +707,6 @@ class AIAssistantService:
             
         Returns:
             dict: Réponse de l'assistant
-            
-        Raises:
-            NoResultFound: Si l'assistant n'existe pas
-            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
         """
         # Si preview mode, utiliser les données de l'assistant passées dans les paramètres
         if assistant_id == 'preview':
@@ -567,15 +716,19 @@ class AIAssistantService:
             assistant_data = params['assistant']
             prompt = self._generate_prompt(assistant_data, params.get('question', ''))
             
-            # Appeler le service LLM
+            # Utiliser la clé API de l'assistant si disponible
+            api_key = assistant_data.get('apiKey')
+            
             response = get_llm_response(
                 prompt=prompt,
-                model=assistant_data.get('model', 'claude-3-7-sonnet')
+                model=assistant_data.get('model', 'claude-3-7-sonnet'),
+                api_key=api_key
             )
             
             return {
                 'content': response,
-                'model': assistant_data.get('model', 'claude-3-7-sonnet')
+                'model': assistant_data.get('model', 'claude-3-7-sonnet'),
+                'usedApiKey': bool(api_key)
             }
         
         # Sinon, charger l'assistant depuis la base de données
@@ -588,15 +741,20 @@ class AIAssistantService:
             
             prompt = self._generate_prompt(assistant.to_dict(), params.get('question', ''))
             
-            # Appeler le service LLM
+            # Utiliser la clé API de l'assistant si disponible
+            api_key = assistant.get_api_key() if assistant.has_api_key() else None
+            
             response = get_llm_response(
                 prompt=prompt,
-                model=assistant.model
+                model=assistant.model,
+                api_key=api_key
             )
             
             return {
                 'content': response,
-                'model': assistant.model
+                'model': assistant.model,
+                'usedApiKey': assistant.has_api_key(),
+                'apiProvider': assistant.api_provider if assistant.has_api_key() else None
             }
         except NoResultFound:
             raise NoResultFound("Assistant non trouvé.")
@@ -697,13 +855,7 @@ DOMAINES DE CONNAISSANCES:"""
             
         Returns:
             list: Historique des conversations
-            
-        Raises:
-            NoResultFound: Si l'assistant n'existe pas
-            PermissionError: Si l'utilisateur n'a pas accès à cet assistant
         """
-        # Cette méthode serait implémentée avec un modèle supplémentaire pour les conversations
-        # Pour l'instant, nous retournons un tableau vide
         try:
             assistant = AIAssistant.query.filter_by(id=assistant_id).one()
             
