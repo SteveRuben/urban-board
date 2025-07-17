@@ -10,7 +10,7 @@ from app.services.coding_platform_service import CodingPlatformService
 from werkzeug.utils import secure_filename
 from app import db
 from app.models.coding_platform import (
-     Challenge, ChallengeStep, UserChallengeProgress, 
+     Challenge, ChallengeStep, Exercise, UserChallenge, UserChallengeProgress, 
     ProgrammingLanguage
 )
 from ..services.interview_exercise_service import InterviewExerciseService
@@ -56,6 +56,25 @@ def get_session_identifier():
 # =============================================================================
 # ADMIN ROUTES - EXERCISE MANAGEMENT
 # =============================================================================
+
+@coding_platform_bp.route('/admin/diagram-templates', methods=['GET'])
+@token_required
+def get_diagram_templates():
+    """Récupère les templates de diagrammes disponibles"""
+    templates = {
+        'use_case': {
+            'type': 'uml_use_case',
+            'format': 'json',
+            'template': {...}  # Template de base
+        },
+        'sequence': {
+            'type': 'uml_sequence', 
+            'format': 'json',
+            'template': {...}
+        }
+        # ... autres templates
+    }
+    return jsonify(templates), 200
 
 @coding_platform_bp.route('/admin/exercises', methods=['GET'])
 @token_required
@@ -110,8 +129,13 @@ def create_exercise():
     data = request.get_json()
     # Validation selon la catégorie
     category = data.get('category', 'developer')
-    
-    if category == 'developer':
+    if category == 'business_analyst':
+        required_fields = ['title', 'difficulty', 'business_domain']
+    elif category == 'secretary':
+        required_fields = ['title']
+    elif category == 'accountant':
+        required_fields = ['title']
+    elif category == 'developer':
         required_fields = ['title', 'language', 'difficulty']
     elif category == 'data_analyst':
         required_fields = ['title', 'difficulty', 'required_skills']
@@ -1295,3 +1319,171 @@ def validate_visualization():
     except Exception as e:
         print(f"Erreur dans validate_visualization: {e}")
         return jsonify({"error": f"Erreur lors de la validation de visualisation: {str(e)}"}), 500
+    
+@coding_platform_bp.route('/admin/reviews/pending', methods=['GET'])
+@token_required
+def get_pending_reviews():
+    """Récupère les soumissions en attente de révision"""
+    user_id = get_current_user_id()
+    
+    # Récupérer les progrès nécessitant une révision manuelle
+    pending_reviews = UserChallengeProgress.query.filter_by(
+        requires_manual_review=True,
+        manual_review_status='pending'
+    ).join(UserChallenge).join(Challenge).join(Exercise).filter(
+        Exercise.created_by == user_id
+    ).all()
+    
+    reviews_data = []
+    for progress in pending_reviews:
+        reviews_data.append({
+            'progress_id': progress.id,
+            'candidate_name': progress.user_challenge.anonymous_identifier,
+            'exercise_title': progress.step.challenge.exercise.title,
+            'step_title': progress.step.title,
+            'submitted_at': progress.last_edited.isoformat(),
+            'content': progress.code or progress.notebook_content,
+            'automatic_score': progress.score,
+            'step_type': progress.step.challenge.exercise.category.value
+        })
+    
+    return jsonify(reviews_data), 200
+
+@coding_platform_bp.route('/admin/reviews/<progress_id>/score', methods=['POST'])
+@token_required
+def submit_manual_score(progress_id):
+    """Soumet le score manuel pour une soumission"""
+    user_id = get_current_user_id()
+    data = request.get_json()
+    
+    progress = UserChallengeProgress.query.get(progress_id)
+    if not progress:
+        return jsonify({"error": "Progress not found"}), 404
+    
+    # Vérifier les permissions
+    if progress.step.challenge.exercise.created_by != user_id:
+        return jsonify({"error": "Access denied"}), 403
+    
+    try:
+        # Mettre à jour avec le score manuel
+        progress.manual_score = data['manual_score']
+        progress.manual_feedback = data.get('feedback', '')
+        progress.manual_review_status = 'reviewed'
+        progress.reviewer_id = user_id
+        progress.reviewed_at = datetime.now(timezone.utc)
+        
+        # Calculer le score final (automatique + manuel)
+        automatic_weight = 0.4  # 40% pour le score automatique
+        manual_weight = 0.6     # 60% pour le score manuel
+        
+        progress.final_score = (
+            (progress.score * automatic_weight) + 
+            (progress.manual_score * manual_weight)
+        )
+        
+        # Marquer comme terminé si score acceptable
+        if progress.final_score >= 60:  # Seuil de réussite
+            progress.is_completed = True
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Score submitted successfully",
+            "final_score": progress.final_score,
+            "is_completed": progress.is_completed
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Error submitting score: {str(e)}"}), 500
+
+@coding_platform_bp.route('/admin/reviews/<progress_id>', methods=['GET'])
+@token_required
+def get_review_details(progress_id):
+    """Récupère les détails d'une soumission pour révision"""
+    user_id = get_current_user_id()
+    
+    progress = UserChallengeProgress.query.get(progress_id)
+    if not progress:
+        return jsonify({"error": "Progress not found"}), 404
+    
+    # Vérifier les permissions
+    if progress.step.challenge.exercise.created_by != user_id:
+        return jsonify({"error": "Access denied"}), 403
+    
+    # Récupérer les critères d'évaluation
+    evaluation_criteria = progress.step.evaluation_criteria or {}
+    
+    review_data = {
+        'progress': progress.to_dict(),
+        'step': progress.step.to_dict(include_solution=True),
+        'challenge': progress.step.challenge.to_dict(),
+        'candidate': {
+            'identifier': progress.user_challenge.anonymous_identifier,
+            'session_metadata': progress.user_challenge.session_metadata
+        },
+        'evaluation_criteria': evaluation_criteria,
+        'automatic_results': progress.last_execution_result
+    }
+    
+    return jsonify(review_data), 200
+
+@coding_platform_bp.route('/admin/document-templates', methods=['GET'])
+@token_required
+def get_document_templates():
+    """Récupère les templates de documents disponibles"""
+    templates = {
+        'letter': {
+            'type': 'correspondence',
+            'format': 'plain_text',
+            'template': "Date: [DATE]\n\nDestinaire: [RECIPIENT]\n\nObjet: [SUBJECT]\n\n[GREETING],\n\n[BODY]\n\n[CLOSING],\n[SIGNATURE]"
+        },
+        'report': {
+            'type': 'document_structure',
+            'format': 'plain_text',
+            'template': "TITRE: [TITLE]\n\n1. INTRODUCTION\n[INTRODUCTION]\n\n2. DÉVELOPPEMENT\n[DEVELOPMENT]\n\n3. CONCLUSION\n[CONCLUSION]"
+        },
+        'memo': {
+            'type': 'correspondence',
+            'format': 'plain_text',
+            'template': "MÉMORANDUM\n\nDE: [FROM]\nÀ: [TO]\nDATE: [DATE]\nOBJET: [SUBJECT]\n\n[CONTENT]"
+        }
+    }
+    return jsonify(templates), 200
+
+@coding_platform_bp.route('/admin/financial-templates', methods=['GET'])
+@token_required
+def get_financial_templates():
+    """Récupère les templates financiers disponibles"""
+    templates = {
+        'balance_sheet': {
+            'type': 'balance_sheet',
+            'format': 'json',
+            'template': {
+                'assets': {'current_assets': 0, 'fixed_assets': 0},
+                'liabilities': {'current_liabilities': 0, 'long_term_liabilities': 0},
+                'equity': {'capital': 0, 'retained_earnings': 0}
+            }
+        },
+        'income_statement': {
+            'type': 'income_statement',
+            'format': 'json',
+            'template': {
+                'revenue': 0,
+                'cost_of_goods_sold': 0,
+                'gross_profit': 0,
+                'operating_expenses': 0,
+                'net_income': 0
+            }
+        },
+        'budget': {
+            'type': 'budget',
+            'format': 'json',
+            'template': {
+                'revenues': {'sales': 0, 'other_income': 0},
+                'expenses': {'salaries': 0, 'rent': 0, 'utilities': 0},
+                'total': 0
+            }
+        }
+    }
+    return jsonify(templates), 200

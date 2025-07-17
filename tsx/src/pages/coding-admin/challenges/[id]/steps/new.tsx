@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Save, Layers, Plus, X, TestTube, Code, Upload, Database, BarChart3, FileText } from 'lucide-react';
 
-// 🆕 Import du service unifié
-import CodingPlatformService from '@/services/coding-platform-service';
 
 import { 
   Challenge, 
@@ -17,9 +15,13 @@ import {
   Exercise,
   ExecutionEnvironment,
   TestcaseType,
-  ExerciseDataset
+  ExerciseDataset,
+  DiagramType, 
+  DiagramFormat,
+  DocumentFormat,
+  FinancialDocumentType
 } from '@/types/coding-plateform';
-import ExtendedCodingPlatformService from '@/services/extended-coding-platform-service';
+import CodingPlatformService from '@/services/coding-platform-service';
 
 interface StepFormPageProps {
   challengeId?: string;
@@ -51,6 +53,13 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
     notebook_template: '',
     sql_schema: {},
     expected_output_type: '',
+
+     // Business Analyst 
+     diagram_template: '',
+     diagram_type: 'uml_use_case',
+     diagram_format: 'json',
+     business_requirements: {},
+
     evaluation_criteria: {},
     order_index: 1,
     is_final_step: false
@@ -157,10 +166,20 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   // Charger les datasets de l'exercice
   const loadDatasets = async (exerciseId: string) => {
     try {
-      const datasetsData = await ExtendedCodingPlatformService.getExerciseDatasets(exerciseId);
+      const datasetsData = await CodingPlatformService.getExerciseDatasets(exerciseId);
       setDatasets(datasetsData);
     } catch (err) {
       console.error('Erreur lors du chargement des datasets:', err);
+    }
+  };
+
+  const loadDiagramTemplates = async () => {
+    try {
+      const templates = await CodingPlatformService.getDiagramTemplates();
+      return templates;
+    } catch (err) {
+      console.error('Erreur lors du chargement des templates:', err);
+      return {};
     }
   };
 
@@ -202,7 +221,19 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
       newErrors.notebook_template = 'Le template de notebook est requis';
       if (Object.keys(newErrors).length === 1) firstErrorTab = 'code';
     }
-  
+    
+    if (environment === 'diagram_editor') {
+      if (!formData.diagram_type) {
+        newErrors.diagram_type = 'Le type de diagramme est requis';
+        if (Object.keys(newErrors).length === 1) firstErrorTab = 'code';
+      }
+      if (!formData.diagram_template?.trim()) {
+        newErrors.diagram_template = 'Le template de diagramme est requis';
+        if (Object.keys(newErrors).length === 1) firstErrorTab = 'code';
+      }
+    }
+
+
     // Validation onglet "Tests"
     if (testCases.length === 0) {
       newErrors.testCases = 'Au moins un cas de test est requis';
@@ -273,14 +304,15 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
         resultStepId = updatedStep.id;
       } else {
         // 🆕 Utiliser le service unifié
-        const newStep = await ExtendedCodingPlatformService.createChallengeStepExtended(finalChallengeId!, formData);
+        console.log('llslslk...',formData)
+        const newStep = await CodingPlatformService.createChallengeStep(finalChallengeId!, formData);
         resultStepId = newStep.id;
       }
 
       // 🆕 Créer/mettre à jour les cas de test avec le service unifié
       if (testCases.length > 0) {
         try {
-          const result = await ExtendedCodingPlatformService.bulkImportTestCases(resultStepId, { testcases: testCases });
+          const result = await CodingPlatformService.bulkImportTestCases(resultStepId, { testcases: testCases });
           
           // Afficher les erreurs s'il y en a
           if (result.errors && result.errors.length > 0) {
@@ -303,6 +335,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   };
 
   const handleInputChange = (field: keyof ChallengeStepFormData, value: any) => {
+    console.log('lslslls',value)
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -319,7 +352,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   // Ajouter un cas de test selon l'environnement
   const addTestCase = () => {
     const environment = challenge?.execution_environment || 'code_executor';
-    const compatibleTypes = ExtendedCodingPlatformService.getCompatibleTestcaseTypes(environment);
+    const compatibleTypes = CodingPlatformService.getCompatibleTestcaseTypes(environment);
     const defaultType = compatibleTypes[0] || 'unit_test';
     
     const baseTestCase: TestCaseFormData = {
@@ -332,11 +365,53 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
     };
 
     // Ajouter les champs spécifiques selon le type
-    if (defaultType === 'sql_query_test') {
+    if (['text_formatting_test', 'spelling_grammar_test', 'document_structure_test', 
+      'correspondence_test', 'proofreading_test'].includes(defaultType)) {
+   // Secrétaire
+      Object.assign(baseTestCase, {
+        expected_document_structure: {
+          min_words: 100,
+          required_elements: ['greeting', 'body', 'closing']
+        },
+        text_quality_criteria: {
+          max_spelling_errors: 0,
+          grammar_check: true
+        }
+      });
+    } else if (['accounting_calculation_test', 'financial_analysis_test', 'budget_validation_test',
+                'balance_sheet_test', 'tax_calculation_test', 'audit_trail_test'].includes(defaultType)) {
+      // Comptable
+      Object.assign(baseTestCase, {
+        expected_financial_result: {
+          total: 0,
+          balance: true
+        },
+        accounting_validation_rules: {
+          balance_equation: true,
+          positive_amounts: true
+        }
+      });
+    }
+    else if (defaultType === 'sql_query_test') {
       Object.assign(baseTestCase, {
         sql_query_expected: '',
         dataset_reference: datasets[0]?.name || ''
       });
+    } else if (['process_diagram', 'use_case_diagram', 'sequence_diagram', 'class_diagram', 
+      'activity_diagram', 'flowchart', 'wireframe'].includes(defaultType)) {
+      // Business Analyst - NOUVEAU
+      Object.assign(baseTestCase, {
+      diagram_requirements: {
+      elements_required: [],
+      relationships_required: [],
+      style_requirements: {}
+      },
+      evaluation_rubric: {
+      completeness: 0.4,
+      accuracy: 0.4,
+      clarity: 0.2
+      }
+    });
     } else if (defaultType === 'visualization_test') {
       Object.assign(baseTestCase, {
         expected_visualization: {
@@ -391,6 +466,11 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
     
     const environment = challenge.execution_environment;
     
+    if (environment === 'diagram_editor') {
+      const diagramType = formData.diagram_type || 'uml_use_case';
+      return getDefaultDiagramTemplate(diagramType);
+    }
+
     if (environment === 'jupyter_notebook') {
       return JSON.stringify({
         cells: [
@@ -429,10 +509,216 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
     }
   };
 
+  const getDefaultDiagramTemplate = (diagramType: DiagramType): string => {
+    const templates = {
+      'uml_use_case': JSON.stringify({
+        type: 'use_case_diagram',
+        actors: [{ name: 'Utilisateur', id: 'user1' }],
+        use_cases: [{ name: 'Action principale', id: 'uc1' }],
+        relationships: [{ from: 'user1', to: 'uc1', type: 'association' }]
+      }, null, 2),
+      
+      'uml_sequence': JSON.stringify({
+        type: 'sequence_diagram',
+        participants: [{ name: 'Client', id: 'client' }, { name: 'Serveur', id: 'server' }],
+        messages: [{ from: 'client', to: 'server', message: 'requête', type: 'sync' }]
+      }, null, 2),
+      
+      'flowchart': JSON.stringify({
+        type: 'flowchart',
+        nodes: [
+          { id: 'start', label: 'Début', type: 'start' },
+          { id: 'process1', label: 'Processus', type: 'process' },
+          { id: 'end', label: 'Fin', type: 'end' }
+        ],
+        connections: [
+          { from: 'start', to: 'process1' },
+          { from: 'process1', to: 'end' }
+        ]
+      }, null, 2),
+      
+      'wireframe': JSON.stringify({
+        type: 'wireframe',
+        components: [
+          { type: 'header', content: 'En-tête', position: { x: 0, y: 0, width: 100, height: 10 } },
+          { type: 'button', content: 'Bouton', position: { x: 20, y: 20, width: 20, height: 5 } }
+        ]
+      }, null, 2)
+    };
+    
+    return templates[diagramType] || templates['flowchart'];
+  };
+  const getDefaultDocumentTemplate = (): string => {
+    const documentType = formData.document_format || 'plain_text';
+    
+    const templates = {
+      'plain_text': "Date: [DATE]\n\nDestinaire: [RECIPIENT]\n\nObjet: [SUBJECT]\n\n[GREETING],\n\n[BODY]\n\n[CLOSING],\n[SIGNATURE]",
+      'html': "<html><body><h1>[TITLE]</h1><p>[CONTENT]</p></body></html>",
+      'markdown': "# [TITLE]\n\n## Introduction\n\n[CONTENT]\n\n## Conclusion\n\n[CONCLUSION]"
+    };
+    
+    return templates[documentType] || templates['plain_text'];
+  };
+
+  const getDefaultFinancialTemplate = (): string => {
+    const docType = formData.financial_document_type || 'balance_sheet';
+    
+    const templates = {
+      'balance_sheet': JSON.stringify({
+        assets: { current_assets: 0, fixed_assets: 0 },
+        liabilities: { current_liabilities: 0, long_term_liabilities: 0 },
+        equity: { capital: 0, retained_earnings: 0 }
+      }, null, 2),
+      'budget': JSON.stringify({
+        revenues: { sales: 0, other_income: 0 },
+        expenses: { salaries: 0, rent: 0, utilities: 0 },
+        total: 0
+      }, null, 2)
+    };
+    
+    return templates[docType] || templates['balance_sheet'];
+  };
+
   // Rendu des champs spécifiques selon le type de test
   const renderTestCaseFields = (testCase: TestCaseFormData, index: number) => {
     const testType = testCase.testcase_type || 'unit_test';
-    
+    if (['text_formatting_test', 'spelling_grammar_test', 'document_structure_test', 
+      'correspondence_test', 'proofreading_test'].includes(testType)) {
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Structure de document attendue
+            </label>
+            <textarea
+              rows={4}
+              value={JSON.stringify(testCase.expected_document_structure || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'expected_document_structure', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"min_words": 100, "required_elements": ["greeting", "closing"]}'
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Critères de qualité
+            </label>
+            <textarea
+              rows={3}
+              value={JSON.stringify(testCase.text_quality_criteria || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'text_quality_criteria', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"max_spelling_errors": 0, "grammar_check": true}'
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Tests comptables (Comptable)
+    if (['accounting_calculation_test', 'financial_analysis_test', 'budget_validation_test',
+          'balance_sheet_test', 'tax_calculation_test', 'audit_trail_test'].includes(testType)) {
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Résultat financier attendu
+            </label>
+            <textarea
+              rows={4}
+              value={JSON.stringify(testCase.expected_financial_result || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'expected_financial_result', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"total": 1000, "balance": true, "tax_amount": 200}'
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Règles de validation
+            </label>
+            <textarea
+              rows={3}
+              value={JSON.stringify(testCase.accounting_validation_rules || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'accounting_validation_rules', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"balance_equation": true, "positive_amounts": true}'
+            />
+          </div>
+        </div>
+      );
+    }
+    else if (['process_diagram', 'use_case_diagram', 'sequence_diagram', 'class_diagram', 
+      'activity_diagram', 'flowchart', 'wireframe'].includes(testType)) {
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Exigences du diagramme
+            </label>
+            <textarea
+              rows={4}
+              value={JSON.stringify(testCase.diagram_requirements || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'diagram_requirements', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"elements_required": ["Actor1", "UseCase1"], "relationships_required": ["association"]}'
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Grille d'évaluation
+            </label>
+            <textarea
+              rows={3}
+              value={JSON.stringify(testCase.evaluation_rubric || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value);
+                  updateTestCase(index, 'evaluation_rubric', parsed);
+                } catch (err) {
+                  // Ignore invalid JSON
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              placeholder='{"completeness": 0.4, "accuracy": 0.4, "clarity": 0.2}'
+            />
+          </div>
+        </div>
+      );
+    }
     switch (testType) {
       case 'notebook_cell_test':
       return (
@@ -662,7 +948,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
   // Obtenir l'icône selon l'environnement
   const getEnvironmentIcon = () => {
     const environment = challenge?.execution_environment || 'code_executor';
-    return ExtendedCodingPlatformService.getEnvironmentIcon(environment);
+    return CodingPlatformService.getEnvironmentIcon(environment);
   };
   
   if (initialLoading) {
@@ -714,7 +1000,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                     <span className="text-gray-600">Challenge: {challenge.title}</span>
                     <span className="ml-2 text-lg">{getEnvironmentIcon()}</span>
                     <span className="ml-1 text-sm text-gray-500">
-                      {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge.execution_environment!)}
+                      {CodingPlatformService.getExecutionEnvironmentLabel(challenge.execution_environment!)}
                     </span>
                   </div>
                 )}
@@ -849,9 +1135,34 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                           placeholder="Donnez un indice pour aider l'utilisateur si il est bloqué..."
                         />
                       </div>
-
+                           
+                      {/* {challenge?.execution_environment !== 'text_editor' && (
+                        <div>
+                          <label htmlFor="document_format" className="block text-sm font-medium text-gray-700 mb-2">
+                            Type de sortie attendue
+                          </label>
+                          <select
+                            id="document_format"
+                            value={formData.document_format}
+                            onChange={(e) => handleInputChange('document_format', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Sélectionner le type</option>
+                              <>
+                                <option value="word">WORD</option>
+                                <option value="pdf">PDF</option>
+                                <option value="plain_text">PLAIN_TEXT</option>
+                                <option value="html">HTML</option>
+                                <option value="markdown">MRKDOWN</option>
+                                <option value="rtf">RTF</option>
+                              </>
+                            
+                            
+                          </select>
+                        </div>
+                      )} */}
                       {/* 🆕 Type de sortie attendue */}
-                      {challenge?.execution_environment !== 'code_executor' && (
+                      {challenge?.execution_environment !== 'code_executor' && challenge?.execution_environment !== 'text_editor' && challenge?.execution_environment !== 'diagram_editor' && challenge?.execution_environment !== 'spreadsheet_editor' && (
                         <div>
                           <label htmlFor="expected_output_type" className="block text-sm font-medium text-gray-700 mb-2">
                             Type de sortie attendue
@@ -933,7 +1244,226 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                   <div className="p-6">
                     <div className="grid grid-cols-1 gap-6">
                       {/* Code selon l'environnement */}
-                      {challenge?.execution_environment === 'jupyter_notebook' ? (
+                      {challenge?.execution_environment === 'text_editor' ? (
+                        <>
+                          <div>
+                            <label htmlFor="document_format" className="block text-sm font-medium text-gray-700 mb-2">
+                              Format de document *
+                            </label>
+                            <select
+                              id="document_format"
+                              value={formData.document_format}
+                              onChange={(e) => handleInputChange('document_format', e.target.value as DocumentFormat)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="plain_text">Texte brut</option>
+                              <option value="html">HTML</option>
+                              <option value="markdown">Markdown</option>
+                              <option value="word">Word</option>
+                              <option value="pdf">PDF</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label htmlFor="document_template" className="block text-sm font-medium text-gray-700">
+                                Modèle de document *
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleInputChange('document_template', getDefaultDocumentTemplate())}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                              >
+                                Utiliser le modèle par défaut
+                              </button>
+                            </div>
+                            <textarea
+                              id="document_template"
+                              rows={8}
+                              value={formData.document_template}
+                              onChange={(e) => handleInputChange('document_template', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                              placeholder="Modèle de document avec placeholders..."
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="text_requirements" className="block text-sm font-medium text-gray-700 mb-2">
+                              Exigences de rédaction (optionnel)
+                            </label>
+                            <textarea
+                              id="text_requirements"
+                              rows={4}
+                              value={JSON.stringify(formData.text_requirements || {}, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  handleInputChange('text_requirements', parsed);
+                                } catch (err) {
+                                  // Ignore invalid JSON during typing
+                                }
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                              placeholder='{"min_words": 200, "required_elements": ["greeting", "closing"]}'
+                            />
+                          </div>
+                        </>
+                      ) : challenge?.execution_environment === 'spreadsheet_editor' ? (
+                        <>
+                          <div>
+                            <label htmlFor="financial_document_type" className="block text-sm font-medium text-gray-700 mb-2">
+                              Type de document financier *
+                            </label>
+                            <select
+                              id="financial_document_type"
+                              value={formData.financial_document_type}
+                              onChange={(e) => handleInputChange('financial_document_type', e.target.value as FinancialDocumentType)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="balance_sheet">Bilan comptable</option>
+                              <option value="income_statement">Compte de résultat</option>
+                              <option value="cash_flow">Flux de trésorerie</option>
+                              <option value="budget">Budget</option>
+                              <option value="invoice">Facture</option>
+                              <option value="expense_report">Note de frais</option>
+                              <option value="tax_return">Déclaration fiscale</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label htmlFor="financial_template" className="block text-sm font-medium text-gray-700">
+                                Modèle financier *
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleInputChange('financial_template', getDefaultFinancialTemplate())}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                              >
+                                Utiliser le modèle par défaut
+                              </button>
+                            </div>
+                            <textarea
+                              id="financial_template"
+                              rows={10}
+                              value={formData.financial_template}
+                              onChange={(e) => handleInputChange('financial_template', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                              placeholder="Modèle de document financier (JSON)..."
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="accounting_rules" className="block text-sm font-medium text-gray-700 mb-2">
+                              Règles comptables (optionnel)
+                            </label>
+                            <textarea
+                              id="accounting_rules"
+                              rows={4}
+                              value={JSON.stringify(formData.accounting_rules || {}, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  handleInputChange('accounting_rules', parsed);
+                                } catch (err) {
+                                  // Ignore invalid JSON during typing
+                                }
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                              placeholder='{"balance_equation": true, "positive_amounts": true}'
+                            />
+                          </div>
+                        </>
+                      ) :challenge?.execution_environment === 'diagram_editor' ? (
+                          <>
+                            <div>
+                              <label htmlFor="diagram_type" className="block text-sm font-medium text-gray-700 mb-2">
+                                Type de diagramme *
+                              </label>
+                              <select
+                                id="diagram_type"
+                                value={formData.diagram_type}
+                                onChange={(e) => handleInputChange('diagram_type', e.target.value as DiagramType)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="uml_use_case">Diagramme de cas d'usage</option>
+                                <option value="uml_sequence">Diagramme de séquence</option>
+                                <option value="uml_class">Diagramme de classes</option>
+                                <option value="uml_activity">Diagramme d'activité</option>
+                                <option value="bpmn_process">Processus BPMN</option>
+                                <option value="flowchart">Organigramme</option>
+                                <option value="wireframe">Maquette fonctionnelle</option>
+                                <option value="entity_relationship">Diagramme entité-relation</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label htmlFor="diagram_format" className="block text-sm font-medium text-gray-700 mb-2">
+                                Format de diagramme
+                              </label>
+                              <select
+                                id="diagram_format"
+                                value={formData.diagram_format}
+                                onChange={(e) => handleInputChange('diagram_format', e.target.value as DiagramFormat)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="json">JSON (universel)</option>
+                                <option value="staruml">StarUML (.mdj)</option>
+                                <option value="drawio">Draw.io</option>
+                                <option value="svg">SVG</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label htmlFor="diagram_template" className="block text-sm font-medium text-gray-700">
+                                  Template de diagramme *
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => handleInputChange('diagram_template', getDefaultStarterCode())}
+                                  className="text-sm text-blue-600 hover:text-blue-800"
+                                >
+                                  Utiliser le template par défaut
+                                </button>
+                              </div>
+                              <textarea
+                                id="diagram_template"
+                                rows={12}
+                                value={formData.diagram_template}
+                                onChange={(e) => handleInputChange('diagram_template', e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm ${
+                                  errors.diagram_template ? 'border-red-300' : 'border-gray-300'
+                                }`}
+                                placeholder="Template de diagramme (JSON, StarUML, etc.)..."
+                              />
+                              {errors.diagram_template && (
+                                <p className="mt-1 text-sm text-red-600">{errors.diagram_template}</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label htmlFor="business_requirements" className="block text-sm font-medium text-gray-700 mb-2">
+                                Exigences business (optionnel)
+                              </label>
+                              <textarea
+                                id="business_requirements"
+                                rows={4}
+                                value={JSON.stringify(formData.business_requirements || {}, null, 2)}
+                                onChange={(e) => {
+                                  try {
+                                    const parsed = JSON.parse(e.target.value);
+                                    handleInputChange('business_requirements', parsed);
+                                  } catch (err) {
+                                    // Ignore invalid JSON during typing
+                                  }
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                placeholder='{"stakeholders": ["Users", "Admins"], "constraints": ["Security", "Performance"]}'
+                              />
+                            </div>
+                          </>
+                        ): challenge?.execution_environment === 'jupyter_notebook' ? (
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <label htmlFor="notebook_template" className="block text-sm font-medium text-gray-700">
@@ -1037,7 +1567,11 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                           value={formData.solution_code}
                           onChange={(e) => handleInputChange('solution_code', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                          placeholder="Solution complète de l'étape (non visible par les utilisateurs)..."
+                          placeholder={
+                            challenge?.execution_environment === 'diagram_editor' 
+                              ? "Diagramme solution complète (non visible par les utilisateurs)..."
+                              : "Solution complète de l'étape (non visible par les utilisateurs)..."
+                          }
                         />
                         <p className="mt-1 text-sm text-gray-500">
                           Cette solution n'est visible que par les administrateurs pour référence
@@ -1052,7 +1586,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-lg font-medium text-gray-800">
-                        Cas de test - {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
+                        Cas de test - {CodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
                       </h3>
                       <button
                         type="button"
@@ -1092,7 +1626,7 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                               <h4 className="text-sm font-medium text-gray-800 flex items-center">
                                 Cas de test {index + 1}
                                 <span className="ml-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                                  {ExtendedCodingPlatformService.getTestcaseTypeLabel(testCase.testcase_type || 'unit_test')}
+                                  {CodingPlatformService.getTestcaseTypeLabel(testCase.testcase_type || 'unit_test')}
                                 </span>
                               </h4>
                               <button
@@ -1114,9 +1648,9 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                                 onChange={(e) => updateTestCase(index, 'testcase_type', e.target.value as TestcaseType)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                               >
-                                {ExtendedCodingPlatformService.getCompatibleTestcaseTypes(challenge?.execution_environment || 'code_executor').map((type) => (
+                                {CodingPlatformService.getCompatibleTestcaseTypes(challenge?.execution_environment || 'code_executor').map((type) => (
                                   <option key={type} value={type}>
-                                    {ExtendedCodingPlatformService.getTestcaseTypeLabel(type)}
+                                    {CodingPlatformService.getTestcaseTypeLabel(type)}
                                   </option>
                                 ))}
                               </select>
@@ -1219,10 +1753,18 @@ export default function StepFormPage({ challengeId, stepId }: StepFormPageProps)
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Conseils pour {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
+                    Conseils pour {CodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    {challenge?.execution_environment === 'sql_database' ? (
+                    {challenge?.execution_environment === 'diagram_editor' ? (
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Définissez clairement les éléments attendus</li>
+                        <li>Spécifiez les relations entre les composants</li>
+                        <li>Pas de validation automatique - évaluation manuelle</li>
+                        <li>Créez des grilles d'évaluation détaillées</li>
+                        <li>Testez la compatibilité du format choisi</li>
+                      </ul>
+                    ) :challenge?.execution_environment === 'sql_database' ? (
                       <ul className="list-disc list-inside space-y-1">
                         <li>Utilisez les datasets configurés dans l'exercice</li>
                         <li>Testez vos requêtes avec des données réelles</li>

@@ -4,6 +4,9 @@ class ExerciseCategory(Enum):
     """Catégorie d'exercice pour différencier les types de tests"""
     DEVELOPER = "developer"
     DATA_ANALYST = "data_analyst"
+    BUSINESS_ANALYST = "business_analyst"
+    SECRETARY = "secretary"
+    ACCOUNTANT = "accountant"
     # Extensible pour d'autres catégories futures
     # UX_DESIGNER = "ux_designer"
     # PROJECT_MANAGER = "project_manager"
@@ -58,6 +61,9 @@ class ExecutionEnvironment(Enum):
     SQL_DATABASE = "sql_database"        # Base de données pour SQL
     DATA_VISUALIZATION = "data_visualization" # Validation de graphiques
     FILE_ANALYSIS = "file_analysis"      # Analyse de fichiers (CSV, Excel, etc.)
+    DIAGRAM_EDITOR = "diagram_editor"
+    TEXT_EDITOR = "text_editor"
+    SPREADSHEET_EDITOR = "spreadsheet_editor"
 
 class TestcaseType(Enum):
     """Types de cas de test selon l'environnement"""
@@ -72,6 +78,29 @@ class TestcaseType(Enum):
     NOTEBOOK_CELL_TEST = "notebook_cell_test" # Test de cellule notebook
     STATISTICAL_TEST = "statistical_test" # Test statistique
     DATA_CLEANING_TEST = "data_cleaning_test" # Test de nettoyage de données
+    
+    # Pour business analysts
+    PROCESS_DIAGRAM = "process_diagram"
+    USE_CASE_DIAGRAM = "use_case_diagram"
+    SEQUENCE_DIAGRAM = "sequence_diagram"
+    CLASS_DIAGRAM = "class_diagram"
+    ACTIVITY_DIAGRAM = "activity_diagram"
+    FLOWCHART = "flowchart"
+    WIREFRAME = "wireframe",
+    # Nouveaux tests pour secrétaires
+    TEXT_FORMATTING_TEST = "text_formatting_test"
+    SPELLING_GRAMMAR_TEST = "spelling_grammar_test"
+    DOCUMENT_STRUCTURE_TEST = "document_structure_test"
+    CORRESPONDENCE_TEST = "correspondence_test"
+    PROOFREADING_TEST = "proofreading_test"
+    
+    # Nouveaux tests pour comptables
+    ACCOUNTING_CALCULATION_TEST = "accounting_calculation_test"
+    FINANCIAL_ANALYSIS_TEST = "financial_analysis_test"
+    BUDGET_VALIDATION_TEST = "budget_validation_test"
+    BALANCE_SHEET_TEST = "balance_sheet_test"
+    TAX_CALCULATION_TEST = "tax_calculation_test"
+    AUDIT_TRAIL_TEST = "audit_trail_test"
 
 class DatasetType(Enum):
     """Types de datasets pour les tests"""
@@ -93,3 +122,42 @@ class VisualizationType(Enum):
     HEATMAP = "heatmap"
     BOX_PLOT = "box_plot"
     DASHBOARD = "dashboard"
+
+class DiagramType(Enum):
+    """Types de diagrammes pour business analysts"""
+    UML_USE_CASE = "uml_use_case"
+    UML_SEQUENCE = "uml_sequence"
+    UML_CLASS = "uml_class"
+    UML_ACTIVITY = "uml_activity"
+    BPMN_PROCESS = "bpmn_process"
+    FLOWCHART = "flowchart"
+    WIREFRAME = "wireframe"
+    ENTITY_RELATIONSHIP = "entity_relationship"
+    MOCKUP = "mockup"
+
+class DiagramFormat(Enum):
+    """Formats de sauvegarde des diagrammes"""
+    STARUML = "staruml"  # .mdj
+    DRAWIO = "drawio"    # .drawio
+    SVG = "svg"
+    PNG = "png"
+    JSON = "json"        # Format propriétaire
+    
+class DocumentFormat(Enum):
+    """Formats de documents pour les tests de rédaction"""
+    WORD = "word"
+    PDF = "pdf"
+    PLAIN_TEXT = "plain_text"
+    HTML = "html"
+    MARKDOWN = "markdown"
+    RTF = "rtf"
+
+class FinancialDocumentType(Enum):
+    """Types de documents financiers"""
+    BALANCE_SHEET = "balance_sheet"
+    INCOME_STATEMENT = "income_statement"
+    CASH_FLOW = "cash_flow"
+    BUDGET = "budget"
+    INVOICE = "invoice"
+    EXPENSE_REPORT = "expense_report"
+    TAX_RETURN = "tax_return"

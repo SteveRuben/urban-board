@@ -122,23 +122,6 @@ export class CodingPlatformAdapter {
     }
   }
 
-  /**
-   * Crée un cas de test
-   */
-  static async createTestCase(stepId: string, data: any) {
-    try {
-      // 🔄 Si on a des champs étendus, utiliser le service étendu
-      if (this.hasExtendedTestCaseFields(data)) {
-        return await ExtendedCodingPlatformService.createTestCaseExtended(stepId, data);
-      }
-
-      // 🔄 Sinon, utiliser le service original
-      return await CodingPlatformService.createTestCase(stepId, data);
-    } catch (error) {
-      console.error('Erreur dans l\'adaptateur createTestCase:', error);
-      throw error;
-    }
-  }
 
   // =============================================================================
   // DATASET MANAGEMENT - Toujours utiliser le service étendu

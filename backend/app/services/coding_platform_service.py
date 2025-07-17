@@ -1,7 +1,7 @@
 # backend/services/coding_platform_service.py
 from datetime import datetime, timezone
 import json
-from app.types.coding_platform import ExecutionEnvironment, ExerciseCategory, TestcaseType
+from app.types.coding_platform import ExecutionEnvironment, ExerciseCategory, TestcaseType, DiagramFormat, DiagramType
 from app.services.execution_services import ExecutionServiceFactory
 from flask import abort, current_app
 from app import db
@@ -9,7 +9,7 @@ from app.models.coding_platform import (
     Exercise, Challenge, ChallengeStep, ChallengeStepTestcase, ExerciseDataset, 
     UserChallenge, UserChallengeProgress, 
     ChallengeStatus, ChallengeDifficulty, ProgrammingLanguage, 
-    UserChallengeStatus
+    UserChallengeStatus, FinancialDocumentType, DocumentFormat
 )
 import uuid
 import base64
@@ -60,7 +60,9 @@ class CodingPlatformService:
                     order_index=data.get('order_index', 0),
                     required_skills=data.get('required_skills', []),
                     estimated_duration_minutes=data.get('estimated_duration_minutes', 60),
+                    
                 )
+            
             else:
                 exercise = Exercise(
                     created_by=user_id,
@@ -71,6 +73,7 @@ class CodingPlatformService:
                     order_index=data.get('order_index', 0),
                     required_skills=data.get('required_skills', []),
                     estimated_duration_minutes=data.get('estimated_duration_minutes', 60),
+                    business_domain = data.get('business_domain','')
                 )
             
             print(exercise)
@@ -313,7 +316,10 @@ class CodingPlatformService:
         """Retourne l'environnement d'exécution par défaut selon la catégorie"""
         defaults = {
             ExerciseCategory.DEVELOPER: ExecutionEnvironment.CODE_EXECUTOR,
-            ExerciseCategory.DATA_ANALYST: ExecutionEnvironment.JUPYTER_NOTEBOOK
+            ExerciseCategory.DATA_ANALYST: ExecutionEnvironment.JUPYTER_NOTEBOOK,
+            ExerciseCategory.BUSINESS_ANALYST: ExecutionEnvironment.DIAGRAM_EDITOR,
+            ExerciseCategory.SECRETARY: ExecutionEnvironment.TEXT_EDITOR,
+            ExerciseCategory.ACCOUNTANT: ExecutionEnvironment.SPREADSHEET_EDITOR
         }
         return defaults.get(category, ExecutionEnvironment.CODE_EXECUTOR)
     
@@ -458,6 +464,17 @@ class CodingPlatformService:
         
         if challenge.exercise.created_by != user_id:
             abort(403, description="Access denied")
+        
+        if challenge.exercise.category == ExerciseCategory.BUSINESS_ANALYST:
+            if 'diagram_type' not in data:
+                raise ValueError("diagram_type is required for business analyst exercises")
+        elif challenge.exercise.category == ExerciseCategory.SECRETARY:
+            if 'document_format' not in data:
+                raise ValueError("document_format is required for secretary exercises")
+        elif challenge.exercise.category == ExerciseCategory.ACCOUNTANT:
+            if 'financial_document_type' not in data:
+                raise ValueError("financial_document_type is required for accountant exercises")
+            
         try:
             step = ChallengeStep(
                 challenge_id=challenge_id,
@@ -471,7 +488,21 @@ class CodingPlatformService:
                 expected_output_type=data.get('expected_output_type'),
                 order_index=data.get('order_index', 0),
                 is_final_step=data.get('is_final_step', False),
-                evaluation_criteria=data.get('evaluation_criteria', {})
+                evaluation_criteria=data.get('evaluation_criteria', {}),
+                diagram_template=data.get('diagram_template'),  
+                diagram_type=DiagramType(data['diagram_type']) if 'diagram_type' in data else None,  
+                diagram_format=DiagramFormat(data.get('diagram_format', 'json')),  
+                business_requirements=data.get('business_requirements', {}), 
+                # Nouveaux champs pour secrétaires
+                document_template=data.get('document_template'),
+                document_format=DocumentFormat(data['document_format']) if 'document_format' in data else None,
+                text_requirements=data.get('text_requirements', {}),
+                formatting_rules=data.get('formatting_rules', {}),
+                # Nouveaux champs pour comptables
+                financial_template=data.get('financial_template'),
+                financial_document_type=FinancialDocumentType(data['financial_document_type']) if 'financial_document_type' in data else None,
+                accounting_rules=data.get('accounting_rules', {}),
+                calculation_parameters=data.get('calculation_parameters', {})
             )
             
             db.session.add(step)
@@ -969,80 +1000,161 @@ class CodingPlatformService:
         step = ChallengeStep.query.filter_by(id=step_id, challenge_id=challenge_id).first()
         if not step:
             abort(404, description="Challenge step not found")
+            
         print(f'🔍 DEBUG: step trouvé: {step.id}, order_index: {step.order_index}')
-
-        # Récupérer les cas de test
+        
         testcases = ChallengeStepTestcase.query.filter_by(step_id=step_id).order_by(ChallengeStepTestcase.order_index).all()
         if not testcases:
             abort(404, description="No test cases found for this step")
+        primary_testcase_type = testcases[0].testcase_type.value if testcases else None
+        requires_manual_review = self._requires_manual_review(
+            step.challenge.exercise.category, 
+            primary_testcase_type
+        )
+            
+        if step.challenge.exercise.category == ExerciseCategory.BUSINESS_ANALYST:
+            requires_manual_review = True
+            execution_results = [{
+                'testcase_id': 'manual_review',
+                'testcase_type': 'diagram_submission',
+                'passed': True,
+                'requires_manual_review': True,
+                'message': 'Diagram submitted for manual review'
+            }]
+            passed_count = 1
+            total_count = 1
+        elif step.challenge.exercise.category in [ExerciseCategory.SECRETARY, ExerciseCategory.ACCOUNTANT]:
+        # Pour secrétaires et comptables, validation automatique + révision manuelle
+            try:
+                execution_service = self.execution_factory.get_service(
+                    step.challenge.execution_environment
+                )
 
-        try:
-            # Déterminer le service d'exécution
-            execution_service = self.execution_factory.get_service(
-                step.challenge.execution_environment
-            )
+                execution_results = []
+                passed_count = 0
+
+                for testcase in testcases:
+                    execution_kwargs = self._prepare_execution_kwargs(
+                        testcase, language, step.challenge.environment_config
+                    )
+
+                    result = execution_service.execute(
+                        content, 
+                        testcase.to_dict(show_hidden=True), 
+                        **execution_kwargs
+                    )
+
+                    testcase_result = self._format_testcase_result(testcase, result)
+                    execution_results.append(testcase_result)
+
+                    if result.get('passed', False):
+                        passed_count += 1
+
+            except Exception as e:
+                db.session.rollback()
+                raise Exception(f'Error submitting solution: {str(e)}')
+        else:
             
-            # Exécuter contre chaque cas de test
-            execution_results = []
-            passed_count = 0
-            
-            for testcase in testcases:
-                # Préparer les kwargs selon le type de test
-                execution_kwargs = self._prepare_execution_kwargs(
-                    testcase, language, step.challenge.environment_config
+            # Récupérer les cas de test
+            requires_manual_review = False
+            try:
+                # Déterminer le service d'exécution
+                execution_service = self.execution_factory.get_service(
+                    step.challenge.execution_environment
                 )
+
+                # Exécuter contre chaque cas de test
+                execution_results = []
+                passed_count = 0
+
+                for testcase in testcases:
+                    # Préparer les kwargs selon le type de test
+                    execution_kwargs = self._prepare_execution_kwargs(
+                        testcase, language, step.challenge.environment_config
+                    )
+
+                    result = execution_service.execute(
+                        content, 
+                        testcase.to_dict(show_hidden=True), 
+                        **execution_kwargs
+                    )
+
+                    # Préparer le résultat (masquer les données sensibles pour les cas cachés)
+                    testcase_result = self._format_testcase_result(testcase, result)
+                    execution_results.append(testcase_result)
+
+                    if result.get('passed', False):
+                        passed_count += 1
                 
-                result = execution_service.execute(
-                    content, 
-                    testcase.to_dict(show_hidden=True), 
-                    **execution_kwargs
+                # Mettre à jour le progrès
+                step_progress = self._update_step_progress(
+                    user_challenge, step_id, content, content_type, language, passed_count, len(testcases), requires_manual_review
                 )
-                
-                # Préparer le résultat (masquer les données sensibles pour les cas cachés)
-                testcase_result = self._format_testcase_result(testcase, result)
-                execution_results.append(testcase_result)
-                
-                if result.get('passed', False):
-                    passed_count += 1
-            
-            # Mettre à jour le progrès
-            step_progress = self._update_step_progress(
-                user_challenge, step_id, content, content_type, language, passed_count, len(testcases)
-            )
-            
-            # Mettre à jour la progression du challenge si l'étape est complétée
-            step_completed = passed_count == len(testcases)
-            if step_completed:
-                self._update_user_challenge_progression(user_challenge, step)
-            
-            # Incrémenter le compteur de tentatives
-            user_challenge.attempt_count += 1
-            db.session.commit()
-            
-            # Préparer la réponse
-            response = {
-                'execution_results': execution_results,
-                'summary': {
-                    'passed': passed_count,
-                    'total': len(testcases),
-                    'success_rate': round((passed_count / len(testcases)) * 100, 2),
-                    'all_passed': step_completed
-                },
-                'step_progress': {
-                    'step_id': step_id,
-                    'is_completed': step_completed,
-                    'tests_passed': passed_count,
-                    'tests_total': len(testcases),
-                    'score': round((passed_count / len(testcases)) * 100, 2)
-                },
-                'user_challenge': user_challenge.to_dict()
-            }
-            
-            return response
-            
-        except Exception as e:
-            db.session.rollback()
-            raise Exception(f'Error submitting solution: {str(e)}')
+
+                # Mettre à jour la progression du challenge si l'étape est complétée
+                step_completed = passed_count == len(testcases)
+                if step_completed:
+                    self._update_user_challenge_progression(user_challenge, step)
+
+                # Incrémenter le compteur de tentatives
+                user_challenge.attempt_count += 1
+                db.session.commit()
+
+                # Préparer la réponse
+                response = {
+                    'execution_results': execution_results,
+                    'summary': {
+                        'passed': passed_count,
+                        'total': len(testcases),
+                        'success_rate': round((passed_count / len(testcases)) * 100, 2),
+                        'all_passed': step_completed
+                    },
+                    'step_progress': {
+                        'step_id': step_id,
+                        'is_completed': step_completed,
+                        'tests_passed': passed_count,
+                        'tests_total': len(testcases),
+                        'score': round((passed_count / len(testcases)) * 100, 2)
+                    },
+                    'user_challenge': user_challenge.to_dict()
+                }
+
+                return response
+
+            except Exception as e:
+                db.session.rollback()
+                raise Exception(f'Error submitting solution: {str(e)}')
+    
+    def _requires_manual_review(self, category: ExerciseCategory, testcase_type: str = None) -> bool:
+        """Détermine si une révision manuelle est nécessaire"""
+
+        # Toujours révision manuelle pour certaines catégories
+        always_manual_categories = [
+            ExerciseCategory.BUSINESS_ANALYST
+        ]
+
+        if category in always_manual_categories:
+            return True
+
+        # Révision manuelle conditionnelle selon le type de test
+        manual_review_cases = {
+            ExerciseCategory.SECRETARY: [
+                'correspondence_test', 'proofreading_test', 
+                'document_structure_test'
+            ],
+            ExerciseCategory.ACCOUNTANT: [
+                'financial_analysis_test', 'audit_trail_test'
+            ]
+        }
+
+        if testcase_type and category in manual_review_cases:
+            return testcase_type in manual_review_cases[category]
+
+        # Par défaut, révision manuelle pour les nouvelles catégories
+        if category in [ExerciseCategory.SECRETARY, ExerciseCategory.ACCOUNTANT]:
+            return True
+
+        return False
     
     def _prepare_execution_kwargs(self, testcase, language, environment_config):
         """Prépare les arguments d'exécution selon le contexte"""
@@ -1095,7 +1207,7 @@ class CodingPlatformService:
         
         return result
 
-    def _update_step_progress(self, user_challenge, step_id, content, content_type, language, passed_count, total_count):
+    def _update_step_progress(self, user_challenge, step_id, content, content_type, language, passed_count, total_count, requires_manual_review=False):
         """
         Met à jour le progrès d'une étape spécifique
         """
@@ -1116,12 +1228,22 @@ class CodingPlatformService:
             print(f'🔍 DEBUG: Nouveau progress créé pour step_id: {step_id}')
         else:
             print(f'🔍 DEBUG: Progress existant trouvé pour step_id: {step_id}')
-
+        progress.requires_manual_review = requires_manual_review
+        
+        if requires_manual_review:
+            progress.manual_review_status = 'pending'
+            # Score automatique partiel seulement
+            progress.score = round((passed_count / total_count) * 50, 2)  # 50% max sans révision
+            progress.is_completed = False  # Pas terminé tant que pas révisé
+        else:
+            # Score automatique complet
+            progress.score = round((passed_count / total_count) * 100, 2)
+            progress.is_completed = passed_count == total_count
         # Mettre à jour avec les résultats d'exécution
         progress.tests_passed = passed_count
         progress.tests_total = total_count
-        progress.is_completed = passed_count == total_count
-        progress.score = round((passed_count / total_count) * 100, 2) if total_count > 0 else 0
+        # progress.is_completed = passed_count == total_count
+        # progress.score = round((passed_count / total_count) * 100, 2) if total_count > 0 else 0
         progress.last_execution_result = {
             'passed_count': passed_count,
             'total_count': total_count,

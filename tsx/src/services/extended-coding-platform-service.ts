@@ -155,44 +155,7 @@ import {
     // ADMIN ROUTES - CAS DE TEST ÉTENDUS
     // =============================================================================
   
-    // /**
-    //  * Crée un cas de test avec support des types étendus
-    //  */
-    // static async createTestCaseExtended(stepId: string, data: any) {
-    //   try {
-    //     console.log("ExtendedService: Création cas de test", { 
-    //       stepId, 
-    //       testcase_type: data.testcase_type 
-    //     });
-  
-    //     const response = await api.post(`${this.BASE_URL}/admin/steps/${stepId}/testcases`, data, {
-    //       headers: { 'Content-Type': 'application/json' },
-    //     });
-  
-    //     return response.data;
-    //   } catch (error) {
-    //     console.error('Erreur lors de la création du cas de test étendu:', error);
-    //     throw new Error('Erreur lors de la création du cas de test');
-    //   }
-    // }
-  
-    // /**
-    //  * Import en lot de cas de test étendus
-    //  */
-    // static async bulkImportTestCasesExtended(stepId: string, data: { testcases: any[] }) {
-    //   try {
-    //     console.log("ExtendedService: Import en lot", { stepId, count: data.testcases.length });
-  
-    //     const response = await api.post(`${this.BASE_URL}/admin/steps/${stepId}/testcases/bulk`, data, {
-    //       headers: { 'Content-Type': 'application/json' },
-    //     });
-  
-    //     return response.data;
-    //   } catch (error) {
-    //     console.error('Erreur lors de l\'import en lot étendu:', error);
-    //     throw new Error('Erreur lors de l\'import des cas de test');
-    //   }
-    // }
+    
        /**
    * Crée un nouveau cas de test (Admin)
    */

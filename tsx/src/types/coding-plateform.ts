@@ -1,14 +1,50 @@
-// types/coding-plateform.ts - Extensions pour Data Analysts
+// types/coding-platform.ts - Version unifiée complète avec Business Analyst
 
-// ================ NOUVEAUX ENUMS ================
+// ================ ENUMS UNIFIÉS ================
 
-export type ExerciseCategory = 'developer' | 'data_analyst';
-export type ExecutionEnvironment = 'code_executor' | 'jupyter_notebook' | 'sql_database' | 'data_visualization' | 'file_analysis';
-export type TestcaseType = 'unit_test' | 'sql_query_test' | 'visualization_test' | 'statistical_test' | 'notebook_cell_test';
+export type ExerciseCategory = 'developer' | 'data_analyst' | 'business_analyst' | 'secretary' | 'accountant'; // NOUVEAU
+export type ExecutionEnvironment = 'code_executor' | 'jupyter_notebook' | 'sql_database' | 'data_visualization' | 'file_analysis' | 'diagram_editor' | 'text_editor' | 'spreadsheet_editor'; 
+export type TestcaseType = 'unit_test' 
+| 'sql_query_test'
+| 'visualization_test' 
+| 'statistical_test' 
+| 'notebook_cell_test' 
+| 'process_diagram' 
+| 'use_case_diagram' 
+| 'sequence_diagram' 
+| 'class_diagram' 
+| 'activity_diagram' 
+| 'flowchart' 
+| 'wireframe'  
+| 'text_formatting_test'
+| 'spelling_grammar_test'
+| 'document_structure_test'
+| 'correspondence_test'
+| 'proofreading_test'
+| 'accounting_calculation_test'
+| 'financial_analysis_test'
+| 'budget_validation_test'
+| 'balance_sheet_test'
+| 'tax_calculation_test'
+| 'audit_trail_test';; // NOUVEAU
 export type DatasetType = 'csv' | 'json' | 'excel' | 'sqlite' | 'postgresql' | 'mysql' | 'parquet';
+export type DocumentFormat = 'word' | 'pdf' | 'plain_text' | 'html' | 'markdown' | 'rtf';
 
+export type FinancialDocumentType = 
+  | 'balance_sheet' 
+  | 'income_statement' 
+  | 'cash_flow' 
+  | 'budget' 
+  | 'invoice' 
+  | 'expense_report' 
+  | 'tax_return';
 // Étendre ProgrammingLanguage pour les data analysts
 export type ProgrammingLanguage = 'python' | 'javascript' | 'java' | 'cpp' | 'c' | 'sql' | 'r' | 'jupyter_python';
+
+// ================ NOUVEAUX TYPES BUSINESS ANALYST ================
+
+export type DiagramType = 'uml_use_case' | 'uml_sequence' | 'uml_class' | 'uml_activity' | 'bpmn_process' | 'flowchart' | 'wireframe' | 'entity_relationship' | 'mockup';
+export type DiagramFormat = 'staruml' | 'drawio' | 'svg' | 'png' | 'json';
 
 // ================ INTERFACES ÉTENDUES ================
 
@@ -17,16 +53,17 @@ export interface Exercise {
   created_by: string;
   title: string;
   description: string;
-  category: ExerciseCategory; // 🆕 Nouveau
-  language?: ProgrammingLanguage; // 🆕 Maintenant optionnel
+  category: ExerciseCategory;
+  language?: ProgrammingLanguage;
   difficulty: ChallengeDifficulty;
   order_index: number;
-  required_skills: string[]; // 🆕 Nouveau
-  estimated_duration_minutes: number; // 🆕 Nouveau
+  required_skills: string[];
+  estimated_duration_minutes: number;
+  business_domain?: string; // NOUVEAU pour business analyst
   created_at: string;
   updated_at: string;
   challenge_count: number;
-  dataset_count?: number; // 🆕 Nouveau
+  dataset_count?: number;
 }
 
 export interface Challenge {
@@ -39,8 +76,8 @@ export interface Challenge {
   status: ChallengeStatus;
   order_index: number;
   estimated_time_minutes: number;
-  execution_environment: ExecutionEnvironment; // 🆕 Nouveau
-  environment_config: Record<string, any>; // 🆕 Nouveau
+  execution_environment: ExecutionEnvironment;
+  environment_config: Record<string, any>;
   created_at: string;
   updated_at: string;
   step_count: number;
@@ -55,12 +92,31 @@ export interface ChallengeStep {
   hint?: string;
   starter_code?: string;
   solution_code?: string;
-  notebook_template?: string; // 🆕 Nouveau
-  sql_schema?: Record<string, any>; // 🆕 Nouveau
-  expected_output_type?: string; // 🆕 Nouveau
+  
+  // Data Analyst
+  notebook_template?: string;
+  sql_schema?: Record<string, any>;
+  expected_output_type?: string;
+  
+  // Business Analyst - NOUVEAU
+  diagram_template?: string;
+  diagram_type?: DiagramType;
+  diagram_format?: DiagramFormat;
+  business_requirements?: Record<string, any>;
+  
+  document_template?: string;
+  document_format?: DocumentFormat;
+  text_requirements?: Record<string, any>;
+  formatting_rules?: Record<string, any>;
+  
+  // NOUVEAUX champs pour comptables
+  financial_template?: string;
+  financial_document_type?: FinancialDocumentType;
+  accounting_rules?: Record<string, any>;
+  calculation_parameters?: Record<string, any>;
   order_index: number;
   is_final_step: boolean;
-  evaluation_criteria?: Record<string, any>; // 🆕 Nouveau
+  evaluation_criteria?: Record<string, any>;
   testcases?: TestCase[];
   user_progress?: UserProgress;
 }
@@ -68,20 +124,29 @@ export interface ChallengeStep {
 export interface TestCase {
   id: string;
   step_id: string;
-  testcase_type: TestcaseType; // 🆕 Nouveau
+  testcase_type: TestcaseType;
+  
+  // Code classique
   input_data?: string;
   expected_output?: string;
-  dataset_reference?: string; // 🆕 Nouveau
-  sql_query_expected?: string; // 🆕 Nouveau
-  expected_visualization?: Record<string, any>; // 🆕 Nouveau
-  statistical_assertions?: Record<string, any>; // 🆕 Nouveau
+  
+  // Data Analyst
+  dataset_reference?: string;
+  sql_query_expected?: string;
+  expected_visualization?: Record<string, any>;
+  statistical_assertions?: Record<string, any>;
   notebook_cell_output?: any;
   cell_type?: string;
+  
+  // Business Analyst - NOUVEAU
+  diagram_requirements?: Record<string, any>;
+  evaluation_rubric?: Record<string, any>;
+  
   is_hidden: boolean;
   is_example: boolean;
   timeout_seconds: number;
   memory_limit_mb: number;
-  numerical_tolerance?: number; // 🆕 Nouveau
+  numerical_tolerance?: number;
   order_index: number;
 }
 
@@ -91,19 +156,149 @@ export interface UserProgress {
   step_id: string;
   code?: string;
   language?: ProgrammingLanguage;
-  notebook_content?: Record<string, any>; // 🆕 Nouveau
-  sql_queries?: Record<string, any>; // 🆕 Nouveau
-  analysis_results?: Record<string, any>; // 🆕 Nouveau
-  visualizations?: Record<string, any>; // 🆕 Nouveau
+  
+  // Data Analyst
+  notebook_content?: Record<string, any>;
+  sql_queries?: Record<string, any>;
+  analysis_results?: Record<string, any>;
+  visualizations?: Record<string, any>;
+  
+  // Business Analyst - NOUVEAU
+  diagram_content?: Record<string, any>;
+  diagram_metadata?: Record<string, any>;
+  
   tests_passed: number;
   tests_total: number;
   is_completed: boolean;
-  score?: number; // 🆕 Nouveau
+  score?: number;
   last_execution_result?: any;
   last_edited: string;
 }
 
-// ================ NOUVELLES INTERFACES ================
+// ================ FORM DATA ÉTENDUS ================
+
+export interface ExerciseFormData {
+  title: string;
+  description?: string;
+  category: ExerciseCategory;
+  language?: ProgrammingLanguage;
+  difficulty: ChallengeDifficulty;
+  order_index?: number;
+  required_skills?: string[];
+  estimated_duration_minutes?: number;
+  business_domain?: string; // NOUVEAU
+}
+
+export interface ChallengeFormData {
+  exercise_id: string;
+  title: string;
+  description: string;
+  constraints?: string;
+  tags?: string[];
+  status?: ChallengeStatus;
+  order_index?: number;
+  estimated_time_minutes?: number;
+  execution_environment?: ExecutionEnvironment;
+  environment_config?: Record<string, any>;
+}
+
+export interface ChallengeStepFormData {
+  title: string;
+  instructions: string;
+  hint?: string;
+  starter_code?: string;
+  solution_code?: string;
+  
+  // Data Analyst
+  notebook_template?: string;
+  sql_schema?: Record<string, any>;
+  expected_output_type?: string;
+  
+  // Business Analyst - NOUVEAU
+  diagram_template?: string;
+  diagram_type?: DiagramType;
+  diagram_format?: DiagramFormat;
+  business_requirements?: Record<string, any>;
+  
+  order_index?: number;
+  is_final_step?: boolean;
+  evaluation_criteria?: Record<string, any>;
+
+  // NOUVEAUX champs pour secrétaires
+  document_template?: string;
+  document_format?: DocumentFormat;
+  text_requirements?: Record<string, any>;
+  formatting_rules?: Record<string, any>;
+  
+  // NOUVEAUX champs pour comptables
+  financial_template?: string;
+  financial_document_type?: FinancialDocumentType;
+  accounting_rules?: Record<string, any>;
+  calculation_parameters?: Record<string, any>;
+}
+
+export interface TestCaseFormData {
+  testcase_type?: TestcaseType;
+  
+  // Code classique
+  input_data?: string;
+  expected_output?: string;
+  
+  // Data Analyst
+  dataset_reference?: string;
+  sql_query_expected?: string;
+  expected_visualization?: Record<string, any>;
+  statistical_assertions?: Record<string, any>;
+  notebook_cell_output?: any;
+  notebook_cell_output_raw?: string;
+  cell_type?: 'code' | 'markdown' | 'raw';
+  
+  // Business Analyst - NOUVEAU
+  diagram_requirements?: Record<string, any>;
+  evaluation_rubric?: Record<string, any>;
+  
+  is_hidden?: boolean;
+  is_example?: boolean;
+  timeout_seconds?: number;
+  memory_limit_mb?: number;
+  numerical_tolerance?: number;
+  order_index?: number;
+
+  expected_document_structure?: Record<string, any>;
+  text_quality_criteria?: Record<string, any>;
+  formatting_validation?: Record<string, any>;
+  
+  // NOUVEAUX champs pour tests comptables
+  expected_financial_result?: Record<string, any>;
+  accounting_validation_rules?: Record<string, any>;
+  calculation_steps?: Record<string, any>;
+}
+
+// ================ SOUMISSIONS ÉTENDUES ================
+
+export interface ExtendedSubmissionData {
+  content: string | Record<string, any>;
+  content_type: 'code' | 'sql' | 'notebook' | 'visualization' | 'analysis' | 'diagram' | 'text' | 'spreadsheet'; // NOUVEAU
+  language?: ProgrammingLanguage;
+  
+  // Business Analyst - NOUVEAU
+  diagram_format?: DiagramFormat;
+  diagram_metadata?: Record<string, any>;
+}
+
+// ================ TYPES UTILS ================
+
+export interface AvailableTypes {
+  exercise_categories: ExerciseCategory[];
+  execution_environments: ExecutionEnvironment[];
+  testcase_types: TestcaseType[];
+  programming_languages: ProgrammingLanguage[];
+  dataset_types: DatasetType[];
+  diagram_types: DiagramType[]; // NOUVEAU
+  diagram_formats: DiagramFormat[]; // NOUVEAU
+}
+
+// ================ INTERFACES PRÉSERVÉES ================
 
 export interface ExerciseDataset {
   id: string;
@@ -130,131 +325,6 @@ export interface DatasetFormData {
   schema_definition?: Record<string, any>;
 }
 
-// ================ FORM DATA ÉTENDUS ================
-
-export interface ExerciseFormData {
-  title: string;
-  description?: string;
-  category: ExerciseCategory; // 🆕 Nouveau
-  language?: ProgrammingLanguage; // 🆕 Maintenant optionnel
-  difficulty: ChallengeDifficulty;
-  order_index?: number;
-  required_skills?: string[]; // 🆕 Nouveau
-  estimated_duration_minutes?: number; // 🆕 Nouveau
-}
-
-export interface ChallengeFormData {
-  exercise_id: string;
-  title: string;
-  description: string;
-  constraints?: string;
-  tags?: string[];
-  status?: ChallengeStatus;
-  order_index?: number;
-  estimated_time_minutes?: number;
-  execution_environment?: ExecutionEnvironment; // 🆕 Nouveau
-  environment_config?: Record<string, any>; // 🆕 Nouveau
-}
-
-export interface ChallengeStepFormData {
-  title: string;
-  instructions: string;
-  hint?: string;
-  starter_code?: string;
-  solution_code?: string;
-  notebook_template?: string; // 🆕 Nouveau
-  sql_schema?: Record<string, any>; // 🆕 Nouveau
-  expected_output_type?: string; // 🆕 Nouveau
-  order_index?: number;
-  is_final_step?: boolean;
-  evaluation_criteria?: Record<string, any>; // 🆕 Nouveau
-}
-
-export interface TestCaseFormData {
-  testcase_type?: TestcaseType; // 🆕 Nouveau
-  input_data?: string;
-  expected_output?: string;
-  dataset_reference?: string; // 🆕 Nouveau
-  sql_query_expected?: string; // 🆕 Nouveau
-  expected_visualization?: Record<string, any>; // 🆕 Nouveau
-  statistical_assertions?: Record<string, any>; // 🆕 Nouveau
-  notebook_cell_output?: any; // string JSON ou objet
-  notebook_cell_output_raw?: string; // Version string pour l'édition
-  cell_type?: 'code' | 'markdown' | 'raw';
-
-  is_hidden?: boolean;
-  is_example?: boolean;
-  timeout_seconds?: number;
-  memory_limit_mb?: number;
-  numerical_tolerance?: number; // 🆕 Nouveau
-  order_index?: number;
-}
-
-export interface NotebookCellOutput {
-  output_type: 'execute_result' | 'display_data' | 'stream' | 'error';
-  data?: {
-    'text/plain'?: string;
-    'text/html'?: string;
-    'image/png'?: string;
-    'application/json'?: any;
-  };
-  metadata?: any;
-  text?: string; // Pour les sorties de type 'stream'
-  name?: string; // Pour les sorties de type 'stream'
-  ename?: string; // Pour les erreurs
-  evalue?: string; // Pour les erreurs
-  traceback?: string[]; // Pour les erreurs
-  }
-
-// ================ SOUMISSIONS ÉTENDUES ================
-
-export interface ExtendedSubmissionData {
-  content: string | Record<string, any>;
-  content_type: 'code' | 'sql' | 'notebook' | 'visualization' | 'analysis'; // 🆕 Nouveau
-  language?: ProgrammingLanguage;
-}
-
-export interface ExtendedExecutionResult {
-  testcase_id: string;
-  testcase_type: TestcaseType; // 🆕 Nouveau
-  passed: boolean;
-  is_hidden: boolean;
-  execution_time?: number;
-  memory_used?: number;
-  // Résultats spécifiques selon le type
-  input?: string;
-  expected_output?: string;
-  actual_output?: string;
-  error?: string;
-  dataset_reference?: string;
-  result_rows?: number;
-  columns?: string[];
-  visualization_type?: string;
-  data_points?: number;
-  analysis_results?: Record<string, any>;
-}
-
-// ================ TYPES UTILS ================
-
-export interface ChallengeContext {
-  challenge: Challenge;
-  execution_environment: ExecutionEnvironment;
-  environment_config: Record<string, any>;
-  exercise_category: ExerciseCategory;
-  datasets?: ExerciseDataset[];
-  user_progress?: UserChallenge;
-}
-
-export interface AvailableTypes {
-  exercise_categories: ExerciseCategory[];
-  execution_environments: ExecutionEnvironment[];
-  testcase_types: TestcaseType[];
-  programming_languages: ProgrammingLanguage[];
-  dataset_types: DatasetType[];
-}
-
-// ================ ANCIENNES INTERFACES PRÉSERVÉES ================
-
 export interface UserChallenge {
   id: string;
   user_id?: string;
@@ -266,25 +336,45 @@ export interface UserChallenge {
   completed_at?: string;
   session_token: string;
   anonymous_identifier?: string;
-  session_metadata?: Record<string, any>; // 🆕 Nouveau
+  session_metadata?: Record<string, any>;
   is_anonymous: boolean;
 }
 
-export interface ExecutionResult {
+export interface ChallengeContext {
+  challenge: Challenge;
+  execution_environment: ExecutionEnvironment;
+  environment_config: Record<string, any>;
+  exercise_category: ExerciseCategory;
+  datasets?: ExerciseDataset[];
+  user_progress?: UserChallenge;
+}
+
+export interface ExtendedExecutionResult {
   testcase_id: string;
-  input: string;
-  expected_output: string;
-  actual_output: string;
+  testcase_type: TestcaseType;
   passed: boolean;
-  error?: string;
+  is_hidden: boolean;
   execution_time?: number;
   memory_used?: number;
-  status: string;
-  is_hidden: boolean;
+  input?: string;
+  expected_output?: string;
+  actual_output?: string;
+  error?: string;
+  dataset_reference?: string;
+  result_rows?: number;
+  columns?: string[];
+  visualization_type?: string;
+  data_points?: number;
+  analysis_results?: Record<string, any>;
+  
+  // Business Analyst - NOUVEAU
+  requires_manual_review?: boolean;
+  diagram_stored?: boolean;
+  message?: string;
 }
 
 export interface SubmissionResponse {
-  execution_results: ExecutionResult[] | ExtendedExecutionResult[];
+  execution_results: ExtendedExecutionResult[];
   summary: {
     passed: number;
     total: number;
@@ -307,7 +397,70 @@ export interface SubmissionResponse {
   };
 }
 
-// Garder les anciens types pour compatibilité
+// ================ TEST CASE DATA TYPES ================
+
+export interface BaseTestCaseData {
+  testcase_type?: TestcaseType;
+  is_hidden?: boolean;
+  is_example?: boolean;
+  timeout_seconds?: number;
+  memory_limit_mb?: number;
+  order_index?: number;
+  numerical_tolerance?: number;
+}
+
+export interface TestCaseData {
+  testcase_type?: TestcaseType;
+  input_data?: any;
+  expected_output?: any;
+  dataset_reference?: string;
+  sql_query_expected?: string;
+  expected_visualization?: any;
+  statistical_assertions?: any;
+  numerical_tolerance?: number;
+  notebook_cell_output?: {
+    output_type: string;
+    data: Record<string, any>;
+    metadata: Record<string, any>;
+  };
+  cell_type?: 'code' | 'markdown' | 'raw';
+  
+  // Business Analyst - NOUVEAU
+  diagram_requirements?: Record<string, any>;
+  evaluation_rubric?: Record<string, any>;
+  
+  is_hidden?: boolean;
+  is_example?: boolean;
+  timeout_seconds?: number;
+  memory_limit_mb?: number;
+  order_index?: number;
+}
+
+export interface BulkTestCasesData {
+  testcases: TestCaseData[];
+}
+
+export interface BulkTestCasesResponse {
+  message: string;
+  testcases: any[];
+  errors?: string[];
+}
+
+// ================ ANCIENNES INTERFACES PRÉSERVÉES ================
+
+export interface ExecutionResult {
+  testcase_id: string;
+  input: string;
+  expected_output: string;
+  actual_output: string;
+  passed: boolean;
+  error?: string;
+  execution_time?: number;
+  memory_used?: number;
+  status: string;
+  is_hidden: boolean;
+}
+
 export interface CodeSubmissionData {
   code: string;
   language: ProgrammingLanguage;
@@ -352,79 +505,7 @@ export interface AdminTestResponse {
   note?: string;
 }
 
-// export interface BulkTestCasesData {
-//   testcases: TestCaseFormData[];
-// }
-
 // Types pour l'ancien système (préservés)
 export type ChallengeDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 export type ChallengeStatus = 'draft' | 'published' | 'archived';
 export type UserChallengeStatus = 'not_started' | 'in_progress' | 'completed' | 'abandoned';
-
-
-export interface BaseTestCaseData {
-  testcase_type?: 'unit_test' | 'sql_query_test' | 'visualization_test' | 'statistical_test';
-  is_hidden?: boolean;
-  is_example?: boolean;
-  timeout_seconds?: number;
-  memory_limit_mb?: number;
-  order_index?: number;
-  numerical_tolerance?: number;
-}
-
-export interface UnitTestCaseData extends BaseTestCaseData {
-  testcase_type: 'unit_test';
-  input_data: any;
-  expected_output: any;
-}
-
-export interface SqlQueryTestCaseData extends BaseTestCaseData {
-  testcase_type: 'sql_query_test';
-  dataset_reference: string;
-  sql_query_expected: string;
-}
-
-export  interface VisualizationTestCaseData extends BaseTestCaseData {
-  testcase_type: 'visualization_test';
-  expected_visualization: any;
-}
-
-export interface StatisticalTestCaseData extends BaseTestCaseData {
-  testcase_type: 'statistical_test';
-  statistical_assertions: any;
-}
-
-
-
-
-export interface TestCaseData {
-  testcase_type?: TestcaseType;
-  input_data?: any;
-  expected_output?: any;
-  dataset_reference?: string;
-  sql_query_expected?: string;
-  expected_visualization?: any;
-  statistical_assertions?: any;
-  numerical_tolerance?: number;
-  notebook_cell_output?: {
-    output_type: string;
-    data: Record<string, any>;
-    metadata: Record<string, any>;
-  };
-  cell_type?: 'code' | 'markdown' | 'raw';
-  is_hidden?: boolean;
-  is_example?: boolean;
-  timeout_seconds?: number;
-  memory_limit_mb?: number;
-  order_index?: number;
-}
-
-export interface BulkTestCasesData {
-  testcases: TestCaseData[];
-}
-
-export interface BulkTestCasesResponse {
-  message: string;
-  testcases: any[];
-  errors?: string[];
-}

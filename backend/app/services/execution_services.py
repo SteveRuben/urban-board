@@ -13,6 +13,11 @@ import base64
 import psycopg2
 from datetime import datetime, timezone
 from flask import current_app
+import re
+from docx import Document
+from openpyxl import Workbook
+import textstat
+from spellchecker import SpellChecker
 
 from app.types.coding_platform import (
     ExecutionEnvironment, TestcaseType, ProgrammingLanguage
@@ -38,8 +43,12 @@ class CodeExecutionService(BaseExecutionService):
         """Exécute le code via Judge0 API"""
         language = kwargs.get('language', ProgrammingLanguage.PYTHON)
         timeout = testcase.get('timeout_seconds', 5)
-        
+        print('wai')
         try:
+            if isinstance(language, str):
+                language = ProgrammingLanguage(language.lower())
+                print('Type de language après conversion:', type(language))
+
             LANGUAGE_IDS = {
                 ProgrammingLanguage.PYTHON: 71,
                 ProgrammingLanguage.JAVASCRIPT: 63,
@@ -49,13 +58,14 @@ class CodeExecutionService(BaseExecutionService):
             }
             
             language_id = LANGUAGE_IDS.get(language)
+            print('wai1',type(language))
             if not language_id:
                 return {
                     'success': False,
                     'error': f'Unsupported language: {language.value}',
                     'passed': False
                 }
-            
+            print('wai2')
             submission_data = {
                 'source_code': base64.b64encode(content.encode()).decode(),
                 'language_id': language_id,
@@ -64,7 +74,7 @@ class CodeExecutionService(BaseExecutionService):
                 'cpu_time_limit': timeout,
                 'memory_limit': testcase.get('memory_limit_mb', 128) * 1024,
             }
-            
+            print('wai')
             headers = {
                 'Content-Type': 'application/json',
                 'X-RapidAPI-Key': current_app.config.get('JUDGE0_API_KEY', ''),
@@ -87,7 +97,7 @@ class CodeExecutionService(BaseExecutionService):
             
             expected_output = testcase.get('expected_output', '')
             passed = self.validate_output(stdout.strip(), expected_output.strip())
-            
+            print('wai')
             return {
                 'success': True,
                 'passed': passed,
@@ -1048,6 +1058,567 @@ class StatisticalAnalysisService(BaseExecutionService):
                     return False
         
         return True
+class DiagramExecutionService(BaseExecutionService):
+    """Service pour les diagrammes - stockage sans validation automatique"""
+    
+    def execute(self, content: str, testcase: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Stocke le diagramme sans validation automatique"""
+        try:
+            if isinstance(content, str):
+                diagram_data = json.loads(content)
+            else:
+                diagram_data = content
+            
+            # Validation basique de la structure
+            diagram_type = testcase.get('diagram_type', 'unknown')
+            
+            # Métadonnées du diagramme
+            metadata = {
+                'type': diagram_type,
+                'format': testcase.get('diagram_format', 'json'),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'elements_count': len(diagram_data.get('elements', [])),
+                'has_title': bool(diagram_data.get('title')),
+                'diagram_size': len(str(diagram_data))
+            }
+            
+            return {
+                'success': True,
+                'passed': True,  # Toujours True car pas de validation auto
+                'diagram_stored': True,
+                'metadata': metadata,
+                'requires_manual_review': True,
+                'message': 'Diagram saved successfully. Manual review required.'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Diagram storage error: {str(e)}',
+                'passed': False
+            }
+    
+    def validate_output(self, actual_output: Any, expected_output: Any, **kwargs) -> bool:
+        """Pas de validation automatique - toujours True"""
+        return True
+
+class TextEditorService(BaseExecutionService):
+    """Service d'exécution pour les tests de rédaction"""
+    
+    def execute(self, content: str, testcase: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Valide un document rédigé"""
+        try:
+            testcase_type = testcase.get('testcase_type', 'text_formatting_test')
+            
+            if testcase_type == 'spelling_grammar_test':
+                return self._validate_spelling_grammar(content, testcase)
+            elif testcase_type == 'document_structure_test':
+                return self._validate_document_structure(content, testcase)
+            elif testcase_type == 'text_formatting_test':
+                return self._validate_text_formatting(content, testcase)
+            elif testcase_type == 'correspondence_test':
+                return self._validate_correspondence(content, testcase)
+            elif testcase_type == 'proofreading_test':
+                return self._validate_proofreading(content, testcase)
+            else:
+                return self._validate_generic_text(content, testcase)
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Text validation error: {str(e)}',
+                'passed': False
+            }
+    
+    def _validate_spelling_grammar(self, content: str, testcase: Dict) -> Dict:
+        """Valide l'orthographe et la grammaire"""
+        spell = SpellChecker()
+        words = content.split()
+        misspelled = spell.unknown(words)
+        
+        # Critères de qualité
+        quality_criteria = testcase.get('text_quality_criteria', {})
+        max_errors = quality_criteria.get('max_spelling_errors', 0)
+        
+        passed = len(misspelled) <= max_errors
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'spelling_errors': list(misspelled),
+            'error_count': len(misspelled),
+            'word_count': len(words),
+            'readability_score': textstat.flesch_reading_ease(content)
+        }
+    
+    def _validate_document_structure(self, content: str, testcase: Dict) -> Dict:
+        """Valide la structure du document"""
+        expected_structure = testcase.get('expected_document_structure', {})
+        
+        # Analyse de la structure
+        lines = content.split('\n')
+        paragraphs = [line.strip() for line in lines if line.strip()]
+        
+        # Vérifications basiques
+        has_title = any(len(line.split()) <= 10 and line.isupper() for line in paragraphs[:3])
+        has_introduction = len(paragraphs) > 0
+        has_conclusion = len(paragraphs) > 2
+        
+        structure_score = 0
+        if has_title:
+            structure_score += 1
+        if has_introduction:
+            structure_score += 1
+        if has_conclusion:
+            structure_score += 1
+        
+        min_score = expected_structure.get('min_structure_score', 2)
+        passed = structure_score >= min_score
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'structure_score': structure_score,
+            'has_title': has_title,
+            'paragraph_count': len(paragraphs),
+            'word_count': len(content.split())
+        }
+    
+    def _validate_text_formatting(self, content: str, testcase: Dict) -> Dict:
+        """Valide le formatage du texte"""
+        formatting_rules = testcase.get('formatting_validation', {})
+        
+        # Vérifications de formatage
+        issues = []
+        
+        # Vérifier les majuscules en début de phrase
+        sentences = re.split(r'[.!?]+', content)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and not sentence[0].isupper():
+                issues.append(f"Sentence should start with capital: '{sentence[:20]}...'")
+        
+        # Vérifier les espaces doubles
+        if '  ' in content:
+            issues.append("Double spaces found")
+        
+        # Vérifier la ponctuation
+        if not re.search(r'[.!?]$', content.strip()):
+            issues.append("Document should end with punctuation")
+        
+        max_issues = formatting_rules.get('max_formatting_issues', 0)
+        passed = len(issues) <= max_issues
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'formatting_issues': issues,
+            'issue_count': len(issues)
+        }
+    
+    def _validate_correspondence(self, content: str, testcase: Dict) -> Dict:
+        """Valide une correspondance (lettre, email)"""
+        text_requirements = testcase.get('text_requirements', {})
+        
+        # Éléments requis pour une correspondance
+        required_elements = text_requirements.get('required_elements', [])
+        found_elements = []
+        
+        content_lower = content.lower()
+        
+        # Vérifier les éléments requis
+        element_patterns = {
+            'greeting': r'(bonjour|salut|bonsoir|cher|chère)',
+            'closing': r'(cordialement|salutations|amicalement|bien à vous)',
+            'date': r'\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}',
+            'subject': r'(objet|sujet|re:)',
+            'signature': r'(signature|nom|prénom)'
+        }
+        
+        for element in required_elements:
+            if element in element_patterns:
+                if re.search(element_patterns[element], content_lower):
+                    found_elements.append(element)
+        
+        passed = len(found_elements) >= len(required_elements)
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'found_elements': found_elements,
+            'required_elements': required_elements,
+            'completeness': len(found_elements) / len(required_elements) if required_elements else 1
+        }
+    
+    def _validate_proofreading(self, content: str, testcase: Dict) -> Dict:
+        """Valide une correction de texte"""
+        expected_corrections = testcase.get('expected_output', '')
+        
+        # Comparaison avec le texte corrigé attendu
+        similarity_score = self._calculate_text_similarity(content, expected_corrections)
+        
+        passed = similarity_score >= 0.8  # 80% de similarité
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'similarity_score': similarity_score,
+            'corrections_applied': similarity_score > 0.5
+        }
+    
+    def _validate_generic_text(self, content: str, testcase: Dict) -> Dict:
+        """Validation générique de texte"""
+        min_words = testcase.get('min_word_count', 0)
+        max_words = testcase.get('max_word_count', float('inf'))
+        
+        word_count = len(content.split())
+        passed = min_words <= word_count <= max_words
+        
+        return {
+            'success': True,
+            'passed': passed,
+            'word_count': word_count,
+            'character_count': len(content)
+        }
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calcule la similarité entre deux textes"""
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        return len(intersection) / len(union) if union else 0
+    
+    def validate_output(self, actual_output: str, expected_output: str, **kwargs) -> bool:
+        """Validation basique de texte"""
+        if not expected_output:
+            return len(actual_output.strip()) > 0
+        
+        return self._calculate_text_similarity(actual_output, expected_output) >= 0.7
+
+class SpreadsheetEditorService(BaseExecutionService):
+    """Service d'exécution pour les tests comptables"""
+    
+    def execute(self, content: str, testcase: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """Valide des calculs comptables"""
+        try:
+            testcase_type = testcase.get('testcase_type', 'accounting_calculation_test')
+            
+            if testcase_type == 'accounting_calculation_test':
+                return self._validate_accounting_calculation(content, testcase)
+            elif testcase_type == 'financial_analysis_test':
+                return self._validate_financial_analysis(content, testcase)
+            elif testcase_type == 'budget_validation_test':
+                return self._validate_budget(content, testcase)
+            elif testcase_type == 'balance_sheet_test':
+                return self._validate_balance_sheet(content, testcase)
+            elif testcase_type == 'tax_calculation_test':
+                return self._validate_tax_calculation(content, testcase)
+            else:
+                return self._validate_generic_calculation(content, testcase)
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Accounting validation error: {str(e)}',
+                'passed': False
+            }
+    
+    def _validate_accounting_calculation(self, content: str, testcase: Dict) -> Dict:
+        """Valide des calculs comptables"""
+        try:
+            # Parser le contenu comme JSON (résultats de calculs)
+            if isinstance(content, str):
+                calculations = json.loads(content)
+            else:
+                calculations = content
+            
+            expected_results = testcase.get('expected_financial_result', {})
+            validation_rules = testcase.get('accounting_validation_rules', {})
+            
+            tolerance = validation_rules.get('numerical_tolerance', 0.01)
+            passed_calculations = 0
+            total_calculations = len(expected_results)
+            
+            validation_details = []
+            
+            for calc_name, expected_value in expected_results.items():
+                actual_value = calculations.get(calc_name)
+                
+                if actual_value is None:
+                    validation_details.append({
+                        'calculation': calc_name,
+                        'status': 'missing',
+                        'expected': expected_value,
+                        'actual': None
+                    })
+                    continue
+                
+                # Validation numérique avec tolérance
+                if isinstance(expected_value, (int, float)) and isinstance(actual_value, (int, float)):
+                    diff = abs(expected_value - actual_value)
+                    if diff <= tolerance:
+                        passed_calculations += 1
+                        validation_details.append({
+                            'calculation': calc_name,
+                            'status': 'passed',
+                            'expected': expected_value,
+                            'actual': actual_value,
+                            'difference': diff
+                        })
+                    else:
+                        validation_details.append({
+                            'calculation': calc_name,
+                            'status': 'failed',
+                            'expected': expected_value,
+                            'actual': actual_value,
+                            'difference': diff
+                        })
+                else:
+                    # Validation exacte pour les non-numériques
+                    if str(expected_value) == str(actual_value):
+                        passed_calculations += 1
+                        validation_details.append({
+                            'calculation': calc_name,
+                            'status': 'passed',
+                            'expected': expected_value,
+                            'actual': actual_value
+                        })
+                    else:
+                        validation_details.append({
+                            'calculation': calc_name,
+                            'status': 'failed',
+                            'expected': expected_value,
+                            'actual': actual_value
+                        })
+            
+            min_passing_rate = validation_rules.get('min_passing_rate', 1.0)
+            passing_rate = passed_calculations / total_calculations if total_calculations > 0 else 0
+            passed = passing_rate >= min_passing_rate
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'calculations_passed': passed_calculations,
+                'total_calculations': total_calculations,
+                'passing_rate': passing_rate,
+                'validation_details': validation_details
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for calculations',
+                'passed': False
+            }
+    
+    def _validate_financial_analysis(self, content: str, testcase: Dict) -> Dict:
+        """Valide une analyse financière"""
+        try:
+            analysis = json.loads(content) if isinstance(content, str) else content
+            expected_metrics = testcase.get('expected_financial_result', {})
+            
+            # Métriques financières courantes
+            required_metrics = expected_metrics.get('required_metrics', [])
+            found_metrics = []
+            
+            for metric in required_metrics:
+                if metric in analysis:
+                    found_metrics.append(metric)
+            
+            completeness = len(found_metrics) / len(required_metrics) if required_metrics else 1
+            passed = completeness >= 0.8  # 80% des métriques requises
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'found_metrics': found_metrics,
+                'required_metrics': required_metrics,
+                'completeness': completeness
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for financial analysis',
+                'passed': False
+            }
+    
+    def _validate_budget(self, content: str, testcase: Dict) -> Dict:
+        """Valide un budget"""
+        try:
+            budget = json.loads(content) if isinstance(content, str) else content
+            
+            # Vérifications basiques d'un budget
+            required_sections = ['revenues', 'expenses', 'total']
+            found_sections = []
+            
+            for section in required_sections:
+                if section in budget:
+                    found_sections.append(section)
+            
+            # Vérifier l'équilibre budgétaire
+            revenues = budget.get('revenues', 0)
+            expenses = budget.get('expenses', 0)
+            total = budget.get('total', 0)
+            
+            balance_correct = abs((revenues - expenses) - total) < 0.01
+            structure_complete = len(found_sections) == len(required_sections)
+            
+            passed = balance_correct and structure_complete
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'balance_correct': balance_correct,
+                'structure_complete': structure_complete,
+                'budget_balance': revenues - expenses,
+                'declared_total': total
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for budget',
+                'passed': False
+            }
+    
+    def _validate_balance_sheet(self, content: str, testcase: Dict) -> Dict:
+        """Valide un bilan comptable"""
+        try:
+            balance_sheet = json.loads(content) if isinstance(content, str) else content
+            
+            # Équation fondamentale: Actif = Passif + Capitaux propres
+            assets = balance_sheet.get('assets', 0)
+            liabilities = balance_sheet.get('liabilities', 0)
+            equity = balance_sheet.get('equity', 0)
+            
+            balance_equation = abs(assets - (liabilities + equity)) < 0.01
+            
+            # Vérifier les sections requises
+            required_sections = ['assets', 'liabilities', 'equity']
+            sections_present = all(section in balance_sheet for section in required_sections)
+            
+            passed = balance_equation and sections_present
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'balance_equation_correct': balance_equation,
+                'sections_present': sections_present,
+                'assets': assets,
+                'liabilities': liabilities,
+                'equity': equity,
+                'balance_difference': assets - (liabilities + equity)
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for balance sheet',
+                'passed': False
+            }
+    
+    def _validate_tax_calculation(self, content: str, testcase: Dict) -> Dict:
+        """Valide un calcul d'impôt"""
+        try:
+            tax_calc = json.loads(content) if isinstance(content, str) else content
+            expected_tax = testcase.get('expected_financial_result', {}).get('tax_amount', 0)
+            
+            actual_tax = tax_calc.get('tax_amount', 0)
+            tolerance = testcase.get('numerical_tolerance', 0.01)
+            
+            tax_correct = abs(actual_tax - expected_tax) <= tolerance
+            
+            # Vérifier les étapes de calcul
+            calculation_steps = testcase.get('calculation_steps', [])
+            steps_completed = 0
+            
+            for step in calculation_steps:
+                if step in tax_calc:
+                    steps_completed += 1
+            
+            steps_ratio = steps_completed / len(calculation_steps) if calculation_steps else 1
+            passed = tax_correct and steps_ratio >= 0.8
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'tax_calculation_correct': tax_correct,
+                'expected_tax': expected_tax,
+                'actual_tax': actual_tax,
+                'steps_completed': steps_completed,
+                'total_steps': len(calculation_steps)
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for tax calculation',
+                'passed': False
+            }
+    
+    def _validate_generic_calculation(self, content: str, testcase: Dict) -> Dict:
+        """Validation générique de calcul"""
+        try:
+            calculations = json.loads(content) if isinstance(content, str) else content
+            expected_result = testcase.get('expected_output')
+            
+            if expected_result:
+                expected_calc = json.loads(expected_result) if isinstance(expected_result, str) else expected_result
+                passed = self._compare_calculations(calculations, expected_calc)
+            else:
+                # Vérifier juste que c'est un calcul valide
+                passed = isinstance(calculations, dict) and len(calculations) > 0
+            
+            return {
+                'success': True,
+                'passed': passed,
+                'calculation_count': len(calculations) if isinstance(calculations, dict) else 0
+            }
+            
+        except json.JSONDecodeError:
+            return {
+                'success': False,
+                'error': 'Invalid JSON format for calculations',
+                'passed': False
+            }
+    
+    def _compare_calculations(self, actual: Dict, expected: Dict, tolerance: float = 0.01) -> bool:
+        """Compare deux ensembles de calculs"""
+        if set(actual.keys()) != set(expected.keys()):
+            return False
+        
+        for key in expected.keys():
+            actual_val = actual[key]
+            expected_val = expected[key]
+            
+            if isinstance(actual_val, (int, float)) and isinstance(expected_val, (int, float)):
+                if abs(actual_val - expected_val) > tolerance:
+                    return False
+            else:
+                if str(actual_val) != str(expected_val):
+                    return False
+        
+        return True
+    
+    def validate_output(self, actual_output: Any, expected_output: Any, **kwargs) -> bool:
+        """Validation basique de sortie comptable"""
+        if not expected_output:
+            return True
+        
+        try:
+            actual = json.loads(actual_output) if isinstance(actual_output, str) else actual_output
+            expected = json.loads(expected_output) if isinstance(expected_output, str) else expected_output
+            
+            tolerance = kwargs.get('numerical_tolerance', 0.01)
+            return self._compare_calculations(actual, expected, tolerance)
+            
+        except (json.JSONDecodeError, TypeError):
+            return str(actual_output) == str(expected_output)
+
 
 class ExecutionServiceFactory:
     """Factory pour créer les services d'exécution appropriés"""
@@ -1058,6 +1629,9 @@ class ExecutionServiceFactory:
         ExecutionEnvironment.JUPYTER_NOTEBOOK: NotebookExecutionService,
         ExecutionEnvironment.DATA_VISUALIZATION: DataVisualizationService,
         ExecutionEnvironment.FILE_ANALYSIS: StatisticalAnalysisService,
+        ExecutionEnvironment.DIAGRAM_EDITOR: DiagramExecutionService, 
+        ExecutionEnvironment.TEXT_EDITOR: TextEditorService,
+        ExecutionEnvironment.SPREADSHEET_EDITOR: SpreadsheetEditorService,
     }
     
     @classmethod

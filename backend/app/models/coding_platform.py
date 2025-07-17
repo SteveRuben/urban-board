@@ -5,7 +5,11 @@ from sqlalchemy.orm import relationship
 from app import db
 from datetime import datetime, timezone
 
-from app.types.coding_platform import ChallengeDifficulty, ChallengeStatus, ProgrammingLanguage, UserChallengeStatus, ExerciseCategory, ExecutionEnvironment, TestcaseType, DatasetType, VisualizationType
+from app.types.coding_platform import ( 
+    ChallengeDifficulty, ChallengeStatus, 
+    ProgrammingLanguage, UserChallengeStatus, 
+    ExerciseCategory, ExecutionEnvironment, TestcaseType, DatasetType, VisualizationType
+    , DiagramFormat,DiagramType, FinancialDocumentType, DocumentFormat)
 
 from .organization import GUID
     
@@ -27,6 +31,8 @@ class Exercise(db.Model):
     
     required_skills = db.Column(db.JSON, default=list)  # ["sql", "python", "statistics"]
     estimated_duration_minutes = db.Column(db.Integer, default=60)
+    
+    business_domain = db.Column(db.String(255), nullable=False)
     
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -50,8 +56,8 @@ class Exercise(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'challenge_count': len(self.challenges),
-            'dataset_count': len(self.datasets) if self.datasets else 0
-
+            'dataset_count': len(self.datasets) if self.datasets else 0,
+            'business_domain': self.business_domain
         }
 
 class ExerciseDataset(db.Model):
@@ -164,6 +170,24 @@ class ChallengeStep(db.Model):
     sql_schema = db.Column(db.JSON)  # Schéma de base de données
     expected_output_type = db.Column(db.String(100))  # "visualization", "analysis", "query_result"
     
+    # NOUVEAU: Contenu pour business analysts
+    diagram_template = db.Column(db.Text)  # Template de diagramme
+    diagram_type = db.Column(db.Enum(DiagramType))  # Type de diagramme attendu
+    diagram_format = db.Column(db.Enum(DiagramFormat))  # Format de sauvegarde
+    business_requirements = db.Column(db.JSON)  # Exigences business
+    
+    # Nouveaux champs pour secrétaires
+    document_template = db.Column(db.Text)  # Template de document
+    document_format = db.Column(db.Enum(DocumentFormat))  # Format attendu
+    text_requirements = db.Column(db.JSON)  # Exigences de rédaction
+    formatting_rules = db.Column(db.JSON)  # Règles de formatage
+    
+    # Nouveaux champs pour comptables
+    financial_template = db.Column(db.Text)  # Template financier
+    financial_document_type = db.Column(db.Enum(FinancialDocumentType))  # Type de document
+    accounting_rules = db.Column(db.JSON)  # Règles comptables
+    calculation_parameters = db.Column(db.JSON)  # Paramètres de calcul
+    
     order_index = db.Column(db.Integer, nullable=False)
     is_final_step = db.Column(db.Boolean, default=False)
     
@@ -188,6 +212,18 @@ class ChallengeStep(db.Model):
             'notebook_template': self.notebook_template,
             'sql_schema': self.sql_schema,
             'expected_output_type': self.expected_output_type,
+            'diagram_template': self.diagram_template,
+            'diagram_type': self.diagram_type.value if self.diagram_type else None,
+            'diagram_format': self.diagram_format.value if self.diagram_format else None,
+            'business_requirements': self.business_requirements,
+            'document_template': self.document_template,
+            'document_format': self.document_format.value if self.document_format else None,
+            'text_requirements': self.text_requirements,
+            'formatting_rules': self.formatting_rules,
+            'financial_template': self.financial_template,
+            'financial_document_type': self.financial_document_type.value if self.financial_document_type else None,
+            'accounting_rules': self.accounting_rules,
+            'calculation_parameters': self.calculation_parameters,
             'order_index': self.order_index,
             'is_final_step': self.is_final_step,
             'evaluation_criteria': self.evaluation_criteria,
@@ -230,6 +266,14 @@ class ChallengeStepTestcase(db.Model):
     notebook_cell_output = Column(JSON, nullable=True)
     cell_type = Column(String, nullable=True, default='code')
     
+    expected_document_structure = db.Column(db.JSON)  # Structure attendue
+    text_quality_criteria = db.Column(db.JSON)  # Critères de qualité
+    formatting_validation = db.Column(db.JSON)  # Validation formatage
+    
+    # Nouveaux champs pour tests comptables
+    expected_financial_result = db.Column(db.JSON)  # Résultat financier attendu
+    accounting_validation_rules = db.Column(db.JSON)  # Règles de validation
+    calculation_steps = db.Column(db.JSON) 
     
     is_hidden = db.Column(db.Boolean, default=False)  # Hidden from user during development
     is_example = db.Column(db.Boolean, default=False)  # Show as example in problem description
@@ -250,6 +294,12 @@ class ChallengeStepTestcase(db.Model):
             'dataset_reference': self.dataset_reference,
             'numerical_tolerance': self.numerical_tolerance,
             'cell_type': self.cell_type, 
+            'expected_document_structure': self.expected_document_structure,
+            'text_quality_criteria': self.text_quality_criteria,
+            'formatting_validation': self.formatting_validation,
+            'expected_financial_result': self.expected_financial_result,
+            'accounting_validation_rules': self.accounting_validation_rules,
+            'calculation_steps': self.calculation_steps,
             'is_hidden': self.is_hidden,
             'is_example': self.is_example,
             'timeout_seconds': self.timeout_seconds,
@@ -359,11 +409,25 @@ class UserChallengeProgress(db.Model):
     analysis_results = db.Column(db.JSON)  # Résultats d'analyse
     visualizations = db.Column(db.JSON)  # Données de visualisation
     
+    # NOUVEAU: Contenu pour business analysts  
+    diagram_content = db.Column(db.JSON)  # Contenu du diagramme
+    diagram_metadata = db.Column(db.JSON)  # Métadonnées (format, version, etc.)
+    
     is_completed = db.Column(db.Boolean, default=False)
     tests_passed = db.Column(db.Integer, default=0)
     tests_total = db.Column(db.Integer, default=0)
     last_execution_result = db.Column(db.JSON)  # Store last execution details
     last_edited = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    requires_manual_review = db.Column(db.Boolean, default=False)
+    manual_review_status = db.Column(db.String(50), default='pending')  # pending, reviewed, approved
+    manual_score = db.Column(db.Float, nullable=True)  # Score manuel du recruteur
+    manual_feedback = db.Column(db.Text, nullable=True)  # Commentaires du recruteur
+    reviewer_id = db.Column(db.String(36), nullable=True)  # ID du recruteur
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Score final = score automatique + score manuel
+    final_score = db.Column(db.Float, nullable=True)
     
     # Relationships
     user_challenge = db.relationship('UserChallenge', back_populates='progress_entries')
@@ -383,9 +447,18 @@ class UserChallengeProgress(db.Model):
             'sql_queries': self.sql_queries,
             'analysis_results': self.analysis_results,
             'visualizations': self.visualizations,
+            'diagram_content': self.diagram_content,
+            'diagram_metadata': self.diagram_metadata,
             'is_completed': self.is_completed,
             'tests_passed': self.tests_passed,
             'tests_total': self.tests_total,
             'last_execution_result': self.last_execution_result,
-            'last_edited': self.last_edited.isoformat()
+            'last_edited': self.last_edited.isoformat(),
+            'requires_manual_review': self.requires_manual_review,
+            'manual_review_status': self.manual_review_status,
+            'manual_score': self.manual_score,
+            'manual_feedback': self.manual_feedback,
+            'reviewer_id': self.reviewer_id,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'final_score': self.final_score
         }

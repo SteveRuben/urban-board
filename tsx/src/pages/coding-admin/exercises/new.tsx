@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Save, Code, Database, Plus, X } from 'lucide-react';
+import { ArrowLeft, Save, Code, Database, Plus, X, PenTool, Calculator, FileText } from 'lucide-react';
 import { ExtendedCodingPlatformService } from '@/services/extended-coding-platform-service';
 import { 
   ChallengeDifficulty, 
@@ -10,6 +10,7 @@ import {
   ProgrammingLanguage, 
   ExerciseCategory 
 } from '@/types/coding-plateform';
+import CodingPlatformService from '@/services/coding-platform-service';
 
 interface ExtendedExerciseFormPageProps {
   exerciseId?: string;
@@ -27,7 +28,8 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
     difficulty: 'beginner',
     order_index: 1,
     required_skills: [], // 🆕 Nouveau champ
-    estimated_duration_minutes: 60 // 🆕 Nouveau champ
+    estimated_duration_minutes: 60, // 🆕 Nouveau champ
+    business_domain: ''
   });
   
   const [newSkill, setNewSkill] = useState<string>('');
@@ -70,7 +72,7 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
+    
     if (!formData.title.trim()) {
       newErrors.title = 'Le titre est requis';
     } else if (formData.title.length < 3) {
@@ -87,6 +89,9 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
       newErrors.category = 'La catégorie est requise';
     }
 
+    if (formData.category === 'business_analyst' && !formData.business_domain?.trim()) {
+      newErrors.business_domain = 'Le domaine business est requis pour les exercices business analyst';
+    }
     // 🆕 Le langage est requis seulement pour les développeurs
     if (formData.category === 'developer' && !formData.language) {
       newErrors.language = 'Le langage est requis pour les exercices développeur';
@@ -148,7 +153,7 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
       setLoading(false);
     }
   };
-
+  
   const handleInputChange = (field: keyof ExerciseFormData, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -202,6 +207,21 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
       ...(category === 'data_analyst' && {
         language: undefined,
         required_skills: prev.required_skills || []
+      }),
+      ...(category === 'business_analyst' && {
+        language: undefined,
+        required_skills: [],
+        business_domain: prev.business_domain || ''
+      }),
+      ...(category === 'secretary' && {
+        language: undefined,
+        required_skills: [],
+        business_domain: undefined
+      }),
+      ...(category === 'accountant' && {
+        language: undefined,
+        required_skills: [],
+        business_domain: undefined
       })
     }));
   };
@@ -262,8 +282,10 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
               <div className="px-6 py-4 border-b border-gray-200 flex items-center">
                 {formData.category === 'developer' ? (
                   <Code className="h-6 w-6 text-blue-600 mr-3" />
-                ) : (
+                ) : formData.category === 'data_analyst' ? (
                   <Database className="h-6 w-6 text-emerald-600 mr-3" />
+                ) : (
+                  <PenTool className="h-6 w-6 text-purple-600 mr-3" />
                 )}
                 <h2 className="text-lg font-medium text-gray-800">Informations de l'exercice</h2>
               </div>
@@ -308,6 +330,56 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
                           </div>
                         </div>
                       </div>
+                      <div
+                      onClick={() => handleCategoryChange('business_analyst')}
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        formData.category === 'business_analyst'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <PenTool className="h-5 w-5 text-purple-600 mr-2" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Business Analyst</h3>
+                          <p className="text-sm text-gray-500">UML, BPMN, maquettes</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => handleCategoryChange('secretary')}
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        formData.category === 'secretary'
+                          ? 'border-pink-500 bg-pink-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <FileText className="h-5 w-5 text-pink-600 mr-2" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Secrétaire</h3>
+                          <p className="text-sm text-gray-500">Rédaction, correspondance</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* NOUVELLE option Comptable */}
+                    <div
+                      onClick={() => handleCategoryChange('accountant')}
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        formData.category === 'accountant'
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Calculator className="h-5 w-5 text-orange-600 mr-2" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Comptable</h3>
+                          <p className="text-sm text-gray-500">Calculs, analyse financière</p>
+                        </div>
+                      </div>
+                  </div>
                     </div>
                     {errors.category && (
                       <p className="mt-1 text-sm text-red-600">{errors.category}</p>
@@ -357,7 +429,36 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
                       <p className="mt-1 text-sm text-red-600">{errors.description}</p>
                     )}
                   </div>
-
+                  {formData.category === 'business_analyst' && (
+                    <div>
+                      <label htmlFor="business_domain" className="block text-sm font-medium text-gray-700 mb-2">
+                        Domaine business *
+                      </label>
+                      <select
+                        id="business_domain"
+                        value={formData.business_domain || ''}
+                        onChange={(e) => handleInputChange('business_domain', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          errors.business_domain ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                      >
+                        <option value="">Sélectionner un domaine</option>
+                        <option value="e-commerce">E-commerce</option>
+                        <option value="finance">Finance & Banque</option>
+                        <option value="healthcare">Santé</option>
+                        <option value="education">Éducation</option>
+                        <option value="logistics">Logistique</option>
+                        <option value="manufacturing">Manufacturing</option>
+                        <option value="retail">Commerce de détail</option>
+                        <option value="telecommunications">Télécommunications</option>
+                        <option value="government">Secteur public</option>
+                        <option value="insurance">Assurance</option>
+                      </select>
+                      {errors.business_domain && (
+                        <p className="mt-1 text-sm text-red-600">{errors.business_domain}</p>
+                      )}
+                    </div>
+                  )}
                   {/* 🆕 Champs conditionnels selon la catégorie */}
                   {formData.category === 'developer' && (
                     <div>
@@ -533,39 +634,72 @@ export default function ExerciseFormPage({ exerciseId }: ExtendedExerciseFormPag
               <div className={`mt-6 rounded-md p-4 ${
                 formData.category === 'developer' 
                   ? 'bg-blue-50 border border-blue-200' 
-                  : 'bg-emerald-50 border border-emerald-200'
+                  : formData.category === 'data_analyst'
+                  ? 'bg-emerald-50 border border-emerald-200'
+                  : 'bg-purple-50 border border-purple-200'
               }`}>
                 <div className="flex">
                   <div className="flex-shrink-0">
                     {formData.category === 'developer' ? (
                       <Code className="h-5 w-5 text-blue-400" />
-                    ) : (
+                    ) : formData.category === 'data_analyst' ? (
                       <Database className="h-5 w-5 text-emerald-400" />
+                    ) : (
+                      <PenTool className="h-5 w-5 text-purple-400" />
                     )}
                   </div>
                   <div className="ml-3">
                     <h3 className={`text-sm font-medium ${
-                      formData.category === 'developer' ? 'text-blue-800' : 'text-emerald-800'
+                      formData.category === 'developer' 
+                      ? 'text-blue-800' 
+                      : formData.category === 'data_analyst'
+                      ? 'text-emerald-800'
+                      : 'text-purple-800'
                     }`}>
-                      Prochaines étapes - {ExtendedCodingPlatformService.getExerciseCategoryLabel(formData.category)}
+                      Prochaines étapes - {CodingPlatformService.getExerciseCategoryLabel(formData.category)}
                     </h3>
                     <div className={`mt-2 text-sm ${
-                      formData.category === 'developer' ? 'text-blue-700' : 'text-emerald-700'
+                      formData.category === 'developer' 
+                      ? 'text-blue-700'
+                      : formData.category === 'data_analyst'
+                      ? 'text-emerald-700'
+                      : 'text-purple-700' 
                     }`}>
                       <p>Après avoir créé cet exercice, vous pourrez :</p>
-                      {formData.category === 'developer' ? (
+                      {formData.category === 'secretary' ? (
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Créer des modèles de documents</li>
+                          <li>Définir des critères de qualité rédactionnelle</li>
+                          <li>Configurer la validation orthographique</li>
+                          <li>Tester avec l'éditeur de texte intégré</li>
+                        </ul>
+                      ) : formData.category === 'accountant' ? (
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Configurer des modèles financiers</li>
+                          <li>Définir des règles de validation comptable</li>
+                          <li>Créer des tests de calculs complexes</li>
+                          <li>Tester avec l'éditeur de tableur intégré</li>
+                        </ul>
+                      ) :formData.category === 'developer' ? (
                         <ul className="list-disc list-inside mt-1 space-y-1">
                           <li>Ajouter des challenges algorithmiques</li>
                           <li>Créer des étapes avec code de démarrage</li>
                           <li>Définir des cas de test d'entrée/sortie</li>
                           <li>Tester avec l'éditeur de code intégré</li>
                         </ul>
-                      ) : (
+                       ) : formData.category === 'data_analyst' ? (
                         <ul className="list-disc list-inside mt-1 space-y-1">
                           <li>Ajouter des datasets CSV, SQL, Excel</li>
                           <li>Créer des challenges SQL et Python</li>
                           <li>Définir des tests de visualisation</li>
                           <li>Tester avec notebooks Jupyter</li>
+                        </ul>
+                      ) : (
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Créer des templates de diagrammes UML/BPMN</li>
+                          <li>Définir des critères d'évaluation manuels</li>
+                          <li>Paramétrer l'éditeur de diagrammes</li>
+                          <li>Tester avec différents formats (StarUML, Draw.io)</li>
                         </ul>
                       )}
                     </div>

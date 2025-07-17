@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Save, Target, Plus, X, Database, Code, BarChart3, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Target, Plus, X, Database, Code, BarChart3, FileText, PenTool, Calculator } from 'lucide-react';
 import { ExtendedCodingPlatformService } from '@/services/extended-coding-platform-service';
 import { 
   ChallengeFormData, 
@@ -11,6 +11,7 @@ import {
   ExecutionEnvironment,
   ExerciseCategory 
 } from '@/types/coding-plateform';
+import CodingPlatformService from '@/services/coding-platform-service';
 
 export default function ChallengeFormPage() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function ChallengeFormPage() {
       setExercise(exerciseData);
       
       // 🆕 Définir l'environnement d'exécution par défaut selon la catégorie
-      const defaultEnvironment = ExtendedCodingPlatformService.getDefaultExecutionEnvironment(
+      const defaultEnvironment = CodingPlatformService.getDefaultExecutionEnvironment(
         exerciseData.category || 'developer'
       );
       
@@ -112,7 +113,7 @@ export default function ChallengeFormPage() {
       setError(null);
 
       // 🆕 Utiliser le service étendu pour supporter les nouveaux environnements
-      const newChallenge = await ExtendedCodingPlatformService.createChallengeExtended(formData);
+      const newChallenge = await CodingPlatformService.createChallenge(formData);
       router.push(`/coding-admin/challenges/${newChallenge.id}`);
       
     } catch (err) {
@@ -166,7 +167,25 @@ export default function ChallengeFormPage() {
       'file_analysis': {
         numerical_tolerance: 0.001,
         max_file_size_mb: 10
-      }
+      },
+      'diagram_editor': { // NOUVEAU
+      supported_formats: ['json', 'staruml', 'drawio', 'svg'],
+      max_elements: 50,
+      validation_mode: 'manual'
+    },
+    'text_editor': {
+      supported_formats: ['plain_text', 'html', 'markdown'],
+      max_document_length: 10000,
+      spell_check_enabled: true,
+      grammar_check_enabled: true
+    },
+    'spreadsheet_editor': {
+      supported_formats: ['json', 'csv'],
+      max_calculations: 100,
+      numerical_precision: 2,
+      validation_rules: ['balance_equations', 'positive_amounts']
+    }
+  
     };
     return defaults[environment] || {};
   };
@@ -198,7 +217,7 @@ export default function ChallengeFormPage() {
   // 🆕 Obtenir les environnements compatibles
   const getCompatibleEnvironments = (): ExecutionEnvironment[] => {
     if (!exercise) return ['code_executor'];
-    return ExtendedCodingPlatformService.getCompatibleEnvironments(exercise.category || 'developer');
+    return CodingPlatformService.getCompatibleEnvironments(exercise.category || 'developer');
   };
 
   // 🆕 Rendu des options d'environnement
@@ -210,7 +229,10 @@ export default function ChallengeFormPage() {
       'sql_database': Database,
       'jupyter_notebook': FileText,
       'data_visualization': BarChart3,
-      'file_analysis': FileText
+      'file_analysis': FileText,
+      'diagram_editor': PenTool,
+      'text_editor': FileText,
+      'spreadsheet_editor': Calculator
     };
 
     return (
@@ -235,7 +257,7 @@ export default function ChallengeFormPage() {
                 }`} />
                 <div>
                   <h3 className="font-medium text-gray-900">
-                    {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(env)}
+                    {CodingPlatformService.getExecutionEnvironmentLabel(env)}
                   </h3>
                   <p className="text-sm text-gray-500">
                     {getEnvironmentDescription(env)}
@@ -256,7 +278,10 @@ export default function ChallengeFormPage() {
       'sql_database': 'Requêtes SQL sur datasets',
       'jupyter_notebook': 'Notebooks Python interactifs',
       'data_visualization': 'Création de graphiques',
-      'file_analysis': 'Analyse statistique de données'
+      'file_analysis': 'Analyse statistique de données',
+      'diagram_editor': 'Création de diagrammes UML/BPMN',
+      'text_editor': 'Rédaction et mise en forme de texte',
+      'spreadsheet_editor': 'Calculs et analyses financières'
     };
     return descriptions[env] || '';
   };
@@ -296,7 +321,7 @@ export default function ChallengeFormPage() {
                         ? 'bg-blue-100 text-blue-800' 
                         : 'bg-emerald-100 text-emerald-800'
                     }`}>
-                      {ExtendedCodingPlatformService.getExerciseCategoryLabel(exercise.category || 'developer')}
+                      {CodingPlatformService.getExerciseCategoryLabel(exercise.category || 'developer')}
                     </span>
                   </div>
                 )}
@@ -373,7 +398,114 @@ export default function ChallengeFormPage() {
                       <p className="mt-1 text-sm text-red-600">{errors.execution_environment}</p>
                     )}
                   </div>
+                  {formData.execution_environment === 'text_editor' && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Configuration Éditeur de Texte</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Format principal</label>
+                        <select
+                          value={formData.environment_config?.primary_format || 'plain_text'}
+                          onChange={(e) => handleInputChange('environment_config', {
+                            ...formData.environment_config,
+                            primary_format: e.target.value
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="plain_text">Texte brut</option>
+                          <option value="html">HTML</option>
+                          <option value="markdown">Markdown</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Longueur max (mots)</label>
+                        <input
+                          type="number"
+                          value={formData.environment_config?.max_words || 1000}
+                          onChange={(e) => handleInputChange('environment_config', {
+                            ...formData.environment_config,
+                            max_words: parseInt(e.target.value) || 1000
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          min="100"
+                          max="10000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
+                {formData.execution_environment === 'spreadsheet_editor' && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Configuration Tableur</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Précision décimale</label>
+                        <input
+                          type="number"
+                          value={formData.environment_config?.numerical_precision || 2}
+                          onChange={(e) => handleInputChange('environment_config', {
+                            ...formData.environment_config,
+                            numerical_precision: parseInt(e.target.value) || 2
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          min="0"
+                          max="10"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Calculs max</label>
+                        <input
+                          type="number"
+                          value={formData.environment_config?.max_calculations || 100}
+                          onChange={(e) => handleInputChange('environment_config', {
+                            ...formData.environment_config,
+                            max_calculations: parseInt(e.target.value) || 100
+                          })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          min="10"
+                          max="500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                  {formData.execution_environment === 'diagram_editor' && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Configuration Diagrammes</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Format principal</label>
+                          <select
+                            value={formData.environment_config?.primary_format || 'json'}
+                            onChange={(e) => handleInputChange('environment_config', {
+                              ...formData.environment_config,
+                              primary_format: e.target.value
+                            })}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          >
+                            <option value="json">JSON</option>
+                            <option value="staruml">StarUML</option>
+                            <option value="drawio">Draw.io</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Éléments max</label>
+                          <input
+                            type="number"
+                            value={formData.environment_config?.max_elements || 50}
+                            onChange={(e) => handleInputChange('environment_config', {
+                              ...formData.environment_config,
+                              max_elements: parseInt(e.target.value) || 50
+                            })}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                            min="10"
+                            max="100"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* 🆕 Configuration d'environnement */}
                   {formData.execution_environment === 'sql_database' && (
                     <div className="bg-gray-50 p-4 rounded-lg">
@@ -597,7 +729,14 @@ export default function ChallengeFormPage() {
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>Après avoir créé ce challenge, vous pourrez :</p>
-                    {formData.execution_environment === 'sql_database' ? (
+                    {formData.execution_environment === 'diagram_editor' ? (
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>Créer des templates de diagrammes</li>
+                        <li>Définir des critères d'évaluation</li>
+                        <li>Paramétrer l'éditeur de diagrammes</li>
+                        <li>Tester avec différents formats</li>
+                      </ul>
+                    ):formData.execution_environment === 'sql_database' ? (
                       <ul className="list-disc list-inside mt-1 space-y-1">
                         <li>Ajouter des datasets CSV ou SQLite</li>
                         <li>Créer des étapes avec requêtes SQL</li>

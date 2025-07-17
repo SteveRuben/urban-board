@@ -38,8 +38,15 @@ import {
   Database,
   BarChart3,
   FileText,
+  PenTool,
+  Workflow,
+  Users,
+  GitBranch,
+  Layout,
+  MousePointer,
+  Clipboard,
+  Info
 } from "lucide-react"
-import { ExtendedCodingPlatformService } from "@/services/extended-coding-platform-service"
 import { ContentEditor } from "@/components/ContentEditors"
 import type { 
   Challenge, 
@@ -49,7 +56,11 @@ import type {
   ExtendedSubmissionData,
   ChallengeContext,
   ExerciseDataset,
-  ExecutionEnvironment
+  ExecutionEnvironment,
+  DiagramType,
+  DiagramFormat,
+  FinancialDocumentType,
+  DocumentFormat
 } from "@/types/coding-plateform"
 import CodingPlatformService from "@/services/coding-platform-service"
 
@@ -103,7 +114,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   )
 }
 
-// 🆕 Composant de résultats étendus
+// 🆕 Composant de résultats étendus avec support Business Analyst
 const ExtendedTestResultCard: React.FC<{ result: ExtendedExecutionResult; index: number }> = ({ result, index }) => {
   const [showDetails, setShowDetails] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -124,10 +135,28 @@ const ExtendedTestResultCard: React.FC<{ result: ExtendedExecutionResult; index:
         return <FileText className="h-4 w-4" />
       case 'statistical_test':
         return <Target className="h-4 w-4" />
+      // 🆕 Business Analyst - Types de diagrammes
+      case 'process_diagram':
+        return <Workflow className="h-4 w-4" />
+      case 'use_case_diagram':
+        return <Users className="h-4 w-4" />
+      case 'sequence_diagram':
+        return <GitBranch className="h-4 w-4" />
+      case 'class_diagram':
+        return <Code className="h-4 w-4" />
+      case 'activity_diagram':
+        return <Activity className="h-4 w-4" />
+      case 'flowchart':
+        return <GitBranch className="h-4 w-4" />
+      case 'wireframe':
+        return <Layout className="h-4 w-4" />
       default:
         return <Code className="h-4 w-4" />
     }
   }
+
+  // 🆕 Vérifier si c'est un test de diagramme
+  const isDiagramTest = ['process_diagram', 'use_case_diagram', 'sequence_diagram', 'class_diagram', 'activity_diagram', 'flowchart', 'wireframe'].includes(result.testcase_type)
 
   return (
     <div
@@ -166,12 +195,26 @@ const ExtendedTestResultCard: React.FC<{ result: ExtendedExecutionResult; index:
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-100 text-purple-700">
                   {getTestTypeIcon(result.testcase_type)}
-                  {ExtendedCodingPlatformService.getTestcaseTypeLabel(result.testcase_type)}
+                  {CodingPlatformService.getTestcaseTypeLabel(result.testcase_type)}
                 </span>
                 {result.execution_time && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-700">
                     <Timer className="h-3 w-3" />
                     {result.execution_time}ms
+                  </span>
+                )}
+                {/* 🆕 Badge pour révision manuelle */}
+                {result.requires_manual_review && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-orange-100 text-orange-700">
+                    <MousePointer className="h-3 w-3" />
+                    Révision manuelle
+                  </span>
+                )}
+                {/* 🆕 Badge pour diagramme stocké */}
+                {result.diagram_stored && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700">
+                    <Clipboard className="h-3 w-3" />
+                    Diagramme sauvé
                   </span>
                 )}
               </div>
@@ -185,6 +228,17 @@ const ExtendedTestResultCard: React.FC<{ result: ExtendedExecutionResult; index:
             {showDetails ? "Masquer" : "Voir détails"}
           </button>
         </div>
+
+        {/* 🆕 Affichage du message si disponible */}
+        {result.message && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">Information</span>
+            </div>
+            <p className="text-sm text-blue-700 mt-1">{result.message}</p>
+          </div>
+        )}
 
         {showDetails && (
           <div className="space-y-6 pt-6 border-t border-gray-200/60">
@@ -232,6 +286,83 @@ const ExtendedTestResultCard: React.FC<{ result: ExtendedExecutionResult; index:
                   <pre className="text-sm text-gray-700 overflow-x-auto">
                     {JSON.stringify(result.analysis_results || {}, null, 2)}
                   </pre>
+                </div>
+              </div>
+            ) : isDiagramTest ? (
+              // 🆕 Affichage spécifique pour les tests de diagrammes Business Analyst
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <PenTool className="h-4 w-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">Type de diagramme</span>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                      <div className="flex items-center gap-2">
+                        {getTestTypeIcon(result.testcase_type)}
+                        <span className="text-sm font-medium text-purple-800">
+                          {CodingPlatformService.getTestcaseTypeLabel(result.testcase_type)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">Statut d'évaluation</span>
+                    </div>
+                    <div className="space-y-2">
+                      {result.diagram_stored && (
+                        <div className="flex items-center gap-2 text-sm text-green-700">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Diagramme sauvegardé avec succès</span>
+                        </div>
+                      )}
+                      {result.requires_manual_review && (
+                        <div className="flex items-center gap-2 text-sm text-orange-700">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>Évaluation manuelle requise</span>
+                        </div>
+                      )}
+                      {!result.requires_manual_review && !result.diagram_stored && (
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <Info className="h-4 w-4" />
+                          <span>Évaluation automatique uniquement</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Affichage des critères d'évaluation s'ils existent */}
+                {result.analysis_results && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clipboard className="h-4 w-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">Critères d'évaluation</span>
+                    </div>
+                    <div className="bg-gray-100 p-4 rounded-lg">
+                      <pre className="text-sm text-gray-700 overflow-x-auto whitespace-pre-wrap">
+                        {JSON.stringify(result.analysis_results, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
+                {/* Informations complémentaires pour les diagrammes */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-800">Information</span>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Les diagrammes sont évalués selon des critères spécifiques définis par l'exercice. 
+                    {result.requires_manual_review 
+                      ? " Ce test nécessite une révision manuelle par un formateur."
+                      : " L'évaluation a été effectuée automatiquement."
+                    }
+                  </p>
                 </div>
               </div>
             ) : (
@@ -335,21 +466,24 @@ export default function ChallengeDetailPage() {
       setLoading(true)
       setError(null)
 
-      // 🆕 Utiliser le service étendu
       const challengeData = await CodingPlatformService.getChallenge(challengeId!)
       setChallenge(challengeData)
-      console.log('>>>>>>>>>>>>>>...........',challengeData)
+      
       const exerciseData = await CodingPlatformService.getExercise(challengeData.exercise_id)
       setExercise(exerciseData)
 
       // 🆕 Charger les datasets si c'est un exercice data analyst
       if (exerciseData.category === 'data_analyst') {
-        const datasetsData = await ExtendedCodingPlatformService.getExerciseDatasets(challengeData.exercise_id)
-        setDatasets(datasetsData)
+        try {
+          const datasetsData = await CodingPlatformService.getExerciseDatasets(challengeData.exercise_id)
+          setDatasets(datasetsData)
+        } catch (err) {
+          console.warn('Pas de datasets trouvés pour cet exercice')
+          setDatasets([])
+        }
       }
 
       const stepsData = await CodingPlatformService.getChallengeSteps(challengeId!)
-      console.log('????????????????????????????',stepsData)
       setSteps(stepsData.sort((a, b) => a.order_index - b.order_index))
 
       if (stepsData.length > 0) {
@@ -365,11 +499,10 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 🆕 Initialiser le contenu selon l'environnement
+  // 🆕 Initialiser le contenu selon l'environnement - Version complète avec Business Analyst
   const setInitialContent = (step: ChallengeStep, environment: ExecutionEnvironment) => {
     switch (environment) {
       case 'jupyter_notebook':
-        // Priorité au notebook_template, puis starter_code, puis solution_code, puis défaut
         if (step.notebook_template) {
           try {
             setContent(JSON.parse(step.notebook_template))
@@ -401,8 +534,8 @@ export default function ChallengeDetailPage() {
           setContent(getDefaultNotebook())
         }
         break
+
       case 'data_visualization':
-        // Template de visualisation par défaut ou depuis step
         setContent({
           type: 'bar_chart',
           data: [],
@@ -410,22 +543,135 @@ export default function ChallengeDetailPage() {
           title: step.title || ''
         })
         break
+
       case 'sql_database':
-        // Pour SQL, utiliser starter_code en priorité
         setContent(step.starter_code || step.solution_code || "-- Votre requête SQL ici\nSELECT * FROM table_name;")
         break
+
       case 'file_analysis':
-        // Pour l'analyse de fichiers
         setContent(step.starter_code || step.solution_code || "# Votre code d'analyse ici\nimport pandas as pd\nimport numpy as np\n")
         break
+
+      // 🆕 Support pour l'éditeur de diagrammes Business Analyst
+      case 'diagram_editor':
+        if (step.diagram_template) {
+          try {
+            setContent(JSON.parse(step.diagram_template))
+          } catch (e) {
+            console.error('Erreur parsing diagram_template:', e)
+            setContent(getDefaultDiagram(step.diagram_type || 'flowchart'))
+          }
+        } else {
+          setContent(getDefaultDiagram(step.diagram_type || 'flowchart'))
+        }
+        break
+        case 'text_editor':
+          if (step.document_template) {
+            try {
+              setContent(JSON.parse(step.document_template))
+            } catch (e) {
+              console.error('Erreur parsing document_template:', e)
+              setContent(getDefaultDocument(step.document_format || 'word'))
+            }
+          } else {
+            setContent(getDefaultDocument(step.document_format || 'word'))
+          }
+          break
+        
+        case 'spreadsheet_editor':
+          if (step.financial_template) {
+            try {
+              setContent(JSON.parse(step.financial_template))
+            } catch (e) {
+              console.error('Erreur parsing financial_template:', e)
+              setContent(getDefaultSpreadsheet(step.financial_document_type || 'balance_sheet'))
+            }
+          } else {
+            setContent(getDefaultSpreadsheet(step.financial_document_type || 'balance_sheet'))
+          }
+          break
       default:
         // Pour les autres environnements, prioriser starter_code
         setContent(step.starter_code || step.solution_code || "")
         break
     }
   }
+  // Document par défaut
+  const getDefaultDocument = (documentFormat: DocumentFormat) => {
+    return {
+      title: 'Nouveau document',
+      content: 'Rédigez votre document ici...',
+      format: documentFormat,
+      metadata: {
+        created: new Date().toISOString(),
+        author: '',
+        language: 'fr'
+      }
+    }
+  }
 
-  // 🆕 Notebook par défaut
+// 🆕 Tableur par défaut selon le type financier
+  const getDefaultSpreadsheet = (financialDocumentType: FinancialDocumentType) => {
+    const templates = {
+      balance_sheet: {
+        title: 'Bilan comptable',
+        sheets: [{
+          name: 'Bilan',
+          data: [
+            ['ACTIF', 'Montant', '', 'PASSIF', 'Montant'],
+            ['Immobilisations', '0', '', 'Capital', '0'],
+            ['Stocks', '0', '', 'Réserves', '0'],
+            ['Créances', '0', '', 'Dettes', '0'],
+            ['Trésorerie', '0', '', 'Résultat', '0']
+          ],
+          formulas: {},
+          formatting: {}
+        }]
+      },
+      income_statement: {
+        title: 'Compte de résultat',
+        sheets: [{
+          name: 'Résultat',
+          data: [
+            ['Compte de résultat', 'N', 'N-1'],
+            ['Chiffre d\'affaires', '0', '0'],
+            ['Achats', '0', '0'],
+            ['Charges', '0', '0'],
+            ['Résultat', '0', '0']
+          ],
+          formulas: {},
+          formatting: {}
+        }]
+      },
+      budget: {
+        title: 'Budget prévisionnel',
+        sheets: [{
+          name: 'Budget',
+          data: [
+            ['Poste', 'Prévisionnel', 'Réalisé', 'Écart'],
+            ['Recettes', '0', '0', '0'],
+            ['Dépenses', '0', '0', '0'],
+            ['Résultat', '0', '0', '0']
+          ],
+          formulas: {},
+          formatting: {}
+        }]
+      }
+    };
+
+    const template = templates[financialDocumentType] || templates.balance_sheet;
+    
+    return {
+      type: financialDocumentType,
+      ...template,
+      metadata: {
+        created: new Date().toISOString(),
+        currency: 'EUR',
+        fiscalYear: new Date().getFullYear()
+      }
+    };
+  }
+  // Notebook par défaut
   const getDefaultNotebook = () => {
     return {
       cells: [
@@ -436,6 +682,57 @@ export default function ChallengeDetailPage() {
         }
       ]
     }
+  }
+
+  // 🆕 Diagramme par défaut selon le type
+  const getDefaultDiagram = (diagramType: DiagramType) => {
+    const defaults = {
+      'uml_use_case': {
+        type: 'use_case_diagram',
+        actors: [{ name: 'Utilisateur', id: 'user1', position: { x: 50, y: 100 } }],
+        use_cases: [{ name: 'Se connecter', id: 'uc1', position: { x: 200, y: 100 } }],
+        relationships: [{ from: 'user1', to: 'uc1', type: 'association' }],
+        system_boundary: { name: 'Système', bounds: { x: 150, y: 50, width: 200, height: 150 } }
+      },
+      'uml_sequence': {
+        type: 'sequence_diagram',
+        participants: [
+          { name: 'Client', id: 'client', position: { x: 50, y: 0 } },
+          { name: 'Serveur', id: 'server', position: { x: 200, y: 0 } }
+        ],
+        messages: [
+          { from: 'client', to: 'server', message: 'login(user, pass)', type: 'sync', order: 1 },
+          { from: 'server', to: 'client', message: 'token', type: 'return', order: 2 }
+        ],
+        lifelines: ['client', 'server']
+      },
+      'flowchart': {
+        type: 'flowchart',
+        nodes: [
+          { id: 'start', label: 'Début', type: 'start', position: { x: 100, y: 50 } },
+          { id: 'process1', label: 'Processus principal', type: 'process', position: { x: 100, y: 120 } },
+          { id: 'decision1', label: 'Condition ?', type: 'decision', position: { x: 100, y: 190 } },
+          { id: 'end', label: 'Fin', type: 'end', position: { x: 100, y: 260 } }
+        ],
+        connections: [
+          { from: 'start', to: 'process1', label: '' },
+          { from: 'process1', to: 'decision1', label: '' },
+          { from: 'decision1', to: 'end', label: 'Oui' }
+        ]
+      },
+      'wireframe': {
+        type: 'wireframe',
+        components: [
+          { type: 'header', content: 'En-tête du site', position: { x: 0, y: 0, width: 100, height: 10 }, style: { background: '#f0f0f0' } },
+          { type: 'navigation', content: 'Menu principal', position: { x: 0, y: 10, width: 20, height: 80 }, style: { background: '#e0e0e0' } },
+          { type: 'content', content: 'Zone de contenu principal', position: { x: 20, y: 10, width: 60, height: 80 }, style: { background: '#ffffff' } },
+          { type: 'sidebar', content: 'Barre latérale', position: { x: 80, y: 10, width: 20, height: 80 }, style: { background: '#f5f5f5' } },
+          { type: 'footer', content: 'Pied de page', position: { x: 0, y: 90, width: 100, height: 10 }, style: { background: '#d0d0d0' } }
+        ],
+        viewport: { width: 1200, height: 800 }
+      }
+    };
+    return defaults[diagramType] || defaults['flowchart'];
   }
 
   const handleStepChange = (step: ChallengeStep) => {
@@ -461,7 +758,6 @@ export default function ChallengeDetailPage() {
         return
       }
 
-      // 🆕 Créer la soumission étendue selon l'environnement
       const submissionData: ExtendedSubmissionData = createSubmissionData(challenge.execution_environment!, content)
 
       const response = await CodingPlatformService.adminValidateCode(activeStep.id, submissionData)
@@ -478,7 +774,7 @@ export default function ChallengeDetailPage() {
 
   // 🆕 Validation avec soumission étendue
   const handleValidateCode = async () => {
-    if (!activeStep || !challenge || !exercise){ console.log('ksksk'); return;}
+    if (!activeStep || !challenge || !exercise) return
 
     try {
       setValidating(true)
@@ -507,7 +803,7 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 🆕 Créer les données de soumission selon l'environnement
+  // 🆕 Créer les données de soumission selon l'environnement - Version complète avec Business Analyst
   const createSubmissionData = (environment: ExecutionEnvironment, content: any): ExtendedSubmissionData => {
     switch (environment) {
       case 'sql_database':
@@ -531,6 +827,38 @@ export default function ChallengeDetailPage() {
           content: content,
           content_type: 'analysis'
         }
+      // 🆕 Support pour les diagrammes Business Analyst
+      case 'diagram_editor':
+        return {
+          content: content,
+          content_type: 'diagram',
+          diagram_format: activeStep?.diagram_format || 'json',
+          diagram_metadata: {
+            diagram_type: activeStep?.diagram_type || 'flowchart',
+            business_requirements: activeStep?.business_requirements || {}
+          }
+        }
+        case 'text_editor':
+          return {
+            content: content,
+            content_type: 'text',
+            // document_format: activeStep?.document_format || 'word',
+            // document_metadata: {
+            //   document_format: activeStep?.document_format || 'word',
+            //   text_requirements: activeStep?.text_requirements || {}
+            // }
+          }
+        
+        case 'spreadsheet_editor':
+          return {
+            content: content,
+            content_type: 'spreadsheet',
+            // financial_document_type: activeStep?.financial_document_type || 'balance_sheet',
+            // spreadsheet_metadata: {
+            //   financial_document_type: activeStep?.financial_document_type || 'balance_sheet',
+            //   calculation_parameters: activeStep?.calculation_parameters || {}
+            // }
+          }
       default:
         return {
           content: content,
@@ -577,14 +905,14 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 🆕 Obtenir l'icône selon l'environnement
+  // Obtenir l'icône selon l'environnement
   const getEnvironmentIcon = (environment: ExecutionEnvironment) => {
-    return ExtendedCodingPlatformService.getEnvironmentIcon(environment)
+    return CodingPlatformService.getEnvironmentIcon(environment)
   }
 
-  // 🆕 Obtenir la couleur selon l'environnement
+  // Obtenir la couleur selon l'environnement
   const getEnvironmentColor = (environment: ExecutionEnvironment) => {
-    return ExtendedCodingPlatformService.getExecutionEnvironmentColor(environment)
+    return CodingPlatformService.getExecutionEnvironmentColor(environment)
   }
 
   if (loading) {
@@ -686,7 +1014,7 @@ export default function ChallengeDetailPage() {
                         <div className="flex items-center gap-1.5">
                           <span className="text-2xl">{getEnvironmentIcon(challenge?.execution_environment || 'code_executor')}</span>
                           <span className="text-sm font-medium">
-                            {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
+                            {CodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
                           </span>
                         </div>
                         {exercise?.language && (
@@ -695,6 +1023,13 @@ export default function ChallengeDetailPage() {
                             <span className="text-sm font-medium">{exercise.language}</span>
                           </div>
                         )}
+                        {/* 🆕 Affichage de la catégorie d'exercice */}
+                        <div className="flex items-center gap-1.5">
+                          <Target className="h-4 w-4" />
+                          <span className="text-sm font-medium">
+                            {CodingPlatformService.getExerciseCategoryLabel(exercise?.category || 'developer')}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -725,7 +1060,7 @@ export default function ChallengeDetailPage() {
                             {dataset.name}
                           </code>
                           <span className="text-xs text-emerald-600">
-                            {ExtendedCodingPlatformService.getDatasetTypeLabel(dataset.dataset_type)}
+                            {CodingPlatformService.getDatasetTypeLabel(dataset.dataset_type)}
                           </span>
                         </div>
                         {dataset.description && (
@@ -833,6 +1168,12 @@ export default function ChallengeDetailPage() {
                                         <CheckCircle className="h-3 w-3 text-white" />
                                       </div>
                                     )}
+                                    {/* 🆕 Badge pour les diagrammes */}
+                                    {step.diagram_type && (
+                                      <div className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                        {CodingPlatformService.getDiagramTypeLabel(step.diagram_type)}
+                                      </div>
+                                    )}
                                   </div>
 
                                   <p className="text-sm text-gray-600 line-clamp-2 mb-3">
@@ -892,6 +1233,12 @@ export default function ChallengeDetailPage() {
                               <BookOpen className="h-4 w-4 text-white" />
                             </div>
                             <h2 className="text-xl font-semibold text-white">{activeStep.title}</h2>
+                            {/* 🆕 Badge pour le type de diagramme */}
+                            {activeStep.diagram_type && (
+                              <span className="px-3 py-1 bg-white/20 rounded-lg text-sm text-white">
+                                {CodingPlatformService.getDiagramTypeLabel(activeStep.diagram_type)}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -913,11 +1260,28 @@ export default function ChallengeDetailPage() {
                               <p className="text-blue-800 leading-relaxed">{activeStep.hint}</p>
                             </div>
                           )}
+
+                          {/* 🆕 Exigences métier pour Business Analyst */}
+                          {activeStep.business_requirements && Object.keys(activeStep.business_requirements).length > 0 && (
+                            <div className="mt-8 bg-purple-50 border border-purple-200 rounded-xl p-6">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                  <Target className="h-4 w-4 text-purple-600" />
+                                </div>
+                                <h4 className="font-semibold text-purple-900">Exigences métier</h4>
+                              </div>
+                              <div className="text-purple-800">
+                                <pre className="whitespace-pre-wrap text-sm bg-white p-3 rounded border">
+                                  {JSON.stringify(activeStep.business_requirements, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
 
-                    {/* 🆕 Éditeur adaptatif selon l'environnement */}
+                    {/* 🆕 Éditeur adaptatif selon l'environnement avec support complet Business Analyst */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="bg-gray-900 px-6 py-4">
                         <div className="flex items-center justify-between">
@@ -927,12 +1291,18 @@ export default function ChallengeDetailPage() {
                             </div>
                             <div>
                               <h3 className="text-lg font-semibold text-white">
-                                {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
+                                {CodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}
                               </h3>
                               <div className="flex items-center gap-3 mt-1">
                                 {exercise?.language && (
                                   <span className="px-2.5 py-1 bg-white/20 rounded-lg text-sm font-medium text-white">
                                     {exercise.language}
+                                  </span>
+                                )}
+                                {/* 🆕 Informations sur le format de diagramme */}
+                                {activeStep?.diagram_format && (
+                                  <span className="px-2.5 py-1 bg-white/20 rounded-lg text-sm font-medium text-white">
+                                    Format: {activeStep.diagram_format.toUpperCase()}
                                   </span>
                                 )}
                                 <span className="text-sm text-gray-300">Mode Administration</span>
@@ -982,14 +1352,21 @@ export default function ChallengeDetailPage() {
                         </div>
                       </div>
 
-                      {/* 🆕 Utiliser ContentEditor selon l'environnement */}
+                      {/* 🆕 Utiliser ContentEditor selon l'environnement avec support Business Analyst */}
                       <div className={`${isFullscreen ? "h-[calc(100vh-200px)]" : "h-[500px]"}`}>
                         <ContentEditor
                           environment={challenge?.execution_environment || 'code_executor'}
                           initialContent={content}
                           onContentChange={setContent}
-                          onSubmit= {handleValidateCode}
+                          onSubmit={handleValidateCode}
                           datasets={datasets}
+                          language={exercise?.language}
+                          // 🆕 Props spécifiques aux diagrammes Business Analyst
+                          diagramType={activeStep?.diagram_type}
+                          diagramFormat={activeStep?.diagram_format}
+                          documentFormat={activeStep?.document_format}
+                          // 🆕 Props spécifiques aux tableurs Comptables
+                          financialDocumentType={activeStep?.financial_document_type}
                         />
                       </div>
                     </div>
@@ -1033,7 +1410,7 @@ export default function ChallengeDetailPage() {
                     </div>
                     <h3 className="text-2xl font-semibold text-gray-900 mb-3">Sélectionnez une étape</h3>
                     <p className="text-gray-600 text-lg mb-8 max-w-md mx-auto">
-                      Choisissez une étape dans la liste de gauche pour commencer à tester avec l'environnement {ExtendedCodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}.
+                      Choisissez une étape dans la liste de gauche pour commencer à tester avec l'environnement {CodingPlatformService.getExecutionEnvironmentLabel(challenge?.execution_environment || 'code_executor')}.
                     </p>
                     {steps.length === 0 && (
                       <Link
