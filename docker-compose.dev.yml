@@ -1,0 +1,171 @@
+# Docker Compose pour le développement avec la plateforme de coding
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: recruteai-postgres
+    environment:
+      POSTGRES_DB: recruteai_dev
+      POSTGRES_USER: recruteai
+      POSTGRES_PASSWORD: dev_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - recruteai-network
+
+  # Redis pour le cache et les sessions
+  redis:
+    image: redis:7-alpine
+    container_name: recruteai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - recruteai-network
+
+  # Backend Flask
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: recruteai-backend
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://recruteai:dev_password_123@postgres:5432/recruteai_dev
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=dev_jwt_secret_key_change_in_production
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # Pour accéder à Docker depuis le conteneur
+      - /tmp:/tmp  # Pour les fichiers temporaires d'exécution de code
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - recruteai-network
+    restart: unless-stopped
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: recruteai-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - recruteai-network
+    restart: unless-stopped
+
+  # Images pour l'exécution de code (pré-construites)
+  code-runner-python:
+    build:
+      context: ./docker/code-execution
+      dockerfile: Dockerfile.python
+    image: recruteai/code-runner:python
+    container_name: code-runner-python-builder
+    command: "true"  # Ne fait que construire l'image
+    networks:
+      - recruteai-network
+
+  code-runner-node:
+    build:
+      context: ./docker/code-execution
+      dockerfile: Dockerfile.node
+    image: recruteai/code-runner:node
+    container_name: code-runner-node-builder
+    command: "true"
+    networks:
+      - recruteai-network
+
+  code-runner-java:
+    build:
+      context: ./docker/code-execution
+      dockerfile: Dockerfile.java
+    image: recruteai/code-runner:java
+    container_name: code-runner-java-builder
+    command: "true"
+    networks:
+      - recruteai-network
+
+  code-runner-cpp:
+    build:
+      context: ./docker/code-execution
+      dockerfile: Dockerfile.cpp
+    image: recruteai/code-runner:cpp
+    container_name: code-runner-cpp-builder
+    command: "true"
+    networks:
+      - recruteai-network
+
+  # Monitoring avec Prometheus (optionnel)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: recruteai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - recruteai-network
+    profiles:
+      - monitoring
+
+  # Grafana pour les dashboards (optionnel)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: recruteai-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - recruteai-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  recruteai-network:
+    driver: bridge
+    name: recruteai-dev-network

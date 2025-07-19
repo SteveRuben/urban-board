@@ -1,0 +1,52 @@
+{
+  "description": "Configuration de sécurité pour l'exécution de code",
+  "container_limits": {
+    "memory": "128m",
+    "cpu_quota": 50000,
+    "cpu_period": 100000,
+    "pids_limit": 50,
+    "timeout": 30
+  },
+  "security_options": {
+    "user": "coderunner:coderunner",
+    "read_only": true,
+    "no_new_privileges": true,
+    "network_disabled": true,
+    "cap_drop": ["ALL"],
+    "security_opt": ["no-new-privileges:true"]
+  },
+  "blocked_syscalls": [
+    "mount",
+    "umount",
+    "reboot",
+    "syslog",
+    "ptrace",
+    "process_vm_readv",
+    "process_vm_writev",
+    "socket",
+    "connect",
+    "bind",
+    "listen",
+    "accept"
+  ],
+  "allowed_files": {
+    "max_size": "1MB",
+    "allowed_extensions": [".py", ".js", ".java", ".cpp", ".c", ".h"],
+    "blocked_patterns": [
+      "import os",
+      "import subprocess",
+      "import socket",
+      "require('fs')",
+      "require('child_process')",
+      "System.exit",
+      "Runtime.getRuntime()",
+      "#include <cstdlib>",
+      "system("
+    ]
+  },
+  "execution_limits": {
+    "max_execution_time": 10,
+    "max_output_size": "10KB",
+    "max_error_size": "5KB"
+  }
+}

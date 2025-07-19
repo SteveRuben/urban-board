@@ -1,0 +1,162 @@
+name: Maintenance & Monitoring
+
+on:
+  schedule:
+    # Tous les jours à 2h du matin UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  # Mise à jour des dépendances
+  dependency-update:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Update npm dependencies
+      run: |
+        cd frontend
+        npm update
+        npm audit fix --audit-level moderate
+        
+    - name: Update Python dependencies
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip-review --local --auto
+        
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: 'chore: update dependencies'
+        title: 'Automated dependency updates'
+        body: |
+          Mise à jour automatique des dépendances :
+          - Frontend: npm packages
+          - Backend: Python packages
+          
+          Vérifiez les changements avant de merger.
+        branch: automated-dependency-updates
+
+  # Scan de sécurité approfondi
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run npm audit
+      run: |
+        cd frontend
+        npm audit --audit-level high
+        
+    - name: Run Python safety check
+      run: |
+        cd backend
+        pip install safety
+        safety check
+        
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+
+  # Monitoring de performance
+  performance-monitoring:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        configPath: './lighthouserc.json'
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+        
+    - name: Database performance check
+      run: |
+        # Script pour vérifier les performances de la base de données
+        echo "Checking database performance..."
+        # Ajouter ici les scripts de monitoring DB
+
+  # Backup automatique
+  automated-backup:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Backup production database
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          # Backup de la base de données
+          docker-compose exec -T postgres pg_dump -U $POSTGRES_USER $POSTGRES_DB | gzip > /backups/recrute-ia-$(date +%Y%m%d).sql.gz
+          
+          # Nettoyage des anciens backups (garde 30 jours)
+          find /backups -name "recrute-ia-*.sql.gz" -mtime +30 -delete
+          
+          # Upload vers S3 (optionnel)
+          aws s3 cp /backups/recrute-ia-$(date +%Y%m%d).sql.gz s3://recrute-ia-backups/
+
+  # Monitoring des logs
+  log-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Analyze application logs
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          # Analyse des logs d'erreur
+          ERROR_COUNT=$(docker-compose logs --since=24h | grep -i error | wc -l)
+          if [ $ERROR_COUNT -gt 10 ]; then
+            echo "⚠️ Nombre élevé d'erreurs détecté: $ERROR_COUNT"
+            # Envoyer une alerte
+          fi
+          
+          # Vérification de l'espace disque
+          DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+          if [ $DISK_USAGE -gt 80 ]; then
+            echo "⚠️ Espace disque faible: ${DISK_USAGE}%"
+          fi
+
+  # Notification de statut
+  status-notification:
+    needs: [dependency-update, security-audit, performance-monitoring, automated-backup, log-analysis]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Send status notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          📊 Rapport de maintenance quotidien RecruteIA:
+          - Dépendances: ${{ needs.dependency-update.result }}
+          - Sécurité: ${{ needs.security-audit.result }}
+          - Performance: ${{ needs.performance-monitoring.result }}
+          - Backup: ${{ needs.automated-backup.result }}
+          - Logs: ${{ needs.log-analysis.result }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

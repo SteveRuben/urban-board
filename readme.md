@@ -58,6 +58,9 @@ RecruteIA est une plateforme de recrutement assistée par IA qui permet aux recr
 - ✅ Réinitialisation de mot de passe
 - ✅ Authentification à deux facteurs (App, SMS, Email)
 - ✅ Historique des connexions et détection d'activité suspecte
+- 🆕 **Chiffrement automatique des clés API** (Kiro IDE)
+- 🆕 **En-têtes de sécurité avancés** (CSP, XSS Protection)
+- 🆕 **Validation automatique de configuration** au démarrage
 
 ### Profil utilisateur
 - ✅ Page de profil complète
@@ -91,5 +94,23 @@ RecruteIA est une plateforme de recrutement assistée par IA qui permet aux recr
 - ✅ Partage d'entretiens
 - ✅ Système de commentaires horodatés
 - ✅ Intégration d'assistants IA spécialisés
+
+### 🆕 Service IA Spécialisé (Kiro IDE)
+- ✅ **Analyse de personnalité Big Five** automatique
+- ✅ **Questions adaptatives** selon profil et genre
+- ✅ **Évaluation sans biais** avec détection automatique
+- ✅ **Feedback personnalisé** basé sur la personnalité
+- ✅ **Adaptation culturelle** et sensibilité au genre
+- ✅ **Dashboard analytics** des tendances organisationnelles
+- ✅ **Recommandations d'équipe** basées sur complémentarité
+- ✅ **API complète** avec 20+ endpoints spécialisés
+
+### Sécurité et Performance (Kiro IDE)
+- ✅ **Chiffrement Fernet** pour les clés API sensibles
+- ✅ **Logging structuré** avec rotation automatique
+- ✅ **Validation de configuration** au démarrage
+- ✅ **Gestion d'erreurs avancée** avec rollback automatique
+- ✅ **Templates d'email** avec Jinja2
+- ✅ **WebSocket optimisé** pour communication temps réel
 
 [Plus d'information](/docs/index.md)

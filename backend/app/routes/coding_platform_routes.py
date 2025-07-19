@@ -1,1489 +1,286 @@
-
-import os
-import re
-from uuid import UUID
-from datetime import datetime, timezone
-from app.types.coding_platform import ExecutionEnvironment, ExerciseCategory, TestcaseType
-from flask import g, request, jsonify, abort, current_app, Blueprint
-from app.routes.user import token_required
-from app.services.coding_platform_service import CodingPlatformService
-from werkzeug.utils import secure_filename
-from app import db
-from app.models.coding_platform import (
-     Challenge, ChallengeStep, Exercise, UserChallenge, UserChallengeProgress, 
-    ProgrammingLanguage
-)
-from ..services.interview_exercise_service import InterviewExerciseService
+"""
+Routes pour la plateforme de coding - Version simplifiée
+"""
+from flask import Blueprint, request, jsonify
+from datetime import datetime
 
 coding_platform_bp = Blueprint('coding_platform', __name__)
 
-# Initialize service
-coding_platform_service = CodingPlatformService()
-exercise_service = InterviewExerciseService()
-
-
-def get_current_user_id():
-    """Retourne l'ID utilisateur actuel sous forme de string"""
-    return str(g.current_user.id) if hasattr(g, 'current_user') and g.current_user else None
-
-def get_session_identifier():
-    """
-    Get session identifier for anonymous users
-    Can be session_token, user_id, or anonymous identifier
-    """
-    # First check if we have an authenticated user
-    user_id = get_current_user_id()
-    if user_id:
-        return {'type': 'user_id', 'value': user_id}
-    
-    # Check for session token in headers
-    session_token = request.headers.get('X-Session-Token')
-    if session_token:
-        return {'type': 'session_token', 'value': session_token}
-    
-    # Check for session token in query params (fallback)
-    session_token = request.args.get('session_token')
-    if session_token:
-        return {'type': 'session_token', 'value': session_token}
-    
-    # Check for anonymous identifier (email, name, etc.)
-    anonymous_id = request.headers.get('X-Anonymous-ID')
-    if anonymous_id:
-        return {'type': 'anonymous_id', 'value': anonymous_id}
-    
-    return None
-
-# =============================================================================
-# ADMIN ROUTES - EXERCISE MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/admin/diagram-templates', methods=['GET'])
-@token_required
-def get_diagram_templates():
-    """Récupère les templates de diagrammes disponibles"""
-    templates = {
-        'use_case': {
-            'type': 'uml_use_case',
-            'format': 'json',
-            'template': {...}  # Template de base
-        },
-        'sequence': {
-            'type': 'uml_sequence', 
-            'format': 'json',
-            'template': {...}
-        }
-        # ... autres templates
+# Mock data pour les exercices
+MOCK_EXERCISES = [
+    {
+        'id': 1,
+        'title': 'Two Sum',
+        'description': 'Trouver deux nombres dans un tableau qui s\'additionnent pour donner une cible',
+        'difficulty': 'facile',
+        'language': 'python',
+        'category': 'algorithmes',
+        'estimated_time': 15,
+        'created_at': '2025-01-15T10:00:00Z',
+        'status': 'active'
+    },
+    {
+        'id': 2,
+        'title': 'Reverse String',
+        'description': 'Inverser une chaîne de caractères',
+        'difficulty': 'facile',
+        'language': 'javascript',
+        'category': 'strings',
+        'estimated_time': 10,
+        'created_at': '2025-01-16T10:00:00Z',
+        'status': 'active'
+    },
+    {
+        'id': 3,
+        'title': 'Binary Search',
+        'description': 'Implémenter la recherche binaire',
+        'difficulty': 'moyen',
+        'language': 'python',
+        'category': 'algorithmes',
+        'estimated_time': 25,
+        'created_at': '2025-01-17T10:00:00Z',
+        'status': 'active'
+    },
+    {
+        'id': 4,
+        'title': 'Merge Sort',
+        'description': 'Implémenter le tri fusion',
+        'difficulty': 'difficile',
+        'language': 'java',
+        'category': 'tri',
+        'estimated_time': 45,
+        'created_at': '2025-01-18T10:00:00Z',
+        'status': 'active'
     }
-    return jsonify(templates), 200
+]
 
 @coding_platform_bp.route('/admin/exercises', methods=['GET'])
-@token_required
 def get_exercises():
-    """Récupère la liste des exercices avec filtrage et pagination"""
-    user_id = get_current_user_id()
-    
-    # Paramètres de filtrage et pagination
-    page = int(request.args.get('page', 1))
-    per_page = min(int(request.args.get('per_page', 20)), 100)
-    category = request.args.get('category')
-    language = request.args.get('language')
-    difficulty = request.args.get('difficulty')
-    
+    """Récupérer la liste des exercices avec filtres"""
     try:
-        exercises, total = coding_platform_service.get_exercises(
-            page=page,
-            per_page=per_page,
-            category=category,
-            language=language,
-            difficulty=difficulty,
-            user_id=user_id
-        )
+        # Récupérer les paramètres de requête
+        difficulty = request.args.get('difficulty')
+        language = request.args.get('language')
+        category = request.args.get('category')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
         
-        result = {
-            'data': [exercise.to_dict() for exercise in exercises],
-            'pagination': {
-                'total': total,
+        # Filtrer les exercices
+        filtered_exercises = MOCK_EXERCISES.copy()
+        
+        if difficulty:
+            filtered_exercises = [ex for ex in filtered_exercises if ex['difficulty'] == difficulty]
+        
+        if language:
+            filtered_exercises = [ex for ex in filtered_exercises if ex['language'] == language]
+            
+        if category:
+            filtered_exercises = [ex for ex in filtered_exercises if ex['category'] == category]
+        
+        # Pagination
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_exercises = filtered_exercises[start_idx:end_idx]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'exercises': paginated_exercises,
+                'total': len(filtered_exercises),
                 'page': page,
-                'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page
-            },
-            'filters': {
-                'categories': [cat.value for cat in ExerciseCategory],
-                'execution_environments': [env.value for env in ExecutionEnvironment]
+                'limit': limit,
+                'total_pages': (len(filtered_exercises) + limit - 1) // limit
             }
-        }
+        })
         
-        return jsonify(result), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        print(f"Erreur dans get_exercises route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des exercices"}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @coding_platform_bp.route('/admin/exercises', methods=['POST'])
-@token_required
 def create_exercise():
-    """Crée un nouvel exercice"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    # Validation selon la catégorie
-    category = data.get('category', 'developer')
-    if category == 'business_analyst':
-        required_fields = ['title', 'difficulty', 'business_domain']
-    elif category == 'secretary':
-        required_fields = ['title']
-    elif category == 'accountant':
-        required_fields = ['title']
-    elif category == 'developer':
-        required_fields = ['title', 'language', 'difficulty']
-    elif category == 'data_analyst':
-        required_fields = ['title', 'difficulty', 'required_skills']
-    else:
-        return jsonify({"error": "Invalid category. Must be 'developer' or 'data_analyst'"}), 400
-    
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire pour la catégorie {category}"}), 400
-    
-    
+    """Créer un nouvel exercice"""
     try:
-        exercise = coding_platform_service.create_exercise(user_id, data)
-        return jsonify(exercise.to_dict()), 201
+        data = request.get_json()
         
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        # Validation basique
+        required_fields = ['title', 'description', 'difficulty', 'language', 'category']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    'success': False,
+                    'error': f'Le champ {field} est requis'
+                }), 400
+        
+        # Créer le nouvel exercice
+        new_exercise = {
+            'id': len(MOCK_EXERCISES) + 1,
+            'title': data['title'],
+            'description': data['description'],
+            'difficulty': data['difficulty'],
+            'language': data['language'],
+            'category': data['category'],
+            'estimated_time': data.get('estimated_time', 30),
+            'created_at': datetime.now().isoformat() + 'Z',
+            'status': 'active'
+        }
+        
+        MOCK_EXERCISES.append(new_exercise)
+        
+        return jsonify({
+            'success': True,
+            'data': new_exercise
+        }), 201
+        
     except Exception as e:
-        print(f"Erreur dans create_exercise route: {e}")
-        return jsonify({"error": "Erreur lors de la création de l'exercice"}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-@coding_platform_bp.route('/admin/exercises/<exercise_id>', methods=['GET'])
-@token_required
+@coding_platform_bp.route('/admin/exercises/<int:exercise_id>', methods=['GET'])
 def get_exercise(exercise_id):
-    """Récupère les détails d'un exercice spécifique"""
-    user_id = get_current_user_id()
+    """Récupérer un exercice spécifique"""
     try:
-        exercise = coding_platform_service.get_exercise_by_id(exercise_id, user_id)
-        print('/////////////////////////////////',user_id)
-
-        result = exercise.to_dict()
-        result['challenges'] = [challenge.to_dict() for challenge in exercise.challenges]
-        return jsonify(result), 200
+        exercise = next((ex for ex in MOCK_EXERCISES if ex['id'] == exercise_id), None)
         
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_exercise route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération de l'exercice"}), 500
-
-@coding_platform_bp.route('/admin/exercises/<exercise_id>', methods=['PUT'])
-@token_required
-def update_exercise(exercise_id):
-    """Met à jour un exercice existant"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    # Validation de base
-    if not data:
-        return jsonify({"error": "Aucune donnée fournie"}), 400
-    
-    try:
-        exercise = coding_platform_service.update_exercise(exercise_id, user_id, data)
-        return jsonify(exercise.to_dict()), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans update_exercise route: {e}")
-        return jsonify({"error": "Erreur lors de la mise à jour de l'exercice"}), 500
-
-@coding_platform_bp.route('/admin/exercises/<exercise_id>', methods=['DELETE'])
-@token_required
-def delete_exercise(exercise_id):
-    """Supprime un exercice et tous ses challenges"""
-    user_id = get_current_user_id()
-    
-    try:
-        coding_platform_service.delete_exercise(exercise_id, user_id)
-        return jsonify({"message": "Exercice supprimé avec succès"}), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans delete_exercise route: {e}")
-        return jsonify({"error": "Erreur lors de la suppression de l'exercice"}), 500
-
-# =============================================================================
-# ADMIN ROUTES - DATASET MANAGEMENT (Nouveau)
-# =============================================================================
-
-@coding_platform_bp.route('/admin/exercises/<exercise_id>/datasets', methods=['POST'])
-@token_required
-def create_exercise_dataset(exercise_id):
-    """Crée un dataset pour un exercice d'analyse de données"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    required_fields = ['name', 'dataset_type']
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
-    
-    try:
-        dataset = coding_platform_service.create_exercise_dataset(exercise_id, user_id, data)
-        return jsonify(dataset.to_dict()), 201
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        elif 'can only be added' in str(e).lower():
-            return jsonify({"error": str(e)}), 400
-        print(f"Erreur dans create_exercise_dataset: {e}")
-        return jsonify({"error": "Erreur lors de la création du dataset"}), 500
-
-@coding_platform_bp.route('/admin/exercises/<exercise_id>/datasets', methods=['GET'])
-@token_required
-def get_exercise_datasets(exercise_id):
-    """Récupère les datasets d'un exercice"""
-    user_id = get_current_user_id()
-    
-    try:
-        datasets = coding_platform_service.get_exercise_datasets(exercise_id, user_id)
-        return jsonify([dataset.to_dict() for dataset in datasets]), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_exercise_datasets: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des datasets"}), 500
-
-# =============================================================================
-# ADMIN ROUTES - CHALLENGE MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/admin/challenges', methods=['GET'])
-@token_required
-def get_challenges():
-    """Récupère la liste des challenges avec filtrage et pagination"""
-    user_id = get_current_user_id()
-    
-    # Paramètres de filtrage et pagination
-    exercise_id = request.args.get('exercise_id', type=int)
-    status = request.args.get('status')
-    page = int(request.args.get('page', 1))
-    per_page = min(int(request.args.get('per_page', 20)), 100)
-    
-    try:
-        challenges, total = coding_platform_service.get_challenges(
-            exercise_id=exercise_id,
-            status=status,
-            page=page,
-            per_page=per_page,
-            user_id=user_id
-        )
-        
-        result = {
-            'data': [challenge.to_dict() for challenge in challenges],
-            'pagination': {
-                'total': total,
-                'page': page,
-                'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
-        
-        return jsonify(result), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f"Erreur dans get_challenges route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des challenges"}), 500
-
-@coding_platform_bp.route('/admin/challenges', methods=['POST'])
-@token_required
-def create_challenge():
-    """Crée un nouveau challenge"""
-    data = request.get_json()
-    
-    # Validation basique des champs obligatoires
-    required_fields = ['exercise_id', 'title', 'description']
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
-    
-    try:
-        challenge = coding_platform_service.create_challenge(data)
-        return jsonify(challenge.to_dict()), 201
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans create_challenge route: {e}")
-        return jsonify({"error": "Erreur lors de la création du challenge"}), 500
-
-@coding_platform_bp.route('/admin/challenges/<challenge_id>', methods=['GET'])
-@token_required
-def get_challenge(challenge_id):
-    """Récupère les détails d'un challenge spécifique"""
-    user_id = get_current_user_id()
-    
-    try:
-        challenge = coding_platform_service.get_challenge_by_id(
-            challenge_id, 
-            user_id=user_id, 
-            check_published=False
-        )
-        return jsonify(challenge.to_dict(include_steps=True)), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_challenge route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération du challenge"}), 500
-
-@coding_platform_bp.route('/admin/challenges/<challenge_id>', methods=['PUT'])
-@token_required
-def update_challenge(challenge_id):
-    """Met à jour un challenge existant"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    # Validation de base
-    if not data:
-        return jsonify({"error": "Aucune donnée fournie"}), 400
-    
-    try:
-        # Cas spécial : mise à jour du statut uniquement
-        if 'status' in data and len(data) == 1:
-            challenge = coding_platform_service.update_challenge(challenge_id, user_id, data)
-            return jsonify(challenge.to_dict()), 200
-        
-        # Sinon, c'est une mise à jour complète
-        challenge = coding_platform_service.update_challenge(challenge_id, user_id, data)
-        return jsonify(challenge.to_dict()), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans update_challenge route: {e}")
-        return jsonify({"error": "Erreur lors de la mise à jour du challenge"}), 500
-
-@coding_platform_bp.route('/admin/challenges/<challenge_id>', methods=['DELETE'])
-@token_required
-def delete_challenge(challenge_id):
-    """Supprime un challenge et toutes ses étapes"""
-    user_id = get_current_user_id()
-    
-    try:
-        coding_platform_service.delete_challenge(challenge_id, user_id)
-        return jsonify({"message": "Challenge supprimé avec succès"}), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans delete_challenge route: {e}")
-        return jsonify({"error": "Erreur lors de la suppression du challenge"}), 500
-
-# =============================================================================
-# ADMIN ROUTES - STEP MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/admin/challenges/<challenge_id>/steps', methods=['GET'])
-@token_required
-def get_challenge_steps(challenge_id):
-    """Récupère toutes les étapes d'un challenge"""
-    user_id = get_current_user_id()
-    
-    try:
-        steps = coding_platform_service.get_challenge_steps(challenge_id, user_id)
-        return jsonify([step.to_dict(include_testcases=True, include_solution=True) for step in steps]), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_challenge_steps route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des étapes"}), 500
-
-@coding_platform_bp.route('/admin/challenges/<challenge_id>/steps', methods=['POST'])
-@token_required
-def create_challenge_step(challenge_id):
-    """Crée une nouvelle étape de challenge"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    # Validation basique des champs obligatoires
-    required_fields = ['title', 'instructions']
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
-    
-    try:
-        step = coding_platform_service.create_challenge_step(challenge_id, user_id, data)
-        return jsonify(step.to_dict(include_solution=True)), 201
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans create_challenge_step route: {e}")
-        return jsonify({"error": "Erreur lors de la création de l'étape"}), 500
-    
-
-@coding_platform_bp.route('/admin/steps/<step_id>', methods=['GET'])
-@token_required
-def get_step(step_id):
-    """Récupère les détails d'une étape spécifique (Admin)"""
-    user_id = get_current_user_id()
-    
-    try:
-        step = coding_platform_service.get_step_by_id(step_id, user_id)
-        return jsonify(step.to_dict(include_testcases=True, include_solution=True)), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_step route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération de l'étape"}), 500
-
-@coding_platform_bp.route('/admin/steps/<step_id>', methods=['PUT'])
-@token_required
-def update_step(step_id):
-    """Met à jour une étape existante (Admin)"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({"error": "Aucune donnée fournie"}), 400
-    
-    try:
-        step = coding_platform_service.update_step(step_id, user_id, data)
-        return jsonify(step.to_dict(include_solution=True)), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans update_step route: {e}")
-        return jsonify({"error": "Erreur lors de la mise à jour de l'étape"}), 500
-
-@coding_platform_bp.route('/admin/steps/<step_id>', methods=['DELETE'])
-@token_required
-def delete_step(step_id):
-    """Supprime une étape et ses cas de test (Admin)"""
-    user_id = get_current_user_id()
-    
-    try:
-        coding_platform_service.delete_step(step_id, user_id)
-        return jsonify({"message": "Étape supprimée avec succès"}), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans delete_step route: {e}")
-        return jsonify({"error": "Erreur lors de la suppression de l'étape"}), 500
-
-# =============================================================================
-# ADMIN ROUTES - TEST CASE MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/admin/steps/<step_id>/testcases', methods=['POST'])
-@token_required
-def create_testcase(step_id):
-    """Crée un nouveau cas de test"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    testcase_type = data.get('testcase_type', 'unit_test')
-    
-    if testcase_type == 'unit_test':
-        required_fields = ['input_data', 'expected_output']
-    elif testcase_type == 'sql_query_test':
-        required_fields = ['dataset_reference', 'sql_query_expected']
-    elif testcase_type == 'visualization_test':
-        required_fields = ['expected_visualization']
-    elif testcase_type == 'statistical_test':
-        required_fields = ['statistical_assertions']
-    else:
-        return jsonify({"error": f"Type de test case non supporté: {testcase_type}"}), 400
-    
-    for field in required_fields:
-        if field not in data or data[field] is None:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire pour le type {testcase_type}"}), 400
-    
-    try:
-        testcase = coding_platform_service.create_testcase(step_id, user_id, data)
-        return jsonify(testcase.to_dict(show_hidden=True)), 201
-        
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans create_testcase route: {e}")
-        return jsonify({"error": "Erreur lors de la création du cas de test"}), 500
-
-def process_testcase_data(testcase_data):
-    """
-    Traite les données des cas de test avant insertion en base
-    """
-    processed_data = testcase_data.copy()
-    
-    # 🔧 S'assurer que testcase_type est une string et non un enum
-    if 'testcase_type' in processed_data:
-        if hasattr(processed_data['testcase_type'], 'value'):
-            # Si c'est un enum, extraire la valeur string
-            processed_data['testcase_type'] = processed_data['testcase_type'].value
-        elif isinstance(processed_data['testcase_type'], str):
-            # Si c'est déjà une string, garder tel quel
-            pass
-        else:
-            # Conversion de sécurité
-            processed_data['testcase_type'] = str(processed_data['testcase_type'])
-    
-    # 🔧 Valider que le type de test est supporté
-    valid_types = [e.value for e in TestcaseType]
-    if processed_data.get('testcase_type') not in valid_types:
-        raise ValueError(f"Type de test non supporté: {processed_data.get('testcase_type')}")
-    
-    # 🔧 Nettoyer les champs selon le type de test
-    testcase_type = processed_data.get('testcase_type', 'unit_test')
-    
-    if testcase_type == 'notebook_cell_test':
-        # Pour les tests de notebook, input_data et expected_output peuvent être None
-        processed_data['input_data'] = processed_data.get('input_data') or None
-        processed_data['expected_output'] = processed_data.get('expected_output') or None
-        
-        # S'assurer que notebook_cell_output est présent
-        if not processed_data.get('notebook_cell_output'):
-            raise ValueError("notebook_cell_output est requis pour les tests de cellule notebook")
-            
-    elif testcase_type == 'sql_query_test':
-        # Pour les tests SQL
-        if not processed_data.get('sql_query_expected'):
-            raise ValueError("sql_query_expected est requis pour les tests SQL")
-            
-    elif testcase_type == 'unit_test':
-        # Pour les tests unitaires classiques
-        if not processed_data.get('input_data'):
-            raise ValueError("input_data est requis pour les tests unitaires")
-        if not processed_data.get('expected_output'):
-            raise ValueError("expected_output est requis pour les tests unitaires")
-    
-    return processed_data
-
-@coding_platform_bp.route('/admin/steps/<step_id>/testcases/bulk', methods=['POST'])
-@token_required
-def bulk_import_testcases_simple(step_id):
-    """Import en lot de cas de test - Version avec appels individuels"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    if not data or 'testcases' not in data:
-        return jsonify({"error": "Le champ 'testcases' est obligatoire"}), 400
-    
-    try:
-        print(f"Début import bulk pour step_id: {step_id}, {len(data['testcases'])} cas de test")
-        
-        created_testcases = []
-        errors = []
-        
-        for i, tc_data in enumerate(data['testcases']):
-            try:
-                # 🔧 Debug: Log des données reçues
-                testcase_type = tc_data.get('testcase_type', 'unit_test')
-                print(f"Traitement cas de test {i+1}: type={testcase_type}")
-                
-                # Ajouter l'index d'ordre si pas fourni
-                if 'order_index' not in tc_data:
-                    tc_data['order_index'] = i
-                
-                # 🔧 Debug: Log avant création
-                print(f"Données du cas de test {i+1}: {list(tc_data.keys())}")
-                
-                # Créer le cas de test individuellement
-                testcase = coding_platform_service.create_testcase(step_id, user_id, tc_data)
-                created_testcases.append(testcase.to_dict(show_hidden=True))
-                
-                print(f"Cas de test {i+1} créé avec succès: {testcase.id}")
-                
-            except Exception as e:
-                error_msg = f"Cas de test {i+1}: {str(e)}"
-                errors.append(error_msg)
-                print(f"Erreur cas de test {i+1}: {e}")
-                print(f"Données problématiques: {tc_data}")
-        
-        print(f"Résultat import: {len(created_testcases)} créés, {len(errors)} erreurs")
-        
-        # Préparer la réponse
-        response_data = {
-            "message": f"Créé {len(created_testcases)} cas de test avec succès",
-            "testcases": created_testcases
-        }
-        
-        if errors:
-            response_data["errors"] = errors
-            response_data["message"] += f", {len(errors)} erreurs"
-        
-        # Déterminer le code de statut
-        if not created_testcases:
+        if not exercise:
             return jsonify({
-                "error": "Aucun cas de test n'a pu être créé",
-                "errors": errors
-            }), 400
-        elif errors:
-            return jsonify(response_data), 207  # Multi-status: succès partiels
-        else:
-            return jsonify(response_data), 201
-        
-    except Exception as e:
-        error_msg = str(e).lower()
-        if 'not found' in error_msg or 'access denied' in error_msg:
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur globale dans bulk_import_testcases_simple: {e}")
-        return jsonify({"error": "Erreur lors de l'import en lot des cas de test"}), 500
-    
-# =============================================================================
-# PUBLIC ROUTES - USER CHALLENGE DISCOVERY
-# =============================================================================
-
-@coding_platform_bp.route('/exercises', methods=['GET'])
-def get_public_exercises():
-    """Récupère les exercices publiés pour les utilisateurs"""
-    # Paramètres de filtrage et pagination
-    language = request.args.get('language')
-    difficulty = request.args.get('difficulty')
-    page = int(request.args.get('page', 1))
-    per_page = min(int(request.args.get('per_page', 20)), 100)
-    
-    try:
-        exercises, total = coding_platform_service.get_exercises(
-            page=page,
-            per_page=per_page,
-            language=language,
-            difficulty=difficulty,
-            user_id=None  # Public access
-        )
-        
-        result = {
-            'data': [exercise.to_dict() for exercise in exercises],
-            'pagination': {
-                'total': total,
-                'page': page,
-                'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
-        
-        return jsonify(result), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f"Erreur dans get_public_exercises route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des exercices"}), 500
-
-@coding_platform_bp.route('/exercises/<exercise_id>/challenges', methods=['GET'])
-def get_exercise_challenges(exercise_id):
-    """Récupère les challenges publiés d'un exercice"""
-    try:
-        exercise = coding_platform_service.get_exercise_by_id(exercise_id)
-        challenges, _ = coding_platform_service.get_challenges(
-            exercise_id=exercise_id,
-            user_id=None  # Public access
-        )
-        
-        result = {
-            'exercise': exercise.to_dict(),
-            'challenges': [challenge.to_dict() for challenge in challenges]
-        }
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_exercise_challenges route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des challenges"}), 500
-
-@coding_platform_bp.route('/challenges/<challenge_id>', methods=['GET'])
-def get_challenge_for_user(challenge_id):
-    """Récupère les détails d'un challenge pour l'utilisateur (sans solutions)"""
-    session_info = get_session_identifier()
-    
-    try:
-        challenge = coding_platform_service.get_challenge_by_id(
-            challenge_id, 
-            check_published=True
-        )
-        
-        result = challenge.to_dict(include_steps=True)
-        
-        # Ajouter les informations de progrès utilisateur si session disponible
-        if session_info:
-            user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-            if user_challenge:
-                result['user_progress'] = user_challenge.to_dict()
-                
-                # Récupérer le progrès des étapes
-                step_progress = {}
-                for progress in user_challenge.progress_entries:
-                    step_progress[progress.step_id] = progress.to_dict()
-                result['step_progress'] = step_progress
-        
-        # Supprimer le code solution des étapes (les utilisateurs ne doivent pas le voir)
-        for step in result.get('steps', []):
-            step.pop('solution_code', None)
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_challenge_for_user route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération du challenge"}), 500
-
-# =============================================================================
-# PUBLIC ROUTES - USER SESSION MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/challenges/<challenge_id>/start', methods=['POST'])
-def start_challenge(challenge_id):
-    """Démarre ou reprend une session de challenge (supporte les utilisateurs anonymes)"""
-    session_info = get_session_identifier()
-    data = request.get_json() or {}
-    anonymous_identifier = data.get('anonymous_identifier')
-    
-    try:
-        user_challenge = coding_platform_service.start_challenge(
-            challenge_id, 
-            session_info, 
-            anonymous_identifier
-        )
-        
-        result = {
-            'user_challenge': user_challenge.to_dict(),
-            'session_token': user_challenge.session_token,
-            'message': 'Session créée' if user_challenge.user_id is None else 'Session reprise'
-        }
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans start_challenge route: {e}")
-        return jsonify({"error": "Erreur lors du démarrage du challenge"}), 500
-
-@coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>', methods=['GET'])
-def get_challenge_step(challenge_id, step_id):
-    """Récupère une étape spécifique de challenge avec les cas de test (visibles uniquement)"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis (utiliser l'en-tête X-Session-Token ou démarrer une session)"}), 400
-    
-    try:
-        step = coding_platform_service.get_challenge_step(
-            challenge_id, 
-            step_id, 
-            session_info=session_info
-        )
-        
-        # Récupérer les cas de test visibles
-        from app.models.coding_platform import ChallengeStepTestcase
-        testcases = ChallengeStepTestcase.query.filter_by(
-            step_id=step_id,
-            is_hidden=False
-        ).order_by(ChallengeStepTestcase.order_index).all()
-        
-        # Récupérer le progrès de l'utilisateur pour cette étape
-        user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-        progress = None
-        if user_challenge:
-            from app.models.coding_platform import UserChallengeProgress
-            progress = UserChallengeProgress.query.filter_by(
-                user_challenge_id=user_challenge.id,
-                step_id=step_id
-            ).first()
-        
-        result = step.to_dict()
-        result['testcases'] = [tc.to_dict() for tc in testcases]
-        result['user_progress'] = progress.to_dict() if progress else None
-        
-        # Supprimer le code solution
-        result.pop('solution_code', None)
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans get_challenge_step route: {e}")
-        return jsonify({"error": "Erreur lors de la récupération de l'étape"}), 500
-
-# =============================================================================
-# PUBLIC ROUTES - PROGRESS MANAGEMENT
-# =============================================================================
-
-@coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/load', methods=['GET'])
-def load_step_progress(challenge_id, step_id):
-    """Charge le progrès de code sauvegardé d'une étape - supporte les utilisateurs anonymes"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis (utiliser l'en-tête X-Session-Token)"}), 400
-    
-    try:
-        progress = coding_platform_service.load_step_progress(
-            challenge_id, 
-            step_id, 
-            session_info
-        )
-        
-        if hasattr(progress, 'to_dict'):
-            return jsonify(progress.to_dict()), 200
-        else:
-            return jsonify(progress), 200  # Pour la réponse du code de départ
-        
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans load_step_progress route: {e}")
-        return jsonify({"error": "Erreur lors du chargement du progrès"}), 500
-
-# =============================================================================
-# PUBLIC ROUTES - CODE EXECUTION
-# =============================================================================
-
-
-@coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/test', methods=['POST'])
-def test_code(challenge_id, step_id):
-    """Teste le code contre les cas de test visibles uniquement (pour le développement)"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis (utiliser l'en-tête X-Session-Token)"}), 400
-    
-    data = request.get_json()
-    if not data or 'code' not in data or 'language' not in data:
-        return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
-    
-    try:
-        response = coding_platform_service.test_code(
-            challenge_id, 
-            step_id, 
-            session_info, 
-            data['code'], 
-            data['language']
-        )
-        
-        return jsonify(response), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans test_code route: {e}")
-        return jsonify({"error": "Erreur lors du test du code"}), 500
-    
-
-@coding_platform_bp.route('/admin/steps/<step_id>/test', methods=['POST'])
-@token_required
-def admin_test_code(step_id):
-    """Teste le code contre les cas de test (contexte admin)"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    if not data or 'code' not in data or 'language' not in data:
-        return jsonify({"error": "Les champs 'code' et 'language' sont obligatoires"}), 400
-    
-    try:
-        response = coding_platform_service.admin_test_code(
-            step_id, 
-            user_id, 
-            data['code'], 
-            data['language']
-        )
-        
-        return jsonify(response), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans admin_test_code route: {e}")
-        return jsonify({"error": "Erreur lors du test du code"}), 500
-
-@coding_platform_bp.route('/admin/steps/<step_id>/validate', methods=['POST'])
-@token_required
-def admin_validate_code(step_id):
-    """Valide le code contre tous les cas de test (contexte admin)"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({"error": "Aucune donnée fournie"}), 400
-    
-    try:
-        response = coding_platform_service.admin_validate_code(
-            step_id, 
-            user_id, 
-            data.get('content'), 
-            data.get('language')
-        )
-        
-        return jsonify(response), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        if 'not found' in str(e).lower() or 'access denied' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        print(f"Erreur dans admin_validate_code route: {e}")
-        return jsonify({"error": "Erreur lors de la validation du code"}), 500
-
-# Corrections pour les routes coding_platform_bp
-
-@coding_platform_bp.route('/<access_token>/challenges/<challenge_id>/steps/<step_id>/submit', methods=['POST'])
-def submit_code(challenge_id, step_id,access_token):
-    """Soumet le code pour évaluation contre les cas de test - supporte les utilisateurs anonymes"""
-
-    user_exercise = exercise_service.get_user_exercise_by_token(access_token)
-    if not user_exercise or not user_exercise.is_accessible():
-        return jsonify({'status': 'error', 'message': 'Accès non autorisé'}), 403
-       
-    session_info = {'type': 'anonymous_id', 'value': access_token}
-        
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Aucune donnée fournie"}), 400
-    
-    content_type = data.get('content_type', 'code')  # 'code', 'notebook', 'sql', 'analysis', 'visualization'
-    content = data.get('content', '')
-    language = data.get('language')
-    
-    if content_type == 'code' and not language:
-        return jsonify({"error": "Le langage est obligatoire pour les soumissions de code"}), 400
-    
-    
-    try:
-        print(f'🔍 DEBUG: Route submit_code appelée - Challenge: {challenge_id}, Step: {step_id}')
-        print(f'🔍 DEBUG: Session info: {session_info}')
-        
-        response = coding_platform_service.submit_code(
-            challenge_id, 
-            step_id, 
-            session_info, 
-            content, 
-            content_type,
-            language
-        )
-        
-        print(f'🔍 DEBUG: Response from service: {response}')
-        return jsonify(response), 200
-        
-    except ValueError as e:
-        print(f'🔍 DEBUG: ValueError in submit_code route: {e}')
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f'🔍 DEBUG: Exception in submit_code route: {e}')
-        if 'not found' in str(e).lower():
-            return jsonify({"error": str(e)}), 404
-        return jsonify({"error": "Erreur lors de la soumission du code"}), 500
-
-# CORRECTION: Nouvelle route pour récupérer la progression d'une étape
-@coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/progress', methods=['GET'])
-def get_step_progress(challenge_id, step_id):
-    """Récupère la progression d'une étape spécifique"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis"}), 400
-    
-    try:
-        print(f'🔍 DEBUG: Récupération progression - Challenge: {challenge_id}, Step: {step_id}')
-        
-        user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-        if not user_challenge:
-            return jsonify({"error": "Session de challenge non trouvée"}), 404
-        
-        # Récupérer la progression pour cette étape
-        progress = UserChallengeProgress.query.filter_by(
-            user_challenge_id=user_challenge.id,
-            step_id=step_id
-        ).first()
-        
-        if not progress:
-            # Récupérer le starter code de l'étape
-            step = ChallengeStep.query.filter_by(id=step_id, challenge_id=challenge_id).first()
-            if not step:
-                return jsonify({"error": "Étape non trouvée"}), 404
-                
-            return jsonify({
-                "step_id": step_id,
-                "code": step.starter_code or "",
-                "language": "python",  # Valeur par défaut
-                "is_completed": False,
-                "tests_passed": 0,
-                "tests_total": 0,
-                "last_edited": None
-            }), 200
-        
-        response = {
-            "step_id": step_id,
-            "code": progress.code or "",
-            "language": progress.language.value if progress.language else "python",
-            "is_completed": progress.is_completed,
-            "tests_passed": progress.tests_passed or 0,
-            "tests_total": progress.tests_total or 0,
-            "last_edited": progress.last_edited.isoformat() if progress.last_edited else None,
-            "last_execution_result": progress.last_execution_result
-        }
-        
-        print(f'🔍 DEBUG: Progress trouvé: {response}')
-        return jsonify(response), 200
-        
-    except Exception as e:
-        print(f'🔍 DEBUG: Erreur get_step_progress: {e}')
-        return jsonify({"error": "Erreur lors de la récupération de la progression"}), 500
-
-# CORRECTION: Route pour sauvegarder la progression
-@coding_platform_bp.route('/challenges/<challenge_id>/steps/<step_id>/save', methods=['POST'])
-def save_step_progress(challenge_id, step_id):
-    """Sauvegarde la progression d'une étape"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis"}), 400
-    
-    data = request.get_json()
-    if not data or 'code' not in data:
-        return jsonify({"error": "Le champ 'code' est obligatoire"}), 400
-    
-    try:
-        print(f'🔍 DEBUG: Sauvegarde progression - Challenge: {challenge_id}, Step: {step_id}')
-        
-        user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-        if not user_challenge:
-            return jsonify({"error": "Session de challenge non trouvée"}), 404
-        
-        # Récupérer ou créer la progression
-        progress = UserChallengeProgress.query.filter_by(
-            user_challenge_id=user_challenge.id,
-            step_id=step_id
-        ).first()
-        
-        if not progress:
-            language_enum = ProgrammingLanguage(data.get('language', 'python'))
-            progress = UserChallengeProgress(
-                user_challenge_id=user_challenge.id,
-                step_id=step_id,
-                language=language_enum
-            )
-            db.session.add(progress)
-        
-        # Mettre à jour le code
-        progress.code = data['code']
-        if 'language' in data:
-            progress.language = ProgrammingLanguage(data['language'])
-        progress.last_edited = datetime.now(timezone.utc)
-        
-        db.session.commit()
+                'success': False,
+                'error': 'Exercice non trouvé'
+            }), 404
         
         return jsonify({
-            "message": "Progression sauvegardée avec succès",
-            "last_saved": progress.last_edited.isoformat()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f'🔍 DEBUG: Erreur save_step_progress: {e}')
-        return jsonify({"error": "Erreur lors de la sauvegarde"}), 500
-
-# CORRECTION: Route pour récupérer le statut global d'un challenge
-@coding_platform_bp.route('/challenges/<challenge_id>/status', methods=['GET'])
-def get_challenge_status(challenge_id):
-    """Récupère le statut global d'un challenge pour un utilisateur"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis"}), 400
-    
-    try:
-        print(f'🔍 DEBUG: Récupération statut challenge: {challenge_id}')
-        
-        user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-        if not user_challenge:
-            return jsonify({"error": "Session de challenge non trouvée"}), 404
-        
-        # Récupérer la progression de toutes les étapes
-        challenge = Challenge.query.get(challenge_id)
-        if not challenge:
-            return jsonify({"error": "Challenge non trouvé"}), 404
-        
-        steps_progress = []
-        total_completed = 0
-        total_steps = len(challenge.steps)
-        
-        for step in challenge.steps:
-            progress = UserChallengeProgress.query.filter_by(
-                user_challenge_id=user_challenge.id,
-                step_id=step.id
-            ).first()
-            
-            step_data = {
-                "step_id": step.id,
-                "step_order": step.order_index,
-                "step_title": step.title,
-                "is_completed": progress.is_completed if progress else False,
-                "tests_passed": progress.tests_passed if progress else 0,
-                "tests_total": progress.tests_total if progress else len(step.testcases) if step.testcases else 0,
-                "has_code": bool(progress and progress.code) if progress else False
-            }
-            
-            if progress and progress.is_completed:
-                total_completed += 1
-                
-            steps_progress.append(step_data)
-        
-        response = {
-            "challenge_id": challenge_id,
-            "user_challenge": {
-                "id": user_challenge.id,
-                "status": user_challenge.status.value,
-                "current_step_id": user_challenge.current_step_id,
-                "attempt_count": user_challenge.attempt_count,
-                "started_at": user_challenge.started_at.isoformat() if user_challenge.started_at else None,
-                "completed_at": user_challenge.completed_at.isoformat() if user_challenge.completed_at else None
-            },
-            "progress_summary": {
-                "total_steps": total_steps,
-                "completed_steps": total_completed,
-                "completion_rate": round((total_completed / total_steps * 100), 2) if total_steps > 0 else 0
-            },
-            "steps_progress": steps_progress
-        }
-        
-        print(f'🔍 DEBUG: Statut challenge: {response}')
-        return jsonify(response), 200
-        
-    except Exception as e:
-        print(f'🔍 DEBUG: Erreur get_challenge_status: {e}')
-        return jsonify({"error": "Erreur lors de la récupération du statut"}), 500
-
-# CORRECTION: Route pour recalculer les statistiques
-@coding_platform_bp.route('/recalculate-stats', methods=['POST'])
-def recalculate_stats():
-    """Recalcule les statistiques pour un candidat (route de debug/maintenance)"""
-    session_info = get_session_identifier()
-    if not session_info:
-        return jsonify({"error": "Identifiant de session requis"}), 400
-    
-    try:
-        from ..services.interview_exercise_service import InterviewExerciseService
-        interview_service = InterviewExerciseService()
-        
-        # Récupérer le token de session
-        access_token = None
-        if session_info['type'] == 'session_token':
-            access_token = session_info['value']
-        elif session_info['type'] == 'anonymous_id':
-            access_token = session_info['value']
-        
-        if not access_token:
-            return jsonify({"error": "Token d'accès requis pour recalculer les stats"}), 400
-        
-        stats = interview_service.recalculate_candidate_stats(access_token)
-        
-        return jsonify({
-            "message": "Statistiques recalculées avec succès",
-            "stats": stats
-        }), 200
-        
-    except Exception as e:
-        print(f'🔍 DEBUG: Erreur recalculate_stats: {e}')
-        return jsonify({"error": "Erreur lors du recalcul des statistiques"}), 500
-    
-# =============================================================================
-# PUBLIC ROUTES - CONTEXT INFORMATION
-# =============================================================================
-
-@coding_platform_bp.route('/challenges/<challenge_id>/context', methods=['GET'])
-def get_challenge_context(challenge_id):
-    """Récupère le contexte d'un challenge (environnement, datasets, etc.)"""
-    session_info = get_session_identifier()
-    
-    try:
-        from app.models.coding_platform import Challenge, ExerciseDataset
-        
-        challenge = Challenge.query.filter_by(id=challenge_id).first()
-        if not challenge:
-            return jsonify({"error": "Challenge non trouvé"}), 404
-        
-        # Informations de contexte
-        context = {
-            'challenge': challenge.to_dict(),
-            'execution_environment': challenge.execution_environment.value,
-            'environment_config': challenge.environment_config,
-            'exercise_category': challenge.exercise.category.value
-        }
-        
-        # Ajouter les datasets si c'est un exercice d'analyse de données
-        if challenge.exercise.category.value == 'data_analyst':
-            datasets = ExerciseDataset.query.filter_by(exercise_id=challenge.exercise_id).all()
-            context['datasets'] = [dataset.to_dict() for dataset in datasets]
-        
-        # Ajouter les informations de session si disponible
-        if session_info:
-            user_challenge = coding_platform_service._find_user_challenge(challenge_id, session_info)
-            if user_challenge:
-                context['user_progress'] = user_challenge.to_dict()
-        
-        return jsonify(context), 200
-        
-    except Exception as e:
-        print(f"Erreur dans get_challenge_context: {e}")
-        return jsonify({"error": "Erreur lors de la récupération du contexte"}), 500
-
-@coding_platform_bp.route('/meta/types', methods=['GET'])
-def get_available_types():
-    """Récupère tous les types disponibles pour l'interface"""
-    try:
-        types_info = {
-            'exercise_categories': [cat.value for cat in ExerciseCategory],
-            'execution_environments': [env.value for env in ExecutionEnvironment],
-            'testcase_types': [tc_type.value for tc_type in TestcaseType],
-            'programming_languages': [lang.value for lang in ProgrammingLanguage]
-        }
-        
-        return jsonify(types_info), 200
-        
-    except Exception as e:
-        print(f"Erreur dans get_available_types: {e}")
-        return jsonify({"error": "Erreur lors de la récupération des types"}), 500
-
-# =============================================================================
-# ROUTES DE VALIDATION (Pour développement et test)
-# =============================================================================
-
-@coding_platform_bp.route('/admin/validate/sql', methods=['POST'])
-@token_required
-def validate_sql_query():
-    """Valide une requête SQL contre un dataset (pour développement)"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    required_fields = ['query', 'dataset_reference']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f"Le champ '{field}' est obligatoire"}), 400
-    
-    try:
-        from app.services.execution_services import SQLExecutionService
-        
-        sql_service = SQLExecutionService()
-        result = sql_service.execute(
-            data['query'], 
-            {'dataset_reference': data['dataset_reference']},
-            numerical_tolerance=data.get('numerical_tolerance', 0.001)
-        )
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        print(f"Erreur dans validate_sql_query: {e}")
-        return jsonify({"error": f"Erreur lors de la validation SQL: {str(e)}"}), 500
-
-@coding_platform_bp.route('/admin/validate/visualization', methods=['POST'])
-@token_required
-def validate_visualization():
-    """Valide une visualisation de données (pour développement)"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    if 'visualization_data' not in data:
-        return jsonify({"error": "Le champ 'visualization_data' est obligatoire"}), 400
-    
-    try:
-        from app.services.execution_services import DataVisualizationService
-        
-        viz_service = DataVisualizationService()
-        result = viz_service.execute(
-            data['visualization_data'], 
-            {'expected_visualization': data.get('expected_structure', {})}
-        )
-        
-        return jsonify(result), 200
-        
-    except Exception as e:
-        print(f"Erreur dans validate_visualization: {e}")
-        return jsonify({"error": f"Erreur lors de la validation de visualisation: {str(e)}"}), 500
-    
-@coding_platform_bp.route('/admin/reviews/pending', methods=['GET'])
-@token_required
-def get_pending_reviews():
-    """Récupère les soumissions en attente de révision"""
-    user_id = get_current_user_id()
-    
-    # Récupérer les progrès nécessitant une révision manuelle
-    pending_reviews = UserChallengeProgress.query.filter_by(
-        requires_manual_review=True,
-        manual_review_status='pending'
-    ).join(UserChallenge).join(Challenge).join(Exercise).filter(
-        Exercise.created_by == user_id
-    ).all()
-    
-    reviews_data = []
-    for progress in pending_reviews:
-        reviews_data.append({
-            'progress_id': progress.id,
-            'candidate_name': progress.user_challenge.anonymous_identifier,
-            'exercise_title': progress.step.challenge.exercise.title,
-            'step_title': progress.step.title,
-            'submitted_at': progress.last_edited.isoformat(),
-            'content': progress.code or progress.notebook_content,
-            'automatic_score': progress.score,
-            'step_type': progress.step.challenge.exercise.category.value
+            'success': True,
+            'data': exercise
         })
-    
-    return jsonify(reviews_data), 200
-
-@coding_platform_bp.route('/admin/reviews/<progress_id>/score', methods=['POST'])
-@token_required
-def submit_manual_score(progress_id):
-    """Soumet le score manuel pour une soumission"""
-    user_id = get_current_user_id()
-    data = request.get_json()
-    
-    progress = UserChallengeProgress.query.get(progress_id)
-    if not progress:
-        return jsonify({"error": "Progress not found"}), 404
-    
-    # Vérifier les permissions
-    if progress.step.challenge.exercise.created_by != user_id:
-        return jsonify({"error": "Access denied"}), 403
-    
-    try:
-        # Mettre à jour avec le score manuel
-        progress.manual_score = data['manual_score']
-        progress.manual_feedback = data.get('feedback', '')
-        progress.manual_review_status = 'reviewed'
-        progress.reviewer_id = user_id
-        progress.reviewed_at = datetime.now(timezone.utc)
-        
-        # Calculer le score final (automatique + manuel)
-        automatic_weight = 0.4  # 40% pour le score automatique
-        manual_weight = 0.6     # 60% pour le score manuel
-        
-        progress.final_score = (
-            (progress.score * automatic_weight) + 
-            (progress.manual_score * manual_weight)
-        )
-        
-        # Marquer comme terminé si score acceptable
-        if progress.final_score >= 60:  # Seuil de réussite
-            progress.is_completed = True
-        
-        db.session.commit()
-        
-        return jsonify({
-            "message": "Score submitted successfully",
-            "final_score": progress.final_score,
-            "is_completed": progress.is_completed
-        }), 200
         
     except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"Error submitting score: {str(e)}"}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-@coding_platform_bp.route('/admin/reviews/<progress_id>', methods=['GET'])
-@token_required
-def get_review_details(progress_id):
-    """Récupère les détails d'une soumission pour révision"""
-    user_id = get_current_user_id()
-    
-    progress = UserChallengeProgress.query.get(progress_id)
-    if not progress:
-        return jsonify({"error": "Progress not found"}), 404
-    
-    # Vérifier les permissions
-    if progress.step.challenge.exercise.created_by != user_id:
-        return jsonify({"error": "Access denied"}), 403
-    
-    # Récupérer les critères d'évaluation
-    evaluation_criteria = progress.step.evaluation_criteria or {}
-    
-    review_data = {
-        'progress': progress.to_dict(),
-        'step': progress.step.to_dict(include_solution=True),
-        'challenge': progress.step.challenge.to_dict(),
-        'candidate': {
-            'identifier': progress.user_challenge.anonymous_identifier,
-            'session_metadata': progress.user_challenge.session_metadata
-        },
-        'evaluation_criteria': evaluation_criteria,
-        'automatic_results': progress.last_execution_result
-    }
-    
-    return jsonify(review_data), 200
+@coding_platform_bp.route('/admin/exercises/<int:exercise_id>', methods=['PUT'])
+def update_exercise(exercise_id):
+    """Mettre à jour un exercice"""
+    try:
+        data = request.get_json()
+        
+        # Trouver l'exercice
+        exercise_idx = next((i for i, ex in enumerate(MOCK_EXERCISES) if ex['id'] == exercise_id), None)
+        
+        if exercise_idx is None:
+            return jsonify({
+                'success': False,
+                'error': 'Exercice non trouvé'
+            }), 404
+        
+        # Mettre à jour les champs
+        exercise = MOCK_EXERCISES[exercise_idx]
+        for key, value in data.items():
+            if key in exercise:
+                exercise[key] = value
+        
+        return jsonify({
+            'success': True,
+            'data': exercise
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-@coding_platform_bp.route('/admin/document-templates', methods=['GET'])
-@token_required
-def get_document_templates():
-    """Récupère les templates de documents disponibles"""
-    templates = {
-        'letter': {
-            'type': 'correspondence',
-            'format': 'plain_text',
-            'template': "Date: [DATE]\n\nDestinaire: [RECIPIENT]\n\nObjet: [SUBJECT]\n\n[GREETING],\n\n[BODY]\n\n[CLOSING],\n[SIGNATURE]"
-        },
-        'report': {
-            'type': 'document_structure',
-            'format': 'plain_text',
-            'template': "TITRE: [TITLE]\n\n1. INTRODUCTION\n[INTRODUCTION]\n\n2. DÉVELOPPEMENT\n[DEVELOPMENT]\n\n3. CONCLUSION\n[CONCLUSION]"
-        },
-        'memo': {
-            'type': 'correspondence',
-            'format': 'plain_text',
-            'template': "MÉMORANDUM\n\nDE: [FROM]\nÀ: [TO]\nDATE: [DATE]\nOBJET: [SUBJECT]\n\n[CONTENT]"
+@coding_platform_bp.route('/admin/exercises/<int:exercise_id>', methods=['DELETE'])
+def delete_exercise(exercise_id):
+    """Supprimer un exercice"""
+    try:
+        exercise_idx = next((i for i, ex in enumerate(MOCK_EXERCISES) if ex['id'] == exercise_id), None)
+        
+        if exercise_idx is None:
+            return jsonify({
+                'success': False,
+                'error': 'Exercice non trouvé'
+            }), 404
+        
+        deleted_exercise = MOCK_EXERCISES.pop(exercise_idx)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Exercice supprimé avec succès',
+            'data': deleted_exercise
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@coding_platform_bp.route('/exercises/execute', methods=['POST'])
+def execute_code():
+    """Exécuter du code"""
+    try:
+        data = request.get_json()
+        
+        code = data.get('code', '')
+        language = data.get('language', 'python')
+        test_cases = data.get('test_cases', [])
+        
+        # Mock d'exécution
+        return jsonify({
+            'success': True,
+            'data': {
+                'output': f'Code {language} exécuté avec succès',
+                'execution_time': 0.5,
+                'memory_usage': '10MB',
+                'status': 'completed',
+                'test_results': [
+                    {
+                        'test_case': i + 1,
+                        'passed': True,
+                        'expected': 'expected_output',
+                        'actual': 'expected_output'
+                    } for i in range(len(test_cases))
+                ]
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@coding_platform_bp.route('/stats', methods=['GET'])
+def get_stats():
+    """Récupérer les statistiques"""
+    try:
+        stats = {
+            'total_exercises': len(MOCK_EXERCISES),
+            'by_difficulty': {
+                'facile': len([ex for ex in MOCK_EXERCISES if ex['difficulty'] == 'facile']),
+                'moyen': len([ex for ex in MOCK_EXERCISES if ex['difficulty'] == 'moyen']),
+                'difficile': len([ex for ex in MOCK_EXERCISES if ex['difficulty'] == 'difficile'])
+            },
+            'by_language': {
+                'python': len([ex for ex in MOCK_EXERCISES if ex['language'] == 'python']),
+                'javascript': len([ex for ex in MOCK_EXERCISES if ex['language'] == 'javascript']),
+                'java': len([ex for ex in MOCK_EXERCISES if ex['language'] == 'java'])
+            }
         }
-    }
-    return jsonify(templates), 200
-
-@coding_platform_bp.route('/admin/financial-templates', methods=['GET'])
-@token_required
-def get_financial_templates():
-    """Récupère les templates financiers disponibles"""
-    templates = {
-        'balance_sheet': {
-            'type': 'balance_sheet',
-            'format': 'json',
-            'template': {
-                'assets': {'current_assets': 0, 'fixed_assets': 0},
-                'liabilities': {'current_liabilities': 0, 'long_term_liabilities': 0},
-                'equity': {'capital': 0, 'retained_earnings': 0}
-            }
-        },
-        'income_statement': {
-            'type': 'income_statement',
-            'format': 'json',
-            'template': {
-                'revenue': 0,
-                'cost_of_goods_sold': 0,
-                'gross_profit': 0,
-                'operating_expenses': 0,
-                'net_income': 0
-            }
-        },
-        'budget': {
-            'type': 'budget',
-            'format': 'json',
-            'template': {
-                'revenues': {'sales': 0, 'other_income': 0},
-                'expenses': {'salaries': 0, 'rent': 0, 'utilities': 0},
-                'total': 0
-            }
-        }
-    }
-    return jsonify(templates), 200
+        
+        return jsonify({
+            'success': True,
+            'data': stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
